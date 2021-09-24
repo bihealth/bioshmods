@@ -122,7 +122,7 @@ tmodBrowserPlotUI <- function(id) {
         fluidRow(
                  tabsetPanel(
                              tabPanel("Plot", withSpinner(plotOutput(NS(id, "evidencePlot"), height="100%"))),
-                             tabPanel("Genes", withSpinner(dataTableOutput(NS(id, "moduleGenes"))))
+                             tabPanel("Genes", withSpinner(DTOutput(NS(id, "moduleGenes"))))
                  )),
         width=7
       )
@@ -247,7 +247,7 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
       return(ret)
     })
 
-    output$moduleGenes <- renderDataTable({
+    output$moduleGenes <- renderDT({
       req(gs_id$id)
       if(!isTruthy(gs_id$id)) { return(NULL) }
       ds <- gs_id$ds

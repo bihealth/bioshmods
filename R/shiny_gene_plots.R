@@ -111,7 +111,7 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
       mainPanel(
       column(9, style="padding:20px;", tabsetPanel(
       tabPanel("Plot", fluidRow(br(), plot_ui)),
-      tabPanel("Contrast overview", fluidRow(br(), dataTableOutput(NS(id, "contr_sum"))))
+      tabPanel("Contrast overview", fluidRow(br(), DTOutput(NS(id, "contr_sum"))))
       )))))
   } else {
     return(col_control,
@@ -269,7 +269,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     }, sanitize.text.function = function(x) x)
 
     ## summary contrasts table
-    output$contr_sum <- DT::renderDataTable({
+    output$contr_sum <- renderDT({
       if(!isTruthy(ds()) || !isTruthy(g_id()) || is.null(cntr[[ ds() ]])) {
         return(NULL)
       }

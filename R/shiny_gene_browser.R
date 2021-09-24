@@ -104,7 +104,7 @@ geneBrowserTableUI <- function(id, cntr_titles) {
       width=3
     ),
     mainPanel(
-      withSpinner(dataTableOutput(NS(id, "result_tbl"))),
+      withSpinner(DTOutput(NS(id, "result_tbl"))),
       width=9
     )
   )
@@ -243,7 +243,7 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
       sprintf("Contrast is %s", .cntr)
     })
 
-    output$result_tbl <- DT::renderDataTable({
+    output$result_tbl <- renderDT({
 
       .cntr <- gsub(".*::", "", input$contrast)
       .ds   <- gsub("::.*", "", input$contrast)

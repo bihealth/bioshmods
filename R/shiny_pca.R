@@ -54,7 +54,7 @@ pcaUI <- function(id, datasets=NULL) {
         ),
       width=3),
       mainPanel(
-       plotlyOutput(NS(id, "pca_plot"), width="100%", height=600),
+       withSpinner(plotlyOutput(NS(id, "pca_plot"), width="100%", height=600)),
        width=9, useShinyjs()
       )
     )

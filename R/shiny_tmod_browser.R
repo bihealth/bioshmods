@@ -32,7 +32,7 @@
 
 #' @rdname tmodBrowserTableServer
 #' @importFrom shiny tabsetPanel tabPanel
-#' @importFrom shiny dataTableOutput tableOutput renderDataTable renderTable
+#' @importFrom shiny tableOutput renderTable
 #' @importFrom shiny actionButton numericInput
 #' @importFrom shiny shinyApp renderText verbatimTextOutput textOutput renderUI uiOutput
 #' @importFrom shiny tableOutput renderTable renderPlot plotOutput 
@@ -47,6 +47,7 @@
 #' @importFrom shinyjs disable enable useShinyjs 
 #' @importFrom grDevices dev.off pdf
 #' @importFrom DT datatable formatSignif
+#' @importFrom DT DTOutput renderDT 
 #' @importFrom colorDF summary_colorDF
 #' @importFrom thematic thematic_shiny
 #' @importFrom tmod upset
@@ -60,7 +61,7 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
   if(upset_pane == TRUE) {
     main_pane <-  tabsetPanel(id=NS(id, "main_tabset"),
                        tabPanel("Results", 
-                                column(dataTableOutput(NS(id, "tmodResTab")), width=12)),
+                                column(DTOutput(NS(id, "tmodResTab")), width=12)),
                        tabPanel("Upset plot", 
                                 fluidRow(
                                          column(width=3,
@@ -80,7 +81,7 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
                                 fluidRow(plotOutput(NS(id, "upset_plot"), height="100%")))
                      )
   } else {
-    main_pane <- column(dataTableOutput(NS(id, "tmodResTab")), width=12)
+    main_pane <- column(DTOutput(NS(id, "tmodResTab")), width=12)
   }
 
   tips <- list(
@@ -267,7 +268,7 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
       }, width=fig_size$width, height=fig_size$height)
     })
 
-    output$tmodResTab <- renderDataTable({
+    output$tmodResTab <- renderDT({
       if(!isTruthy(res())) { return(NULL) }
       datatable(res()$res, escape=FALSE, selection='none', 
                options=list(pageLength=5, 
@@ -326,7 +327,6 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
 ###' @importFrom shiny nearPoints hoverOpts brushedPoints
 ###' @importFrom shinyjs disable enable useShinyjs 
 ###' @importFrom grDevices dev.off pdf
-###' @importFrom DT datatable formatSignif renderDataTable dataTableOutput
 ###' @importFrom colorDF summary_colorDF
 ###' @importFrom thematic thematic_shiny
 ###' @examples
