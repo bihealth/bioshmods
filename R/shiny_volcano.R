@@ -15,7 +15,7 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
     ds_selector <- tipify(
                           selectInput(NS(id, "dataset"), "Dataset:", 
                                .ds, selected=.ds[1]),
-                          "Choose the dataset to show (use \"all\" to show all data sets")
+                          "Choose the dataset to show (use \"all\" to show all data sets", placement="right")
   }
 
   sidebarLayout(

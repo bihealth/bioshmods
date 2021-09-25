@@ -96,13 +96,13 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
            fluidRow(column(
                            tipify(selectInput(NS(id, "contrast"), label="Contrast", 
                                              choices=cntr_titles, width="100%"),
-                                  "Select for which contrast the results should be shown"),
+                                  "Select for which contrast the results should be shown", placement="right"),
                            width=12)),
            fluidRow(
                     column(tipify(uiOutput(NS(id, "table_sel_db")), 
-                                  "Select gene set database to show"), width=6),
+                                  "Select gene set database to show", placement="right"), width=6),
                     column(tipify(uiOutput(NS(id, "table_sel_sort")), 
-                                  "Select sorting order to show"), width=6)
+                                  "Select sorting order to show", placement="right"), width=6)
                     ),
            fluidRow(
              tipify(checkboxInput(NS(id, "filter"), label="Filter results", value=TRUE),

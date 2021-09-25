@@ -159,9 +159,9 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
         fluidRow(
         column(
            fluidRow(popify(uiOutput(NS(id, "db_field")),
-                    "Gene set database to be shown", ttip$database)),
+                    "Gene set database to be shown", ttip$database, placement="right")),
            fluidRow(popify(uiOutput(NS(id, "sort_field")),
-                           "Sorting order for te enrichment", ttip$sorting_order)),
+                           "Sorting order for te enrichment", ttip$sorting_order, placement="right")),
                     #selectInput(NS(id, "sort"),      label="Sorting",  choices=sorting,     width="100%"),
            fluidRow(popify(numericInput(NS(id, "gene_pval"), label="P-value significance threshold for genes", 
                                  value = 0.05, min=0, step=.01, width="100%"),
@@ -176,14 +176,14 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
                     bsTooltip(NS(id, "font_size"), "Change the font size of plot labels")),
            fluidRow(figsizeInput(NS(id, "figure_size"), width="100%"),
                 bsTooltip(NS(id, "figure_size"), 
-                  "Change the figure size (in pixels), width x height. Press backspace to enter your own sizes.")),
+                  "Change the figure size (in pixels), width x height. Press backspace to enter your own sizes.", placement="right")),
            fluidRow(selectizeInput(NS(id, "label_angle"), label="Contrast label", 
                                 choices=c(Slanted=45, 
                                           Vertical=90,
                                           Horizontal=0),
                                  width="100%"),
                 bsTooltip(NS(id, "label_angle"), 
-                  "How the contrast label should be displayed on the image.")),
+                  "How the contrast label should be displayed on the image.", placement="right")),
             
            fluidRow(numericInput(NS(id, "filter_auc"),  label="Filter by AUC (per row)",  value=0.5,
                                  min=.1, max=1, step=.05, width="100%"),
