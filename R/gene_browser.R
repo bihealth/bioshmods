@@ -1,6 +1,6 @@
 ## prepare contrasts for the gene browser, adding action button, sorting,
 ## removing unnecessary columns etc.
-.gene_browser_prep_res <- function(cntr, but, annot, annot_linkout, primary_id) {
+.gene_browser_prep_res <- function(cntr, but, annot, annot_linkout, primary_id, cols_to_hide) {
 
 	names(cntr_ids) <- cntr_ids <- names(cntr)
 
@@ -11,7 +11,8 @@
                                             but,
                                             annot[[.x]],
                                             annot_linkout[[.x]],
-                                            primary_id))
+                                            primary_id,
+                                            cols_to_hide))
   return(cntr) 
 }
 
@@ -29,12 +30,18 @@
 }
 
 ## this function runs the preparation for a single dataset
-.gene_browser_prep_res_single <- function(ds_id, cntr, but, annot, annot_linkout, primary_id) {
-  cntr   <- cntr %>% 
-    map(~ { .x %>% mutate('>'= sprintf(but, ds_id, .data[[primary_id]])) }) %>%
-    map(~ { .x %>% select(all_of(setdiff(colnames(.x), c("stat", "lfcSE", "symbol", "entrez")))) }) %>%
-    map(~ { .x %>% { merge(annot, ., by=primary_id, all.x=TRUE) } %>% 
-        relocate(all_of(">"), .before=1) %>% arrange(pvalue)})
+.gene_browser_prep_res_single <- function(ds_id, cntr, but, annot, annot_linkout, primary_id,
+                                          cols_to_hide) {
+
+  cntr   <- cntr %>%
+    map(~ { .x %>% select(all_of(setdiff(colnames(.x), cols_to_hide))) }) %>%
+    map(~ { .x %>% { merge(annot, ., by=primary_id, all.x=TRUE) }} )
+
+  if(!is.null(but) && length(but) == 1L) {
+    cntr   <- cntr %>% 
+      map(~ { .x %>% mutate('>'= sprintf(but, ds_id, .data[[primary_id]])) }) %>% 
+      map(~ { .x %>% relocate(all_of(">"), .before=1) %>% arrange(pvalue)})
+  }
 
   if(!is.null(annot_linkout)) {
     cntr <- map(cntr, ~ .apply_annot_linkout(.x, annot_linkout))
@@ -50,7 +57,6 @@
 
 ## prepares IDs/titles of the contrasts for use with the UI
 .prep_cntr_titles <- function(cntr_titles) {
-
   if(is.list(cntr_titles)) {
     cntr_titles <- imap(cntr_titles, ~ {
                         ret <- paste0(.y, '::', .x)
@@ -62,6 +68,10 @@
       cntr_titles <- cntr_titles[[1]]
     }
   } else {
+    if(is.null(names(cntr_titles))) {
+      names(cntr_titles) <- cntr_titles
+    }
+
     tmp <- cntr_titles
     cntr_titles <- paste0("default::", tmp)
     names(cntr_titles) <- names(tmp)
@@ -130,10 +140,18 @@ geneBrowserTableUI <- function(id, cntr_titles) {
   if(!is.null(annot)) {
     if(multilevel) {
       stopifnot(all(map_lgl(annot, is.data.frame)))
-      stopifnot(all(map_lgl(annot, ~ primary_id %in% colnames(.x))))
+      if(primary_id == 0) {
+        stopifnot(all(map_lgl(annot, ~ !is.null(rownames(.x)))))
+      } else {
+        stopifnot(all(map_lgl(annot, ~ primary_id %in% colnames(.x))))
+      }
     } else {
       stopifnot(is.data.frame(annot))
-      stopifnot(primary_id %in% colnames(annot))
+      if(primary_id == 0) {
+        stopifnot(!is.null(rownames(annot)))
+      } else {
+        stopifnot(primary_id %in% colnames(annot))
+      }
     }
   }
 
@@ -188,16 +206,35 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 #' @param primary_id name of the column which holds the primary identifiers
 #' @param cntr_titles named character vector for contrast choices
 #' @param annot_linkout a list; see Details. 
-#' @param gene_id must be a `reactiveValues` object. If not NULL, then
-#' clicking on a gene identifier will modify this object (possibly
-#' triggering an event in another module).
-#' @return reactive value containing the gene ID
+#' @param gene_id must be either NULL or a `reactiveValues` object. If not NULL, then
+#' a button is displayed; clicking on it will modify the `gene_id` reactive
+#' value (possibly triggering an event in another module).
+#' @param cols_to_hide columns in the contrasts data frames to hide in the table. 
+#'        Default is for DESeq2 derived contrasts.
+#' @return `geneBrowserTableServer` returns NULL. `geneBrowserTableUI`
+#'         returns the interface.
 #' @importFrom rlang .data
 #' @importFrom stats cor.test
 #' @importFrom bslib bs_theme
+#' @examples 
+#' if(interactive()) {
+#'   data(C19)
+#'   ui <- fluidPage(
+#'            geneBrowserTableUI("gb", names(C19$contrasts))
+#'         )
+#'
+#'   server <- function(input, output) {
+#'     geneBrowserTableServer("gb", cntr=C19$contrasts,
+#'                                  annot=C19$annotation)
+#'   }
+#'
+#'   shinyApp(ui, server)
+#' }
 #' @export
 geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
-                                   primary_id="PrimaryID", gene_id=NULL) {
+                                   primary_id="PrimaryID", gene_id=NULL,
+                                   cols_to_hide=c("stat", "lfcSE", "symbol", "entrez")
+                                   ) {
 
   multilevel <- .check_multilevel(cntr)
   .check_params(multilevel, cntr=cntr, annot=annot, 
@@ -209,14 +246,33 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
     annot_linkout=list(default=annot_linkout)
   }
 
+  if(primary_id == 0) {
+    primary_id <- "__primary_id"
+    annot <- map(annot, ~ {
+                   stopifnot(!is.null(rownames(.x)))
+                   .x[[primary_id]] <- rownames(.x) 
+                   .x })
+    cntr  <- map(cntr, ~ 
+                 map(.x, ~ {
+                       stopifnot(!is.null(rownames(.x)))
+                       .x[[primary_id]] <- rownames(.x)
+                       .x }))
+  }
+
+
   moduleServer(id, function(input, output, session) {
 
-    but <- actionButton("go~%s~%s", label=" \U25B6 ", 
+    if(is.null(gene_id)) {
+      but <- NULL
+    } else {
+      but <- actionButton("go~%s~%s", label=" \U25B6 ", 
                          onclick=sprintf('Shiny.onInputChange(\"%s-select_button\",  this.id)', id),  
                          class = "btn-primary btn-sm")
+    }
 
     cntr <- .gene_browser_prep_res(cntr, as.character(but), annot, 
-                                   annot_linkout, primary_id=primary_id)
+                                   annot_linkout, primary_id=primary_id,
+                                   cols_to_hide=cols_to_hide)
 
     observeEvent(input$select_button, {
       if(!is.null(gene_id)) {
@@ -264,76 +320,68 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
         formatSignif(columns=intersect(colnames(res), 
                                        c("baseMean", "log2FoldChange", "pvalue", "padj")), digits=2)
     })
+    return(NULL)
   })
 }
 
 
-##' Launch a browser of DE analysis results
-##'
-##' Launch a shiny-based browser of DE analysis results
-##'
-##' Launches a shiny app, web based, which allows to show gene expression
-##' profiles in a pipeline. 
-##'
-##' To speed up launching, you can pre-load the contrasts with the
-##' `get_contrasts` function.
-##' @param pip pipeline object returned by `load_de_pipeline`
-##' @param cntr (optional) pre-loaded contrasts (returned by `get_contrasts`)
-##' @param annot (optional) pre-loaded annotation table (returned by `get_annot`)
-##' @return does not return a value
-##' @importFrom rlang .data
-##' @importFrom stats cor.test
-##' @importFrom bslib bs_theme
-##' @examples
-##' \dontrun{
-##' pip <- load_de_pipeline(config_file="DE_config.yaml")
-##' gene_browser(pip, tmod_dbs)
-##' }
-##' @export
-# gene_browser <- function(pip, cntr=NULL, annot=NULL) {
-#
-#   message("preparing...")
-#   if(is.null(annot)) {
-#     message(" * Loading Annotation (consider using the annot option to speed this up)")
-#     annot  <- get_annot(pip)
-#   }
-#
-#   # prepare the contrast tables
-#   if(is.null(cntr)) {
-#     message(" * Loading contrasts... (consider using the cntr option to speed this up)")
-#     cntr <- get_contrasts(pip)
-#   }
-#
-#   config <- get_config(pip)
-#   covar  <- get_covariates(pip)
-#
-#   rld    <- get_object(pip, step="DESeq2", extension="rld.blind.rds")
-#   rld    <- rld@assays@data@listData[[1]]
-#   
-#   cntr_titles <- map_chr(config$contrasts$contrast_list, `[[`, "ID")
-#   names(cntr_titles) <- map_chr(config$contrasts$contrast_list, `[[`, "title")
-#
-#   thematic_shiny(font="auto")
-#
-#   ## prepare the UI
-#   ui <- fluidPage(
-#     useShinyjs(),
-#     theme = bs_theme(bootswatch = "united"),
-#     fluidRow(titlePanel(h1("Gene browser")), class="bg-primary"),
-#     fluidRow(HTML("<hr>")),
-#     geneBrowserTableUI("geneTab", cntr_titles),
-#     geneBrowserPlotUI("genePlot", contrasts=TRUE)
-#   )
-#
-#   ## prepare the server
-#   server <- function(input, output, session) {
-#     gene_id <- reactiveValues()
-#     geneBrowserTableServer("geneTab", cntr, annot, gene_id=gene_id)
-#     geneBrowserPlotServer("genePlot", gene_id, covar, rld, annot)
-#
-#     message("launching!")
-#   }
-#
-#   shinyApp(ui, server)
-# }
+#' Launch a browser of DE analysis results
+#'
+#' Launch a simple shiny-based browser of DE analysis results
+#'
+#' Creates a shiny app, which allows to show gene expression
+#' profiles.
+#'
+#' @param x object holding the DE analysis results. List containing the
+#'          elements `contrasts`, `covariates`, `expression` and `annotation`.
+#' @param primary_id The name of the column in `contrasts` and `annotation`
+#'                   which holds the primary, unique identifier of genes.
+#' @return does not return a value
+#' @importFrom rlang .data
+#' @importFrom stats cor.test
+#' @importFrom bslib bs_theme
+#' @inheritParams geneBrowserTableServer
+#' @examples
+#' if(interactive()) {
+#'   data(C19)
+#'   annot_linkout <- list(
+#'     SYMBOL="https://www.genecards.org/cgi-bin/carddisp.pl?gene=%s",
+#'     ENTREZ="https://www.ncbi.nlm.nih.gov/gene/?term=%s"
+#'   )
+#'   gene_browser(C19, annot_linkout=annot_linkout)
+#' }
+#' @export
+gene_browser <- function(x, annot_linkout=NULL, 
+                            cols_to_hide=c("stat", "lfcSE", "symbol", "entrez"),
+                            primary_id="PrimaryID") {
+
+  thematic_shiny(font="auto")
+
+  ## prepare the UI
+  ui <- fluidPage(
+    useShinyjs(),
+    #theme = bs_theme(bootswatch = "united"),
+    fluidRow(titlePanel(h1("Gene browser")), class="bg-primary"),
+    fluidRow(HTML("<hr>")),
+    geneBrowserTableUI("geneTab", names(x$contrasts)),
+    geneBrowserPlotUI("genePlot", contrasts=TRUE)
+  )
+
+  ## prepare the server
+  server <- function(input, output, session) {
+    gene_id <- reactiveValues()
+    geneBrowserTableServer("geneTab", 
+                           cntr=x$contrasts, 
+                           annot=x$annotation, 
+                           gene_id=gene_id,
+                           annot_linkout=annot_linkout)
+    geneBrowserPlotServer("genePlot", 
+                          gene_id, 
+                          covar=x$covariates, 
+                          exprs=x$expression, 
+                          annot=x$annotation)
+  }
+
+  shinyApp(ui, server)
+}
 

@@ -114,8 +114,9 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
       tabPanel("Contrast overview", fluidRow(br(), DTOutput(NS(id, "contr_sum"))))
       )))))
   } else {
-    return(col_control,
-      mainPanel(plot_ui))
+    return(sidebarLayout(
+                         col_control,
+      mainPanel(plot_ui)))
   }
 
 }
@@ -141,8 +142,10 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' annot_linkout=list(ENSEMBL="https://www.ensembl.org/id/%s")
 #' ```
 
-#' @param gene_id primary identifier of the gene to show. This must be a
-#'        reactive value
+#' @param gene_id primary identifier of the gene to show. This must be
+#'        either a list containing at least the element `id` and possibly
+#'        the element `ds` (if multiple datasets are used). Alternatively,
+#'        it is a `reactiveValues` object with the same elements.
 #' @param primary_id name of the column which holds the primary identifiers
 #' @param exprs expression matrix; row names must correspond to the primary identifiers
 #' @param contrasts (logical) whether or not create an additional panel
@@ -151,7 +154,7 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @param annot (optional) annotation data frame containing column 'PrimaryID'
 #'        corresponding to the rownames of the contrast data frames
 #' @param annot_linkout a list; see Details. 
-#' @param id identifier (same as the one passed to geneBrowserTableUI)
+#' @param id module identifier (same as the one passed to geneBrowserTableUI)
 #' @param covar data frame with all covariates
 #' @param cntr (optional) list of contrasts
 #' @param symbol_col name of the column in `annot` which contains the gene
@@ -160,22 +163,51 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #'        title / description; use NULL if no such column
 #' @return does not return anything useful
 #' @examples
-#' if(interactive()) {
-#'    mtx <- matrix(rnorm(40, mean=rep(c(0, 1), each=20)), nrow=1)
-#'    rownames(mtx) <- "MUZG"
-#'    covar <- data.frame(
-#'                        em=rep(LETTERS[1:2], each=20),
-#'                        pstrem=rep(letters[1:20], 2),
-#'                        bzdrem=rnorm(40))
+#' mtx <- matrix(rnorm(40, mean=rep(c(0, 1), each=20)), nrow=1)
+#' rownames(mtx) <- "MUZG"
+#' covar <- data.frame(
+#'                     em=rep(LETTERS[1:2], each=20),
+#'                     pstrem=rep(letters[1:20], 2),
+#'                     bzdrem=rnorm(40))
 #'   
-#'    ui  <- fluidPage(geneBrowserPlotUI("gplot", covar))
+#' if(interactive()) {
+#'    ui  <- fluidPage(geneBrowserPlotUI("gplot", FALSE))
 #'    serv <- function(input, output, session) {
-#'      gid <- reactiveVal()
-#'      gid("MUZG")
-#'      geneBrowserPlotServer("gplot", gid, covar, mtx)
+#'      geneBrowserPlotServer("gplot", list(id="MUZG"), covar, mtx)
 #'    }
 #'    shinyApp(ui, serv)
 #' }
+#'
+#' ## Example with the C19 dataset
+#' data(C19)
+#' if(interactive()) {
+#'   ui <- fluidPage(
+#'          fluidRow(selectizeInput("id", label="Search for a gene",
+#'            choices=NULL),
+#'          fluidRow(geneBrowserPlotUI("gplot", TRUE))
+#'          ))
+#'
+#'   server <- function(input, output, session) {
+#'     gene_id <- reactiveValues()
+#'     updateSelectizeInput(session, "id", choices=C19$annotation$SYMBOL)
+#'
+#'     ## translate symbol to primary ID
+#'     observeEvent(input$id, {
+#'       nn <- match(input$id, C19$annotation$SYMBOL)
+#'       gene_id$id <- C19$annotation$PrimaryID[ nn ]
+#'     })
+#'
+#'     geneBrowserPlotServer("gplot", gene_id=gene_id, 
+#'                           covar=C19$covariates, 
+#'                           exprs=C19$expression,
+#'                           annot=C19$annotation, 
+#'                           cntr=C19$contrasts
+#'      )
+#'   }
+#'   shinyApp(ui, server)
+#' }
+#' @seealso [geneBrowserTableServer()], and [gene_browser()] for example
+#' code.
 #' @export
 geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NULL, 
                                   primary_id="PrimaryID", symbol_col="SYMBOL", description_col="GENENAME", 
@@ -197,7 +229,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     annot <- list(default=annot)
     cntr  <- list(default=cntr)
   } else {
-    message("geneBrowserPlotServer in multilevel mode")
+    message("geneBrowserPlotServer in multi dataset mode")
   }
 
   ## vector holding the names of all datasets
@@ -206,6 +238,15 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 
   moduleServer(id, function(input, output, session) {
     disable("save")
+
+    if(!is.reactivevalues(gene_id)) {
+      tmp <- gene_id
+      gene_id <- reactiveValues()
+      gene_id$id <- tmp$id
+      if(is.null(gene_id$ds <- tmp$ds)) {
+        gene_id$ds <- "default"
+      }
+    }
 
     ds   <- reactiveVal()
     g_id <- reactiveVal()
@@ -311,6 +352,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     ## The actual plot
     output$countsplot <- renderPlot({
       if(!isTruthy(ds()) || !isTruthy(g_id())) { return(NULL) }
+      if(!isTruthy(input$covarName)) { return(NULL) }
       if(is.na(g_id())) { return(NULL) }
       enable("save")
       
