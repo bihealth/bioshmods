@@ -96,18 +96,28 @@ if(interactive()) {
            choices=NULL),
          fluidRow(geneBrowserPlotUI("gplot", TRUE))
          ))
+
   server <- function(input, output, session) {
     gene_id <- reactiveValues()
     updateSelectizeInput(session, "id", choices=C19$annotation$SYMBOL)
+
+    ## translate symbol to primary ID
     observeEvent(input$id, {
       nn <- match(input$id, C19$annotation$SYMBOL)
       gene_id$id <- C19$annotation$PrimaryID[ nn ]
     })
 
-    geneBrowserPlotServer("gplot", gene_id, C19$covariates, C19$expression,
-         annot=C19$annotation, cntr=C19$contrasts
+    geneBrowserPlotServer("gplot", gene_id=gene_id, 
+                          covar=C19$covariates, 
+                          exprs=C19$expression,
+                          annot=C19$annotation, 
+                          cntr=C19$contrasts
      )
   }
   shinyApp(ui, server)
 }
+}
+\seealso{
+\code{\link[=geneBrowserTableServer]{geneBrowserTableServer()}}, and \code{\link[=gene_browser]{gene_browser()}} for example
+code.
 }

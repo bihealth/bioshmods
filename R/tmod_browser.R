@@ -1,5 +1,8 @@
 ## call .tmod_browser_prepare_res_single for every data set
 .tmod_browser_prepare_res <- function(but, tmod_res) {
+
+  if(!is.null(but)) { but <- as.character(but) }
+  
   tmod_res <- imap(tmod_res, ~ {
     .tmod_browser_prepare_res_single(.y, but, .x)
   })
@@ -10,6 +13,7 @@
 ## Construct the results table to display. Specifically, add action button
 ## for launching the plot.
 .tmod_browser_prepare_res_single <- function(ds_id, but, tmod_res) {
+
   # prepare the tmod res
   tmod_res <- tmod_res %>% imap(~ {
     .cntr <- .y
@@ -17,10 +21,16 @@
            .dbname <- .y
            imap(.x, ~ {
                   .sort <- .y
-                  .x %>% mutate(">"=sprintf(but, ds_id, .data[["ID"]], .cntr, .dbname, .sort)) %>%
+                  .x <- .x %>%
                     select(-cES, -cerno) %>%
-                    arrange(P.Value) %>%
-                    relocate(all_of(">"), .before=1)
+                    arrange(P.Value) 
+                  if(!is.null(but)) {
+                    .x <- .x %>% 
+                      mutate(">"=sprintf(but, ds_id, .data[["ID"]], .cntr, .dbname, .sort)) %>%
+                      relocate(all_of(">"), .before=1)
+                  }
+
+                  return(.x)
             })
          })
   })
@@ -142,19 +152,105 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
 #'
 #' Shiny Module – tmod results browser table selection
 #'
-#' @param gs_id a list of reactive values (returned by `reactiveValues()`), including 
+#' Regarding required data, this is probably the most complex module. That
+#' is due to the complexity of gene set enrichment analysis – we can test
+#' gene set enrichment using different parameters (e.g. gene list sorting order), for
+#' different gene set collections (such as KEGG or Hallmark from MSigDB)
+#' and, of course, for different contrast.
+#'
+#' This module is adapted to gene set enrichment testing using the tmod
+#' package (described in Zyla et al. 2019).
+#'
+#' @section Use of tmod database objects:
+#' For gene set enrichments, collections (databases) of gene sets must be
+#' defined. Such gene set collections include KEGG and REACTOME pathways,
+#' Gene Ontologies, transcriptional modules as well as meta-collections
+#' such as MSigDB.
+#'
+#' There are many ways of storing such gene set collections. One way that I
+#' find convenient (since I programmed it myself) is included in the
+#' gene set enrichment testing package `tmod`. Tmod database objects are
+#' lists with at least two elements: `MODULES` and `MODULES2GENES` (see
+#' details in the tmod package). They can be conveniently created using
+#' the tmod package.
+#' 
+#' In 'bioshmods', these objects are included in a structure which provides
+#' gene set information to the 'bioshmods' functions. Each such structure
+#' is a named list with one element per gene set collection (i.e., if you
+#' have gene set enrichment results for KEGG and REACTOME, you will have
+#' two such elements). Each of these element is a tmod database object
+#' (returned, for example, by the [tmod::makeTmod()] function from the 'tmod'
+#' package). See the example dataset [C19_gs].
+#' @section Gene set enrichment analysis results:
+#' This object needs to be a hierarchical lists of lists of lists. Top list
+#' is a named list, with each element corresponding to one contrast. On the
+#' next level, there is a named element for each gene set collection (see
+#' 'Use of tmod objects'). Finally, there may be different sorting options
+#' (if in doubt, use `pval` as the only element). The lowest level are data
+#' frames containing column 'ID', 'Title', 'AUC', 'P.Value' and 'adj.P.Val'
+#' as returned by e.g. [tmod::tmodCERNOtest()].
+#' @param gs_id a list of reactive values (returned by [shiny::reactiveValues()]), including 
 #' dataset (`ds`), gene set ID (`id`), contrast id (`cntr`), database ID
 #' (`db`) and sorting mode (`sort`). If `mod_id` is not `NULL`, these
 #' reactive values will be populated, possibly triggering an action in
 #' another shiny module.
-#' @param tmod_res results of tmod analysis, returned by `get_tmod_res`
+#' @param tmod_res results of tmod analysis. It is a list of lists of lists
+#' of data frames. See Details.
 #' @param cntr_titles possibly named character vector with contrast names
 #' @param id identifier for the namespace of the module
-#' @param tmod_dbs list of lists of tmod database objects (or list of lists
-#' of list of tmod database object in multilevel mode). If NULL, upset
-#' plots cannot be generated.
+#' @param tmod_dbs (optional) list of tmod database objects (or lists
+#' of list of tmod database object in multi data set mode). If NULL, upset
+#' plots cannot be generated. See Details.
 #' @param multilevel if TRUE, the results are grouped in data sets
 #' @param upset_pane if TRUE, UI for the upset plot will be created
+#' @examples
+
+#' ## Building an example from scratch
+#' data(C19)
+#' data(C19_gs)
+#'
+#' db <- C19_gs$tmod_dbs$tmod
+#'
+#' ds_res <- C19$contrasts$COVID19_ID0
+#'
+#' ds_res <- ds_res[ order(ds_res$pvalue), ]
+#'
+#' library(tmod)
+#' tmod_res <- tmodCERNOtest(ds_res$symbol, mset=db)
+#'
+#' # sorting by p-value
+#' tmod_res <- list(pval=tmod_res)
+#'
+#' # for datbase tmod
+#' tmod_res <- list(tmod=tmod_res)
+#'
+#' # for contrast Covid
+#' tmod_res <- list(Covid=tmod_res)
+#'
+#' if(interactive()) {
+#'
+#'   ui <- fluidPage(tmodBrowserTableUI("tt", names(tmod_res)))
+#'   server <- function(input, output) {
+#'     tmodBrowserTableServer("tt", tmod_res)
+#'   }
+#'   shinyApp(ui, server)
+#'
+#' }
+#'
+#' ## the data sets in `bioshmods` are preformatted, so we can use them
+#' ## directly.
+#'
+#' if(interactive()) {
+#'
+#'   ui <- fluidPage(tmodBrowserTableUI("tt", names(C19_gs$tmod_res), upset=TRUE))
+#'   server <- function(input, output) {
+#'     tmodBrowserTableServer("tt", C19_gs$tmod_res, gs_id = NULL,
+#'                                  tmod_dbs = C19_gs$tmod_dbs)
+#'   }
+#'   shinyApp(ui, server)
+#'
+#' }
+#'
 #' @export
 tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, tmod_dbs=NULL) {
 
@@ -163,11 +259,15 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
     tmod_dbs <- list(default=tmod_dbs)
   }
 
-  but <- actionButton("go_%s-!-%s-!-%s-!-%s-!-%s", label=" \U25B6 ", 
+  if(is.null(gs_id)) {
+    but <- NULL
+  } else {
+    but <- actionButton("go_%s-!-%s-!-%s-!-%s-!-%s", label=" \U25B6 ", 
                       onclick=sprintf('Shiny.onInputChange(\"%s-select_button\",  this.id)', id),  
                       class = "btn-primary btn-sm")
+  }
 
-  tmod_res <- .tmod_browser_prepare_res(as.character(but), tmod_res)
+  tmod_res <- .tmod_browser_prepare_res(but, tmod_res)
 
   moduleServer(id, function(input, output, session) {
     message("Launching tmod browser server")
@@ -241,7 +341,7 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
         if(is.null(.res <- res())) { return(NULL) }
         if(is.null(tmod_dbs[[.res$ds]])) { return(NULL) }
         modules <- .res$res$ID
-        mset    <- tmod_dbs[[.res$ds]][[.res$db]]$dbobj
+        mset    <- tmod_dbs[[.res$ds]][[.res$db]]
 
         if(length(mset) < 2) {
           stop("Too few gene sets in the result list to show an upset plot")

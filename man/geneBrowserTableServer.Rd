@@ -13,7 +13,8 @@ geneBrowserTableServer(
   annot,
   annot_linkout = NULL,
   primary_id = "PrimaryID",
-  gene_id = NULL
+  gene_id = NULL,
+  cols_to_hide = c("stat", "lfcSE", "symbol", "entrez")
 )
 }
 \arguments{
@@ -32,12 +33,16 @@ corresponding to the rownames of the contrast data frames}
 
 \item{primary_id}{name of the column which holds the primary identifiers}
 
-\item{gene_id}{must be a \code{reactiveValues} object. If not NULL, then
-clicking on a gene identifier will modify this object (possibly
-triggering an event in another module).}
+\item{gene_id}{must be either NULL or a \code{reactiveValues} object. If not NULL, then
+a button is displayed; clicking on it will modify the \code{gene_id} reactive
+value (possibly triggering an event in another module).}
+
+\item{cols_to_hide}{columns in the contrasts data frames to hide in the table.
+Default is for DESeq2 derived contrasts.}
 }
 \value{
-reactive value containing the gene ID
+\code{geneBrowserTableServer} returns NULL. \code{geneBrowserTableUI}
+returns the interface.
 }
 \description{
 Shiny Module – gene browser table selection

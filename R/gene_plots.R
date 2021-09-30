@@ -141,7 +141,6 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' ```
 #' annot_linkout=list(ENSEMBL="https://www.ensembl.org/id/%s")
 #' ```
-
 #' @param gene_id primary identifier of the gene to show. This must be
 #'        either a list containing at least the element `id` and possibly
 #'        the element `ds` (if multiple datasets are used). Alternatively,
@@ -162,6 +161,7 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @param description_col name of the column in `annot` which contains the gene
 #'        title / description; use NULL if no such column
 #' @return does not return anything useful
+#' @importFrom shiny is.reactivevalues
 #' @examples
 #' mtx <- matrix(rnorm(40, mean=rep(c(0, 1), each=20)), nrow=1)
 #' rownames(mtx) <- "MUZG"

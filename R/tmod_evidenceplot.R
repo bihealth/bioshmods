@@ -1,7 +1,7 @@
 
 .tmod_rev_db_map_ids <- function(ids, dbname, tmod_dbs_mapping_obj) {
 
-  mp_id <- tmod_dbs_mapping_obj$dbs[dbname]
+  mp_id   <- tmod_dbs_mapping_obj$dbs[dbname]
   mapping <- tmod_dbs_mapping_obj$maps[[mp_id]]
 
   ret <- names(mapping)[ match(ids, mapping) ]
@@ -20,8 +20,8 @@
 .tmod_browser_gene_table <- function(but, ds, id, db_name, cntr_name, 
                                      sort_name, tmod_dbs, cntr, tmod_map, primary_id) {
 
-  db <- tmod_dbs[[db_name]][["dbobj"]]
-  genes <- db[["MODULES2GENES"]][[id]]
+  db        <- tmod_dbs[[db_name]]
+  genes     <- db[["MODULES2GENES"]][[id]]
   genes_pid <- .tmod_rev_db_map_ids(ids=genes, dbname=db_name, tmod_dbs_mapping_obj=tmod_map)
 
   ret <- cntr[[cntr_name]] %>% filter(.data[[primary_id]] %in% genes_pid)
@@ -39,7 +39,7 @@
 .plot_evidence <- function(mod_id, cntr_id, db_id, sort_id, cntr, tmod_dbs,
                            tmod_gl=NULL, tmod_map=NULL, annot=NULL, primary_id) {
 
-  mset <- tmod_dbs[[db_id]][["dbobj"]]
+  mset <- tmod_dbs[[db_id]]
   cntr <- cntr[[ cntr_id ]]
 
   if(!all(c("pvalue", "log2FoldChange", "padj") %in% colnames(cntr))) {
@@ -96,7 +96,7 @@
 ## given a module, contrast, sorting: prepare a module info tab contents,
 ## including which genes are significant in the given contrast
 .tmod_browser_mod_info <- function(id, ds, db_name, cntr_name, sort_name, tmod_dbs, cntr, tmod_map) {
-  db <- tmod_dbs[[db_name]][["dbobj"]]
+  db <- tmod_dbs[[db_name]]
   ret <- sprintf("Module ID: %s\nDescription: %s\nData set: %s\nContrast: %s\nDatabase: %s\nSorting: %s",
           id,
           db[["MODULES"]][id, ][["Title"]],
@@ -142,19 +142,21 @@ tmodBrowserPlotUI <- function(id) {
 #'
 #'  * ordered gene list: this is the same gene list that is used as an
 #'    input to tmod
-#'  * a list of tmod gene set databases for which the enrichments have been run
-#'  * contrast data frame – for displaying gene names in color
+#'  * a list of gene set collections (tmod gene set databases) for which the enrichments have been run
+#'  * contrast data frame – to know which genes go up or down, for displaying gene names in color
 #'  * if no gene list is given, then using the contrast data frame it is
 #'    possible to create a list ordered by p-values. However, since the
 #'    gene set database might use a different type of identifiers than the
 #'    PrimaryID column of the contrasts data frame, it is necessary to
 #'    provide a mapping between the PrimaryIDs and the database gene IDs as well.
 #'
-#' 
+#' The sections below discuss these elements.
 #'
-#' **tmod gene lists**. To display an evidence plot, we need to have an
+#'
+#' @section tmod gene lists:
+#' To display an evidence plot, we need to have an
 #' ordered list of genes. This has to be provided from outside, as many
-#' different sortings are possible. The parameter tmod_gl is a multi level 
+#' different sortings are possible. The parameter tmod_gl is a hierarchical
 #' list:
 #'  * First level: contrasts
 #'  * Second level: gene set databases
@@ -169,6 +171,8 @@ tmodBrowserPlotUI <- function(id) {
 #' from the contrast object provided. However, in this case it is necessary
 #' to provide a mapping between the PrimaryIDs of the contrasts and the
 #' gene identifiers used by the gene set database.
+#'
+#' @inheritSection tmodBrowserTableServer Use of tmod database objects
 #'
 #' @param id ID of the shiny module
 #' @param tmod_dbs tmod gene set databases returned by `get_tmod_dbs()`
@@ -190,6 +194,30 @@ tmodBrowserPlotUI <- function(id) {
 #' @importFrom shinyBS popify
 #' @importFrom tmod evidencePlot getModuleMembers tmodDecideTests tmodSummary tmodPanelPlot
 #' @importFrom glue glue
+#' @examples
+#' ## extending the example from tmodBrowserTableServer
+#' if(interactive()) {
+#'
+#'   ui <- fluidPage(
+#'    fluidRow(tmodBrowserTableUI("tt", names(C19_gs$tmod_res), upset=TRUE)),
+#'    fluidRow(tmodBrowserPlotUI("tp"))
+#'    )
+#'
+#'   server <- function(input, output) {
+#'     gs_id <- reactiveValues()
+#'     tmodBrowserTableServer("tt", C19_gs$tmod_res, gs_id = gs_id,
+#'                                  tmod_dbs = C19_gs$tmod_dbs)
+#'     tmodBrowserPlotServer("tp",
+#'              gs_id=gs_id,
+#'              tmod_dbs=C19_gs$tmod_dbs,
+#'              tmod_map=C19_gs$tmod_map,
+#'              cntr=C19$contrasts,
+#'              annot=C19$annotation)
+#'   }
+#'   shinyApp(ui, server)
+#'
+#' }
+#'
 #' @export
 tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod_gl=NULL, annot=NULL, 
                                   primary_id="PrimaryID", gene_id=NULL) {
