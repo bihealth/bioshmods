@@ -16,7 +16,8 @@ plot_disco(
   disco = NULL,
   by = 0,
   primary_id = "PrimaryID",
-  label_col = "SYMBOL"
+  label_col = "SYMBOL",
+  label_sel = NULL
 )
 }
 \arguments{
@@ -48,6 +49,8 @@ column which results from the merge}
 
 \item{label_col}{name of the column in \code{annot} which should be used for
 labels}
+
+\item{label_sel}{identifiers of labels to be shown on the plot}
 }
 \value{
 a ggplot object (plot)

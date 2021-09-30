@@ -1,4 +1,5 @@
 #' @rdname discoServer
+#' @importFrom shiny textInput
 #' @export
 discoUI <- function(id, cntr_titles) {
 
@@ -16,11 +17,13 @@ discoUI <- function(id, cntr_titles) {
                              choices = cntr_titles, width="100%"),
         selectInput(NS(id, "contrast2"), label = "Contrast 2", 
                              choices = cntr_titles, selected=cntr_flat[2], width="100%")),
+        fluidRow(uiOutput(NS(id, "matchby"))),
         fluidRow(checkboxInput(NS(id, "autoscale"), "Automatic scale", value=TRUE)),
         fluidRow(sliderInput(NS(id, "min"), "Min", min=-150, max=0, value=-100, width="80%")),
         fluidRow(sliderInput(NS(id, "max"), "Max", min=0, max=150, value=100, width="80%")),
         fluidRow(downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success")),
         HTML("<br/>Hover to identify genes, click to select, or click & drag to select an area<br/><br/>"),
+        fluidRow(textInput(NS(id, "glabs"), "Type a comma separated list of gene IDs to label on the plot")),
         fluidRow(verbatimTextOutput(NS(id, "msg"))),
         fluidRow(tableOutput(NS(id, "point_id")))
     ),
@@ -71,21 +74,7 @@ discoUI <- function(id, cntr_titles) {
 #' clicking on a gene identifier will modify this object (possibly
 #' triggering an event in another module).
 #' @return Returns a reactive expression returning the ID of the activated gene
-#' @examples
-#' if(interactive()) {
-#'    cntr1 <- data.frame(log2FoldChange=rnorm(5000),
-#'                        pvalue=runif(5000))
-#'    rownames(cntr1) <- paste0("ID", 1:5000)
-#'    cntr2 <- data.frame(log2FoldChange=cntr1$log2FoldChange + 
-#'                                       rnorm(5000),
-#'                        pvalue=runif(5000) * cntr1$pvalue)
-#'    rownames(cntr2) <- paste0("ID", 1:5000)
-#'    cntr <- list("Contrast 1"=cntr1, "Contrast 2"=cntr2)
-#'    shinyApp(ui=fluidPage(discoUI("disco", names(cntr))),
-#'             server=function(input, output, session) {
-#'                discoServer("disco", cntr)
-#'             })
-#' }
+#' @example inst/examples/disco.R
 #' @export
 discoServer <- function(id, cntr, annot=NULL,
     selcols=c("PrimaryID", "ENTREZ", "SYMBOL"),
@@ -97,6 +86,14 @@ discoServer <- function(id, cntr, annot=NULL,
     cntr  <- list(default=cntr)
     annot <- list(default=annot)
   }
+
+  cntr <- imap(cntr, ~ {
+                .ds <- .y
+                if(!is.null(annot[[.ds]])) {
+                  .x <- merge(.x, annot[[.ds]], by=primary_id)
+                } 
+                .x 
+    })
 
 
   moduleServer(id, function(input, output, session) {
@@ -111,18 +108,44 @@ discoServer <- function(id, cntr, annot=NULL,
     dataset1  <- reactiveVal()
     contrast2 <- reactiveVal()
     dataset2  <- reactiveVal()
+    gene_labs <- reactiveVal()
 
     observeEvent(input$contrast1, {
       contrast1(gsub(".*::", "", input$contrast1))
       dataset1(gsub("::.*", "", input$contrast1))
     })
+
     observeEvent(input$contrast2, {
       contrast2(gsub(".*::", "", input$contrast2))
       dataset2(gsub("::.*", "", input$contrast2))
     })
 
+    output$matchby <- renderUI({
+      tagList(
+              selectInput(NS(id, "match1"),
+                          "Match column 1:",
+                          colnames(cntr[[dataset1()]][[contrast1()]]),
+                          selected=primary_id),
+              selectInput(NS(id, "match2"),
+                          "Match column 2:",
+                          colnames(cntr[[dataset2()]][[contrast2()]]),
+                          selected=primary_id)
 
-    selcols <- c("PrimaryID", "ENTREZ", "SYMBOL")
+              )
+    })
+
+    ## genes to indicate on the plot
+    observeEvent(input$glabs, {
+      if(isTruthy(input$glabs)) {
+        ids <- strsplit(input$glabs, ",")[[1]]
+        ids <- gsub("^[[:space:]]*", "", ids)
+        ids <- gsub("[[:space:]]*$", "", ids)
+        message("IDS are ", paste(ids, collapse="><"))
+        gene_labs(ids)
+      } else {
+        gene_labs(c())
+      }
+    })
 
     ## enable manual color scale
     observeEvent(input$autoscale, { 
@@ -162,16 +185,28 @@ discoServer <- function(id, cntr, annot=NULL,
 
     ## creating the actual plot
     output$discoplot <- renderPlot({
+      req(input$match1)
+      req(input$match2)
+
       disco(disco_score(cntr[[dataset1()]][[contrast1()]], 
-                        cntr[[dataset2()]][[contrast2()]], by=primary_id))
+                        cntr[[dataset2()]][[contrast2()]], 
+                        by=c(input$match1, input$match2)))
+
+      if(isTruthy(gene_labs)) {
+        .glabs <- gene_labs()
+      } else {
+        .glabs <- NULL
+      }
 
       if(input$autoscale) {
         g <- plot_disco(cntr[[dataset1()]][[contrast1()]], 
-                        cntr[[dataset2()]][[contrast2()]], disco=disco())
+                        cntr[[dataset2()]][[contrast2()]], disco=disco(), label_sel=.glabs,
+                        by=c(input$match1, input$match2))
       } else {
         g <- plot_disco(cntr[[dataset1()]][[contrast1()]], 
                         cntr[[dataset2()]][[contrast2()]], 
-                        lower=input$min, upper=input$max, disco=disco())
+                        lower=input$min, upper=input$max, disco=disco(), label_sel=.glabs,
+                        by=c(input$match1, input$match2))
       }
       return(g)
     }, width=600, height=600, res=90)

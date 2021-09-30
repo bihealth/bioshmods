@@ -60,6 +60,7 @@ disco_color_scale <- function(x, lower=-100, upper=100, int=255, alpha="66") {
 #'       (passed to `merge`). Default: merge by row names
 #' @param primary_id the name which should be assigned to the identifier
 #'        column which results from the merge
+#' @param label_sel identifiers of labels to be shown on the plot
 #' @examples
 #' ## Generate example data
 #' c1 <- data.frame(log2FoldChange=rnorm(5000, sd=2))
@@ -75,7 +76,7 @@ disco_color_scale <- function(x, lower=-100, upper=100, int=255, alpha="66") {
 #' @export
 plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
   show_top_labels=0, top_labels_both=TRUE, annot=NULL, alpha=.5, disco=NULL, by=0,
-  primary_id="PrimaryID", label_col="SYMBOL") {
+  primary_id="PrimaryID", label_col="SYMBOL", label_sel=NULL) {
 
   if(is.null(disco)) {
     cc <- disco_score(contrast1, contrast2, by=by, primary_id=primary_id)
@@ -108,6 +109,22 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
     cc$label[is.na(cc$label)] <- ""
   }
 
+  if(!is.null(label_sel) && length(label_sel) > 0L) {
+    cc$label_sel <- ""
+    if(!is.null(annot) && all(c(primary_id, label_col) %in% colnames(annot))) {
+      cc$label_sel <- as.character(annot[[label_col]])[ match(cc[[primary_id]], annot[[primary_id]]) ]
+      sel <- is.na(cc$label_sel)
+      cc$label_sel[sel] <- cc[[primary_id]][sel]
+      cc$label_sel[is.na(cc$label_sel)] <- ""
+    } else if(is.null(cc$label_sel <- cc[[primary_id]])) {
+      cc$label_sel <- ""
+    }
+
+    sel <- cc$label_sel %in% label_sel
+    cc$label_sel[!sel] <- NA
+  }
+
+
   cc <- cc %>% filter(!is.na(.data$log2FoldChange.x) & !is.na(.data$log2FoldChange.y) & !is.na(.data$disco)) %>%
     mutate(disco=ifelse(.data$disco > upper, upper, ifelse(.data$disco < lower, lower, .data$disco))) %>%
     arrange(abs(.data$disco))
@@ -129,6 +146,10 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
   if(show_top_labels > 0) {
     g <- g + geom_label_repel(aes(label=.data$label, color=.data$disco,
       force_pull=1.5, max.overlaps=Inf))
+  }
+
+  if(!is.null(label_sel) && length(label_sel) > 0L) {
+    g <- g + geom_label(aes(label=.data$label_sel, color=.data$disco))
   }
 
   return(g)
@@ -156,7 +177,11 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
 #' @export
 disco_score <- function(contrast1, contrast2, minp=1e-16, by=0, primary_id="PrimaryID") {
 
-  cc <- merge(as(contrast1, "data.frame"), as(contrast2, "data.frame"), by=by)
+  if(length(by) > 1) {
+    cc <- merge(as(contrast1, "data.frame"), as(contrast2, "data.frame"), by.x=by[1], by.y=by[2])
+  } else {
+    cc <- merge(as(contrast1, "data.frame"), as(contrast2, "data.frame"), by=by)
+  }
   colnames(cc)[1] <- "PrimaryID"
   rownames(cc) <- cc[,1]
   cc$disco <- with(cc, log2FoldChange.x * log2FoldChange.y * (-log10(pvalue.x + minp) -log10(pvalue.y  + minp)))
