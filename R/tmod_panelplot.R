@@ -462,7 +462,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
                ds <- .x
                .make_pie_ds(tmod_res[[ds]], dbname=dbname, 
                      cntr=cntr[[ds]], 
-                     tmod_db_obj=tmod_dbs[[ds]][[dbname]][["dbobj"]],
+                     tmod_db_obj=tmod_dbs[[ds]][[dbname]],
                      tmod_map=tmod_map[[ds]],
                      gene_pval=gene_pval,
                      gene_lfc =gene_lfc)

@@ -194,30 +194,7 @@ tmodBrowserPlotUI <- function(id) {
 #' @importFrom shinyBS popify
 #' @importFrom tmod evidencePlot getModuleMembers tmodDecideTests tmodSummary tmodPanelPlot
 #' @importFrom glue glue
-#' @examples
-#' ## extending the example from tmodBrowserTableServer
-#' if(interactive()) {
-#'
-#'   ui <- fluidPage(
-#'    fluidRow(tmodBrowserTableUI("tt", names(C19_gs$tmod_res), upset=TRUE)),
-#'    fluidRow(tmodBrowserPlotUI("tp"))
-#'    )
-#'
-#'   server <- function(input, output) {
-#'     gs_id <- reactiveValues()
-#'     tmodBrowserTableServer("tt", C19_gs$tmod_res, gs_id = gs_id,
-#'                                  tmod_dbs = C19_gs$tmod_dbs)
-#'     tmodBrowserPlotServer("tp",
-#'              gs_id=gs_id,
-#'              tmod_dbs=C19_gs$tmod_dbs,
-#'              tmod_map=C19_gs$tmod_map,
-#'              cntr=C19$contrasts,
-#'              annot=C19$annotation)
-#'   }
-#'   shinyApp(ui, server)
-#'
-#' }
-#'
+#' @example inst/examples/tmod_browser.R
 #' @export
 tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod_gl=NULL, annot=NULL, 
                                   primary_id="PrimaryID", gene_id=NULL) {
@@ -280,7 +257,7 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
       if(!isTruthy(gs_id$id)) { return(NULL) }
       ds <- gs_id$ds
       .tmod_browser_gene_table(as.character(gene.but), ds,
-                                    gs_id$id, gs_id$db, gs_id$cntr, gs_id$cntr, 
+                                    gs_id$id, gs_id$db, gs_id$cntr, gs_id$sort, 
                                     tmod_dbs[[ds]], cntr[[ds]], tmod_map[[ds]], primary_id)
     })
     

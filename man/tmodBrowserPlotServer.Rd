@@ -117,6 +117,8 @@ package). See the example dataset \link{C19_gs}.
 ## extending the example from tmodBrowserTableServer
 if(interactive()) {
 
+  library(shiny)
+
   ui <- fluidPage(
    fluidRow(tmodBrowserTableUI("tt", names(C19_gs$tmod_res), upset=TRUE)),
    fluidRow(tmodBrowserPlotUI("tp"))
@@ -128,13 +130,14 @@ if(interactive()) {
                                  tmod_dbs = C19_gs$tmod_dbs)
     tmodBrowserPlotServer("tp",
              gs_id=gs_id,
-             tmod_dbs=C19_gs$tmod_dbs,
              tmod_map=C19_gs$tmod_map,
+             tmod_dbs=C19_gs$tmod_dbs,
+             tmod_gl=C19_gs$tmod_gl,
              cntr=C19$contrasts,
              annot=C19$annotation)
   }
-  shinyApp(ui, server)
-
+  runApp(shinyApp(ui, server))
 }
+
 
 }
