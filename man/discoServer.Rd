@@ -54,7 +54,8 @@ if(interactive()) {
                                        rnorm(5000),
                         pvalue=runif(5000) * cntr1$pvalue,
                         PrimaryID=paste0("ID", 1:5000))
-    cntr2$SecondaryID <- sample(cntr2$PrimaryID)
+    cntr1$SecondaryID <- sample(cntr1$PrimaryID, replace=TRUE)
+    cntr2$SecondaryID <- sample(cntr2$PrimaryID, replace=TRUE)
     rownames(cntr2) <- paste0("ID", 1:5000)
     cntr <- list("Contrast 1"=cntr1, "Contrast 2"=cntr2)
     shinyApp(ui=fluidPage(discoUI("disco", names(cntr))),

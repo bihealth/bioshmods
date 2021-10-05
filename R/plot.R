@@ -46,8 +46,7 @@ disco_color_scale <- function(x, lower=-100, upper=100, int=255, alpha="66") {
 #'        and `pvalue`.
 #' @param lower,upper lower and upper boundaries for coloring of the score
 #' @param show_top_labels sort the genes by descending absolute disco score and show top N labels
-#' @param annot annotation object returned by `get_annot()` or any other data
-#'        frame with columns "PrimaryID" and "SYMBOL"
+#' @param annot1,annot2 annotation data frames for the two contrasts
 #' @param top_labels_both should top labels from both negative and positive
 #'        disco scores be shown, or only for the absolute top, whether only negative
 #'        or only positive or both?
@@ -65,17 +64,22 @@ disco_color_scale <- function(x, lower=-100, upper=100, int=255, alpha="66") {
 #' ## Generate example data
 #' c1 <- data.frame(log2FoldChange=rnorm(5000, sd=2))
 #' c1$pvalue <- pnorm(abs(c1$log2FoldChange), sd=2, lower.tail=FALSE)
+#' c1$PrimaryID <- paste0("ID", 1:nrow(c1))
+#'
 #' c2 <- data.frame(log2FoldChange=c1$log2FoldChange + rnorm(5000, sd=3))
 #' c2$pvalue <- pnorm(abs(c2$log2FoldChange), sd=2, lower.tail=FALSE)
+#' c2$PrimaryID <- paste0("ID", 1:nrow(c2))
 #'
 #' ## Example disco plot
 #' plot_disco(c1, c2)
 #' @return a ggplot object (plot)
 #' @import ggplot2 ggrepel
 #' @importFrom stats cor
+#' @importFrom shiny icon
 #' @export
 plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
-  show_top_labels=0, top_labels_both=TRUE, annot=NULL, alpha=.5, disco=NULL, by=0,
+  show_top_labels=0, top_labels_both=TRUE, annot1=NULL, annot2=NULL, 
+  alpha=.5, disco=NULL, by=0,
   primary_id="PrimaryID", label_col="SYMBOL", label_sel=NULL) {
 
   if(is.null(disco)) {
@@ -87,47 +91,66 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
   cc$col <- disco_color_scale(cc$disco, lower=lower, upper=upper)
   cc <- cc[ order(-abs(cc$disco)), ]
 
-  if(show_top_labels > 0) {
-    cc$label <- ""
-    if(!is.null(annot) && all(c(primary_id, label_col) %in% colnames(annot))) {
-      cc$label <- as.character(annot[[label_col]])[ match(cc[[primary_id]], annot[[primary_id]]) ]
-      sel <- is.na(cc$label)
-      cc$label[sel] <- cc[[primary_id]][sel]
-      cc$label[is.na(cc$label)] <- ""
-    } else if(is.null(cc$label <- cc[[primary_id]])) {
-      cc$label <- ""
-    }
-    if(top_labels_both) {
-      o1 <- which(cc$disco > 0)[ 1:show_top_labels ]
-      o2 <- which(cc$disco < 0)[ 1:show_top_labels ]
-      cc$label[ ! 1:nrow(cc) %in% c(o1, o2) ] <- ""
-
-    } else {
-      cc$label[ 1:nrow(cc) > show_top_labels ] <- ""
-    }
-
-    cc$label[is.na(cc$label)] <- ""
-  }
-
-  if(!is.null(label_sel) && length(label_sel) > 0L) {
-    cc$label_sel <- ""
-    if(!is.null(annot) && all(c(primary_id, label_col) %in% colnames(annot))) {
-      cc$label_sel <- as.character(annot[[label_col]])[ match(cc[[primary_id]], annot[[primary_id]]) ]
-      sel <- is.na(cc$label_sel)
-      cc$label_sel[sel] <- cc[[primary_id]][sel]
-      cc$label_sel[is.na(cc$label_sel)] <- ""
-    } else if(is.null(cc$label_sel <- cc[[primary_id]])) {
-      cc$label_sel <- ""
-    }
-
-    sel <- cc$label_sel %in% label_sel
-    cc$label_sel[!sel] <- NA
-  }
-
+# if(show_top_labels > 0) {
+#   cc$label <- ""
+#   if(!is.null(annot) && all(c(primary_id, label_col) %in% colnames(annot))) {
+#     cc$label <- as.character(annot[[label_col]])[ match(cc[[primary_id]], annot[[primary_id]]) ]
+#     sel <- is.na(cc$label)
+#     cc$label[sel] <- cc[[primary_id]][sel]
+#     cc$label[is.na(cc$label)] <- ""
+#   } else if(is.null(cc$label <- cc[[primary_id]])) {
+#     cc$label <- ""
+#   }
+#   if(top_labels_both) {
+#     o1 <- which(cc$disco > 0)[ 1:show_top_labels ]
+#     o2 <- which(cc$disco < 0)[ 1:show_top_labels ]
+#     cc$label[ ! 1:nrow(cc) %in% c(o1, o2) ] <- ""
+#
+#   } else {
+#     cc$label[ 1:nrow(cc) > show_top_labels ] <- ""
+#   }
+#
+#   cc$label[is.na(cc$label)] <- ""
+# }
 
   cc <- cc %>% filter(!is.na(.data$log2FoldChange.x) & !is.na(.data$log2FoldChange.y) & !is.na(.data$disco)) %>%
     mutate(disco=ifelse(.data$disco > upper, upper, ifelse(.data$disco < lower, lower, .data$disco))) %>%
     arrange(abs(.data$disco))
+
+  lab_df <- NULL
+
+  if(!is.null(label_sel) && length(label_sel) > 0L && primary_id %in% colnames(cc)) {
+
+    lab_df <- data.frame(cc[[primary_id]])
+    colnames(lab_df)  <- primary_id
+    lab_df[["label"]] <- NA
+
+    ## function that looks for specified labels in the label_col column of
+    ## data frame df1, matching it with lab_df by primary_id
+    source_labels <- function(lab_df, df1, primary_id, label_col, label_sel) {
+      if(!label_col %in% colnames(df1)) {
+        return(lab_df)
+      }
+
+      sel <- grepl(label_sel, df1[[label_col]]) &
+             df1[[primary_id]] %in% lab_df[[primary_id]]
+
+      if(sum(sel) == 0L) { return(lab_df) }
+
+      m <- match(df1[[primary_id]][sel], lab_df[[primary_id]])
+      lab_df[m, "label"] <- df1[[label_col]][sel]
+      return(lab_df)
+    }
+
+    lab_df <- source_labels(lab_df, contrast1, primary_id, label_col, label_sel)
+    lab_df <- source_labels(lab_df, contrast2, primary_id, label_col, label_sel)
+    lab_df <- source_labels(lab_df, annot1, primary_id, label_col, label_sel)
+    lab_df <- source_labels(lab_df, annot2, primary_id, label_col, label_sel)
+    lab_df <- lab_df[ !is.na(lab_df$label),, drop=FALSE ]
+
+    lab_df <- merge(cc, lab_df, by=primary_id)
+  }
+
 
 
   g <- ggplot(cc, aes_string(x="log2FoldChange.x", y="log2FoldChange.y")) +
@@ -143,13 +166,13 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
         cor(cc$log2FoldChange.x, cc$log2FoldChange.y, use="p"),
         cor(cc$log2FoldChange.x, cc$log2FoldChange.y, method="s", use="p")))
 
-  if(show_top_labels > 0) {
-    g <- g + geom_label_repel(aes(label=.data$label, color=.data$disco,
-      force_pull=1.5, max.overlaps=Inf))
-  }
+# if(show_top_labels > 0) {
+#   g <- g + geom_label_repel(aes(label=.data$label, color=.data$disco,
+#     force_pull=1.5, max.overlaps=Inf))
+# }
 
   if(!is.null(label_sel) && length(label_sel) > 0L) {
-    g <- g + geom_label(aes(label=.data$label_sel, color=.data$disco))
+    g <- g + geom_label(data=lab_df, aes(label=.data$label, color=.data$disco))
   }
 
   return(g)
@@ -170,20 +193,59 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
 #' @param minp minimum p-value
 #' @param by column by which the contrast data frames should be merged
 #'       (passed to `merge`). Default: merge by row names
-#' @param primary_id the name which should be assigned to the identifier
-#'        column which results from the merge
+#' @param primary_id Primary identifier
+#' @param annot1,annot2 annotation data frames corresponding to contrast1
+#' and contrast2, respectively
 #' @return a merged data frame containing column "disco.score"
 #' @importFrom methods as
 #' @export
-disco_score <- function(contrast1, contrast2, minp=1e-16, by=0, primary_id="PrimaryID") {
+disco_score <- function(contrast1, contrast2, primary_id="PrimaryID", annot1=NULL, annot2=NULL, minp=1e-16, by=0) {
+
+  stopifnot(primary_id %in% colnames(contrast1) && primary_id %in% colnames(contrast2))
+
+  ## we need to keep these two columns for displaying the gene table
+  contrast1[["__primary_id_1"]] <- contrast1[[primary_id]]
+  contrast2[["__primary_id_2"]] <- contrast2[[primary_id]]
+
+  ## special case when by has two elements
+  ## this is tedious, but needs be.
 
   if(length(by) > 1) {
+    if(!by[1] %in% colnames(contrast1)) {
+      if(is.null(annot1)) {
+        stop(sprintf("Column %s not in contrast1 data frame and annotation data frame 1is NULL.", by[1]))
+      }
+      if(!by[1] %in% colnames(annot1)) {
+        stop(sprintf("Column %s not in annotation data frame 1.", by[1]))
+      }
+
+      m <- match(contrast1[[primary_id]], annot1[[primary_id]])
+      contrast1[[by[1]]] <- annot1[[by[1]]][m]
+    }
+
+    if(!by[2] %in% colnames(contrast2)) {
+      if(is.null(annot2)) {
+        stop(sprintf("Column %s not in contrast2 data frame and annotation data frame 2 is NULL.", by[2]))
+      }
+      if(!by[2] %in% colnames(annot2)) {
+        stop(sprintf("Column %s not in annotation data frame 2.", by[2]))
+      }
+
+      m <- match(contrast2[[primary_id]], annot2[[primary_id]])
+      contrast2[[by[2]]] <- annot2[[by[2]]][m]
+    }
+
     cc <- merge(as(contrast1, "data.frame"), as(contrast2, "data.frame"), by.x=by[1], by.y=by[2])
   } else {
     cc <- merge(as(contrast1, "data.frame"), as(contrast2, "data.frame"), by=by)
   }
-  colnames(cc)[1] <- "PrimaryID"
-  rownames(cc) <- cc[,1]
+
+  if(nrow(cc) == 0L) {
+    stop(sprintf("No common identifiers for column(s) '%s' in these contrasts.",
+                 paste(by, collapse=",")))
+  }
+  #colnames(cc)[1] <- "PrimaryID"
+  #rownames(cc) <- cc[,1]
   cc$disco <- with(cc, log2FoldChange.x * log2FoldChange.y * (-log10(pvalue.x + minp) -log10(pvalue.y  + minp)))
   cc$disco[ is.na(cc$disco) ] <- 0
   return(cc)

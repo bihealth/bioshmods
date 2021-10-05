@@ -11,7 +11,8 @@ plot_disco(
   upper = 100,
   show_top_labels = 0,
   top_labels_both = TRUE,
-  annot = NULL,
+  annot1 = NULL,
+  annot2 = NULL,
   alpha = 0.5,
   disco = NULL,
   by = 0,
@@ -33,8 +34,7 @@ and \code{pvalue}.}
 disco scores be shown, or only for the absolute top, whether only negative
 or only positive or both?}
 
-\item{annot}{annotation object returned by \code{get_annot()} or any other data
-frame with columns "PrimaryID" and "SYMBOL"}
+\item{annot1, annot2}{annotation data frames for the two contrasts}
 
 \item{alpha}{transparency}
 
@@ -74,8 +74,11 @@ parameter to \code{Inf}.
 ## Generate example data
 c1 <- data.frame(log2FoldChange=rnorm(5000, sd=2))
 c1$pvalue <- pnorm(abs(c1$log2FoldChange), sd=2, lower.tail=FALSE)
+c1$PrimaryID <- paste0("ID", 1:nrow(c1))
+
 c2 <- data.frame(log2FoldChange=c1$log2FoldChange + rnorm(5000, sd=3))
 c2$pvalue <- pnorm(abs(c2$log2FoldChange), sd=2, lower.tail=FALSE)
+c2$PrimaryID <- paste0("ID", 1:nrow(c2))
 
 ## Example disco plot
 plot_disco(c1, c2)
