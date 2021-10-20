@@ -15,6 +15,7 @@ tmodBrowserPlotServer(
   tmod_map = NULL,
   tmod_gl = NULL,
   annot = NULL,
+  tmod_res = NULL,
   primary_id = "PrimaryID",
   gene_id = NULL
 )
