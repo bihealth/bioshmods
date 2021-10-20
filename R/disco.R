@@ -214,7 +214,15 @@ discoServer <- function(id, cntr, annot=NULL,
                         by=c(input$match1, input$match2)))
 
       disco(.ds)
-      if(class(.ds) == "try-error") { return(NULL) }
+      if(class(.ds) == "try-error") { 
+        message("An error occured")
+       #output$discoplot <- renderPlot({
+       #  stop(.ds)
+       #})
+       #
+       # plot_obj(.ds)
+        return(NULL) 
+      }
 
       if(isTruthy(gene_labs)) { .glabs <- gene_labs() } else { .glabs <- NULL }
 
@@ -254,8 +262,10 @@ discoServer <- function(id, cntr, annot=NULL,
     })
 
     output$discoplot <- renderPlot({
+      message("rendering plot")
+      .ds <- disco()
+      if(class(.ds) == "try-error") { stop(.ds) }
       req(plot_obj())
-      if(class(.ds <- disco()) == "try-error") { stop(.ds) }
       plot_obj()
     }, width=600, height=600, res=90)
     

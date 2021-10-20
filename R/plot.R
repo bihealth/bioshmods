@@ -200,7 +200,6 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
 #' @importFrom methods as
 #' @export
 disco_score <- function(contrast1, contrast2, primary_id="PrimaryID", annot1=NULL, annot2=NULL, minp=1e-16, by=0) {
-
   stopifnot(primary_id %in% colnames(contrast1) && primary_id %in% colnames(contrast2))
 
   ## we need to keep these two columns for displaying the gene table
@@ -235,6 +234,8 @@ disco_score <- function(contrast1, contrast2, primary_id="PrimaryID", annot1=NUL
       contrast2[[by[2]]] <- annot2[[by[2]]][m]
     }
 
+    contrast1 <- contrast1[ !is.na(contrast1[[by[1]]]), , drop=FALSE ]
+    contrast2 <- contrast2[ !is.na(contrast2[[by[2]]]), , drop=FALSE ]
     cc <- merge(as(contrast1, "data.frame"), as(contrast2, "data.frame"), by.x=by[1], by.y=by[2])
   } else {
     cc <- merge(as(contrast1, "data.frame"), as(contrast2, "data.frame"), by=by)

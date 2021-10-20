@@ -488,6 +488,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
   genes_sel <- unique(unlist(map(cntr, ~ .x[["PrimaryID"]])))
   genes_sel <- genes_sel[ mp[ genes_sel ] %in% genes_s ]
 
+  ## XXXX TODO: clean up these hard encoded PrimaryIDs
   lfcs  <- map_dfc(cntr, ~ .x[ match(genes_sel, .x[["PrimaryID"]]), ][["log2FoldChange"]])
   pvals <- map_dfc(cntr, ~ .x[ match(genes_sel, .x[["PrimaryID"]]), ][["padj"]])
 

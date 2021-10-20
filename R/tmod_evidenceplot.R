@@ -95,7 +95,7 @@
 
 ## given a module, contrast, sorting: prepare a module info tab contents,
 ## including which genes are significant in the given contrast
-.tmod_browser_mod_info <- function(id, ds, db_name, cntr_name, sort_name, tmod_dbs, cntr, tmod_map) {
+.tmod_browser_mod_info <- function(id, ds, db_name, cntr_name, sort_name, tmod_dbs, cntr, tmod_map, tmod_res=NULL) {
   db <- tmod_dbs[[db_name]]
   ret <- sprintf("Module ID: %s\nDescription: %s\nData set: %s\nContrast: %s\nDatabase: %s\nSorting: %s",
           id,
@@ -104,7 +104,30 @@
           cntr_name,
           db_name, 
           sort_name)
+  ret <- data.frame(Field=c("Gene set ID", "Description", "Data set", "Contrast", "Database", "Sort order"),
+                    Value=c(id,
+          db[["MODULES"]][id, ][["Title"]],
+          ds,
+          cntr_name,
+          db_name, 
+          sort_name))
 
+
+  if(!is.null(tmod_res)) {
+    res <- tmod_res[[ds]][[cntr_name]][[db_name]][[sort_name]]
+    res <- res[ match(id, res[["ID"]]), ] 
+    res <- data.frame(Field=
+                      c("P value", "adj. P value", "Effect size (AUC)"),
+                      Value=
+                      c(format.pval(res$P.Value, digits=2), 
+                        format.pval(res$adj.P.Val, digits=2), 
+                        format(res$AUC, digits=2)))
+
+    ret <- rbind(ret, res)
+  }
+
+
+  ret
 }
 
 
@@ -114,7 +137,7 @@ tmodBrowserPlotUI <- function(id) {
     sidebarLayout(
       sidebarPanel(
         fluidRow(downloadButton(NS(id, "save"), "Save plot", class="bg-success")),
-        fluidRow(verbatimTextOutput(NS(id, "modinfo"))),
+        fluidRow(tableOutput(NS(id, "modinfo"))),
         width=5
       ),
       mainPanel(
@@ -197,6 +220,7 @@ tmodBrowserPlotUI <- function(id) {
 #' @example inst/examples/tmod_browser.R
 #' @export
 tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod_gl=NULL, annot=NULL, 
+                                  tmod_res=NULL,
                                   primary_id="PrimaryID", gene_id=NULL) {
 
   stopifnot(!is.null(tmod_gl) || !is.null(tmod_map))
@@ -244,11 +268,12 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
     }, width=800, height=600)
 
 
-    output$modinfo <- renderText({
+    output$modinfo <- renderTable({
       req(gs_id$id)
       if(!isTruthy(gs_id$id)) { return(NULL) }
       ret <- .tmod_browser_mod_info(gs_id$id, gs_id$ds, gs_id$db, gs_id$cntr, gs_id$sort, 
-                                    tmod_dbs[[gs_id$ds]], cntr[[gs_id$ds]], tmod_map[[gs_id$ds]])
+                                    tmod_dbs[[gs_id$ds]], cntr[[gs_id$ds]], tmod_map[[gs_id$ds]],
+                                    tmod_res)
       return(ret)
     })
 
