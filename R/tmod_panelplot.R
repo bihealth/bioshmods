@@ -1,3 +1,34 @@
+.cleanup_ids <- function(ids) {
+  ids <- gsub("_", " ", ids)
+
+  #return(ids)
+
+  ids <- strsplit(ids, " ")
+  min.l <- min(sapply(ids, length))
+
+  max_prefix <- 0
+  for(i in 1:min.l) {
+
+    if(length(unique(sapply(ids, function(x) x[i]))) == 1L) {
+      max_prefix <- i
+    }
+  }
+
+  if(max_prefix > 0) {
+    ids <- lapply(ids, function(x) x[ -1:-max_prefix ])
+  }
+
+  ids <- unlist(lapply(ids, paste, collapse=" "))
+
+  if(!any(grepl("[a-z]", ids))) {
+    ids <- tolower(ids)
+    substr(ids, 1, 1) <- toupper(substr(ids, 1, 1))
+  }
+
+  ids
+}
+
+
 #' Create a tmod panel plot using ggplot
 #'
 #' Create a tmod panel plot using ggplot
@@ -14,6 +45,8 @@
 #' @param q_cutoff Any q value below `q_cutoff` will be considered equal to
 #' `q_cutoff`
 #' @param label_angle The angle at which column labels are shown
+#' @param cleanup attempt to clean up gene set titls
+#' @param add_ids add IDs of gene sets to their titles on the plot
 #' @importFrom tidyr pivot_longer pivot_wider everything
 #' @importFrom tibble rownames_to_column
 #' @importFrom purrr flatten
@@ -22,16 +55,23 @@ gg_panelplot <- function(res, pie, auc_thr=.5, q_thr=.05,
                          filter_row_q=.01,
                          filter_row_auc=.65,
                          q_cutoff=1e-12,
-                         label_angle=45) {
+                         label_angle=45, cleanup=TRUE, add_ids=TRUE) {
 
   label_angle=as.numeric(label_angle)
   resS <- tmodSummary(res) 
 
   if(any(resS$Title != resS$ID)) {
-    modnames <- paste(resS$ID, resS$Title)
+    modnames <- resS$Title
+    if(cleanup) {
+      modnames <- .cleanup_ids(modnames)
+    }
+    if(add_ids) {
+      modnames <- paste(resS$ID, modnames)
+    }
   } else {
     modnames <- resS$ID
   }
+
 
   names(modnames) <- resS$ID
 
@@ -82,17 +122,20 @@ gg_panelplot <- function(res, pie, auc_thr=.5, q_thr=.05,
     slice(match(resS$ID, .data[["ID"]])) %>%
     ungroup()
 
+  df$Contrast <- factor(df$Contrast, levels=names(res))
+
   colors <- c("red", "grey", "blue")
   names(colors) <- levels(df$Direction)
 
   minq <- max(-log10(df[["q"]]))
+
 
   ggplot(df, aes(x=.data[["ID"]], y=.data[["Number"]], 
                  fill=.data[["Direction"]],
                  contrast=.data[["Contrast"]],
                  id=.data[["ID"]],
                  alpha=-log10(.data[["q"]]))) + 
-    facet_wrap(~ .data[["Contrast"]], nrow=1) + 
+    facet_wrap(~ .data[["Contrast"]], nrow=1, drop=FALSE) + 
     geom_bar(stat="identity") + 
     coord_flip() +
     scale_fill_manual(values=colors) +

@@ -201,6 +201,7 @@ tmodBrowserPlotUI <- function(id) {
 #' @param tmod_dbs tmod gene set databases returned by `get_tmod_dbs()`
 #' @param tmod_map tmod gene set ID mapping returned by `get_tmod_mapping()`
 #' @param tmod_gl tmod gene lists. See details.
+#' @param tmod_res Results of gene set enrichment analysis (optional).
 #' @param id identifier (same as the one passed to geneBrowserTableUI)
 #' @param primary_id name of the column which holds the primary identifiers
 #' @param cntr list of contrast results returned by `get_contrasts()`

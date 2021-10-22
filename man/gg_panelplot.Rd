@@ -12,7 +12,9 @@ gg_panelplot(
   filter_row_q = 0.01,
   filter_row_auc = 0.65,
   q_cutoff = 1e-12,
-  label_angle = 45
+  label_angle = 45,
+  cleanup = TRUE,
+  add_ids = TRUE
 )
 }
 \arguments{
@@ -36,6 +38,10 @@ contrast AUC is larger than \code{filter_row_q}}
 \code{q_cutoff}}
 
 \item{label_angle}{The angle at which column labels are shown}
+
+\item{cleanup}{attempt to clean up gene set titls}
+
+\item{add_ids}{add IDs of gene sets to their titles on the plot}
 }
 \description{
 Create a tmod panel plot using ggplot

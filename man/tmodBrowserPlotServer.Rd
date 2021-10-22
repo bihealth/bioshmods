@@ -39,6 +39,8 @@ another shiny module.}
 
 \item{annot}{data frame containing gene annotation}
 
+\item{tmod_res}{Results of gene set enrichment analysis (optional).}
+
 \item{primary_id}{name of the column which holds the primary identifiers}
 
 \item{gene_id}{must be a \code{reactiveValues} object. If not NULL, then
