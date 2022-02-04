@@ -55,7 +55,8 @@
     cntr <- cntr[ order(cntr$pvalue), ]
     gl <- tmod_map$maps[[ tmod_map$dbs[[ db_id ]] ]][ cntr[[primary_id]] ]
   } else {
-    gl <- tmod_gl[[cntr_id]][[db_id]][[sort_id]]
+    gl <- tmod_gl[[cntr_id]][[sort_id]]
+    gl <- tmod_map$maps[[ tmod_map$dbs[[ db_id ]] ]][ annot[[primary_id]][ gl ] ]
   }
 
   symbols <- names(gl)
@@ -182,13 +183,10 @@ tmodBrowserPlotUI <- function(id) {
 #' different sortings are possible. The parameter tmod_gl is a hierarchical
 #' list:
 #'  * First level: contrasts
-#'  * Second level: gene set databases
-#'  * Third level: sorting type
+#'  * Second level: sorting type
 #' 
-#' For example, then the `tmod_gl[["Contrast1"]][["tmod"]][["pval"]]` is a
-#' vector of gene identifiers which come from the tmod database (in this
-#' case, gene names). The vector is named and the names are primary IDs
-#' matching the contrast data frames.
+#' For example, then the `tmod_gl[["Contrast1"]][["pval"]]` is a
+#' vector of indices which correspond to sorting by pval in Contrast1.
 #'
 #' If this argument is NULL, then the genes will be ordered by p-values
 #' from the contrast object provided. However, in this case it is necessary
