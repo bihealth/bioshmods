@@ -52,7 +52,27 @@
 
 
 
+.gene_browser_prep_res_single_contrast <- function(ds_id, cntr_id, cntr, but, annot, annot_linkout, primary_id, cols_to_hide) {
 
+  res <- cntr[[ ds_id ]][[ cntr_id ]]
+
+  res <- res %>% select(all_of(setdiff(colnames(res), cols_to_hide))) %>% 
+    { merge(annot[[ ds_id ]], ., by=primary_id, all.x=TRUE) } %>% arrange(pvalue)
+
+  if(!is.null(but) && length(but) == 1L) {
+    res <- res %>%
+      mutate('>'= sprintf(but, ds_id, .data[[primary_id]])) %>% 
+      relocate(all_of(">"), .before=1)
+
+  }
+  
+
+  if(!is.null(annot_linkout)) {
+    res <-  .apply_annot_linkout(res, annot_linkout)
+  }
+
+  res
+}
 
 
 ## prepares IDs/titles of the contrasts for use with the UI
@@ -132,25 +152,25 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 
     if(multilevel) {
       for(c in names(cntr)) {
-        stopifnot(all(map_lgl(cntr[[c]], is.data.frame)))
+        stopifnot(all(map_lgl(cntr[[c]], ~ is.data.frame(.x) || is(.x, "disk.frame"))))
       }
     }
   }
 
   if(!is.null(annot)) {
     if(multilevel) {
-      stopifnot(all(map_lgl(annot, is.data.frame)))
+      stopifnot(all(map_lgl(annot, ~ is.data.frame(.x) || is(.x, "disk.frame"))))
       if(primary_id == 0) {
         stopifnot(all(map_lgl(annot, ~ !is.null(rownames(.x)))))
       } else {
-        stopifnot(all(map_lgl(annot, ~ primary_id %in% colnames(.x))))
+        stopifnot(all(map_lgl(annot, ~ primary_id %in% names(.x))))
       }
     } else {
-      stopifnot(is.data.frame(annot))
+      stopifnot(is.data.frame(annot) || is(.x, "disk.frame"))
       if(primary_id == 0) {
         stopifnot(!is.null(rownames(annot)))
       } else {
-        stopifnot(primary_id %in% colnames(annot))
+        stopifnot(primary_id %in% names(annot))
       }
     }
   }
@@ -246,6 +266,7 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
     annot_linkout=list(default=annot_linkout)
   }
 
+  ## in this case we take primary id from row names of annot / cntr
   if(primary_id == 0) {
     primary_id <- "__primary_id"
     annot <- map(annot, ~ {
@@ -270,9 +291,9 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
                          class = "btn-primary btn-sm")
     }
 
-    cntr <- .gene_browser_prep_res(cntr, as.character(but), annot, 
-                                   annot_linkout, primary_id=primary_id,
-                                   cols_to_hide=cols_to_hide)
+   #cntr <- .gene_browser_prep_res(cntr, as.character(but), annot, 
+   #                               annot_linkout, primary_id=primary_id,
+   #                               cols_to_hide=cols_to_hide)
 
     observeEvent(input$select_button, {
       if(!is.null(gene_id)) {
@@ -314,6 +335,11 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
 
         res <- res %>% filter(.data[["padj"]] < input$f_pval & abs(.data[["log2FoldChange"]]) > input$f_lfc) 
       }
+
+      res <- .gene_browser_prep_res_single_contrast(.ds, .cntr, cntr, 
+                                                    as.character(but), 
+                                                    annot, annot_linkout, primary_id, 
+                                                    cols_to_hide)
 
       res %>% datatable(escape=FALSE, selection='none', extensions="Buttons",
                 options=list(pageLength=5, dom="Bfrtip", scrollX=TRUE)) %>%
