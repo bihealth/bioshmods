@@ -523,7 +523,11 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
   tmod_s <- tmodSummary(res)
   dbobj <- tmod_db_obj[ tmod_s[["ID"]] ]
-  genes_s <- unique(unlist(dbobj[["MODULES2GENES"]]))
+  if(is(dbobj, "tmodGS")) {
+    genes_s <- dbobj[["gv"]]
+  } else {
+    genes_s <- unique(unlist(dbobj[["MODULES2GENES"]]))
+  }
 
   mp_id <- tmod_map$dbs[[dbname]]
   mp <- tmod_map$maps[[mp_id]]

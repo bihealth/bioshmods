@@ -21,7 +21,12 @@
                                      sort_name, tmod_dbs, cntr, tmod_map, primary_id) {
 
   db        <- tmod_dbs[[db_name]]
-  genes     <- db[["MODULES2GENES"]][[id]]
+
+  if(is(db, "tmodGS")) {
+    genes     <- db[["gv"]][ db[["gs2gv"]][[ match(id, db[["gs"]][["ID"]] )]] ]
+  } else {
+    genes     <- db[["MODULES2GENES"]][[id]]
+  }
   genes_pid <- .tmod_rev_db_map_ids(ids=genes, dbname=db_name, tmod_dbs_mapping_obj=tmod_map)
 
   ret <- cntr[[cntr_name]] %>% filter(.data[[primary_id]] %in% genes_pid)
@@ -98,16 +103,23 @@
 ## including which genes are significant in the given contrast
 .tmod_browser_mod_info <- function(id, ds, db_name, cntr_name, sort_name, tmod_dbs, cntr, tmod_map, tmod_res=NULL) {
   db <- tmod_dbs[[db_name]]
+
+  if(is(db, "tmodGS")) {
+    title <- db[["gs"]][ match(id, db[["gs"]][["ID"]]), "Title" ]
+  } else {
+    title <- db[["MODULES"]][id, ][["Title"]]
+  }
+
   ret <- sprintf("Module ID: %s\nDescription: %s\nData set: %s\nContrast: %s\nDatabase: %s\nSorting: %s",
           id,
-          db[["MODULES"]][id, ][["Title"]],
+          title,
           ds,
           cntr_name,
           db_name, 
           sort_name)
   ret <- data.frame(Field=c("Gene set ID", "Description", "Data set", "Contrast", "Database", "Sort order"),
                     Value=c(id,
-          db[["MODULES"]][id, ][["Title"]],
+          title,
           ds,
           cntr_name,
           db_name, 

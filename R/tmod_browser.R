@@ -170,7 +170,7 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
 #' There are many ways of storing such gene set collections. One way that I
 #' find convenient (since I programmed it myself) is included in the
 #' gene set enrichment testing package `tmod`. Tmod database objects are
-#' lists with at least two elements: `MODULES` and `MODULES2GENES` (see
+#' lists with at least three elements: `gs`, `gv` and `gv2gs` (see
 #' details in the tmod package). They can be conveniently created using
 #' the tmod package.
 #' 
