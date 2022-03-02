@@ -105,7 +105,7 @@
   db <- tmod_dbs[[db_name]]
 
   if(is(db, "tmodGS")) {
-    title <- db[["gs"]][ match(id, db[["gs"]][["ID"]]), "Title" ]
+    title <- db[["gs"]][ match(id, db[["gs"]][["ID"]]), ][["Title"]]
   } else {
     title <- db[["MODULES"]][id, ][["Title"]]
   }
