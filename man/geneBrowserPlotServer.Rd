@@ -69,8 +69,10 @@ The parameter \code{annot_linkout} is a named list. Names must correspond to
 columns from the annotation data frame. The elements of the list are
 character strings containing URLs with the \verb{\%s} placeholder. For
 example, if the column \code{ENSEMBL} contains ENSEMBL identifiers, you can
-link out by specifying\preformatted{annot_linkout=list(ENSEMBL="https://www.ensembl.org/id/\%s")
-}
+link out by specifying
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{annot_linkout=list(ENSEMBL="https://www.ensembl.org/id/\%s")
+}\if{html}{\out{</div>}}
 }
 \examples{
 mtx <- matrix(rnorm(40, mean=rep(c(0, 1), each=20)), nrow=1)

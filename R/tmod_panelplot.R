@@ -49,7 +49,7 @@
 #' @param add_ids add IDs of gene sets to their titles on the plot
 #' @importFrom tidyr pivot_longer pivot_wider everything
 #' @importFrom tibble rownames_to_column
-#' @importFrom purrr flatten
+#' @importFrom purrr flatten flatten_chr
 #' @export
 gg_panelplot <- function(res, pie, auc_thr=.5, q_thr=.05,
                          filter_row_q=.01,
@@ -164,6 +164,7 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
 
   ttip <- list(
 
+    contrast_select=paste("Select which contrasts are to be shown on the panel plot"),
     gene_pval=paste("Determines which genes are considered significant. Significant genes show as colored",
                     "fragments on the plot."),
     filter_auc=paste("Filter the gene sets by setting a minimal AUC threshold on the maximum AUC",
@@ -188,17 +189,20 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
   }
 
   
-  if(length(datasets) < 2) {
-    tmp <- hidden(selectInput(NS(id, "dataset"), label="Dataset", choices=datasets, width="100%"))
+  if(length(datasets) == 1L) {
+    .inp_dataset <- hidden(selectInput(NS(id, "dataset"), label="Dataset", choices=datasets, width="100%"))
   } else {
     datasets <- c("_all", datasets)
     names(datasets) <- c("All datasets", datasets[-1])
-    tmp <- fluidRow(selectInput(NS(id, "dataset"), label="Dataset", choices=datasets, width="100%"))
+    .inp_dataset <- fluidRow(selectInput(NS(id, "dataset"), label="Dataset", choices=datasets, width="100%"))
   }
 
     sidebarLayout(
       sidebarPanel(
-        tmp,
+        .inp_dataset,
+        fluidRow(popify(uiOutput(NS(id, "contrast_select_field")),
+                           "Select contrast", ttip$contrast_select, placement="right")),
+
         fluidRow(
         column(
            fluidRow(popify(uiOutput(NS(id, "db_field")),
@@ -221,8 +225,8 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
                 bsTooltip(NS(id, "figure_size"), 
                   "Change the figure size (in pixels), width x height. Press backspace to enter your own sizes.", placement="right")),
            fluidRow(selectizeInput(NS(id, "label_angle"), label="Contrast label", 
-                                choices=c(Slanted=45, 
-                                          Vertical=90,
+                                choices=c(Vertical=90,
+                                          Slanted=45, 
                                           Horizontal=0),
                                  width="100%"),
                 bsTooltip(NS(id, "label_angle"), 
@@ -293,6 +297,7 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
 #' `contrast` and `id`.
 #' @importFrom shiny observe selectizeInput
 #' @importFrom shinyBS bsTooltip addTooltip
+#' @importFrom purrr map_lgl
 #' @export
 tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NULL, annot=NULL) {
 
@@ -306,11 +311,14 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
     annot=list(default=annot)
   }
 
-  ds_ids       <- names(cntr)
+  ds_ids       <- names(cntr)  # dataset ids
   is_single_ds <- length(ds_ids) == 1L
 
   ## in this module, we use labels which combine the dataset and the
   ## contrast ID, because the representation is not hierarchical, but flat
+  ## this is used to map the row clicked by the user to the actual contrast
+  ## name
+  ## the unique identifiers are of form 'dataset: contrast'
   if(is_single_ds) {
     ds_label_map <- unlist(imap(cntr, ~ rep(.y, length(.x))))
     names(ds_label_map) <- names(cntr_label_map) <- 
@@ -327,32 +335,56 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
                    names(.x) <- paste0(.y, ': ', names(.x))
                    .x
     })
+    tmod_res <- imap(tmod_res, ~ {
+                       names(.x) <- paste0(.y, ': ', names(.x))
+                       .x
+    })
   }
-    
+
 	moduleServer(id, function(input, output, session) {
     message("Launching tmod panelplot server")
     disable("save")
 
     observeEvent(input$dataset, {
-
       if(!is_single_ds) {
         .ds <- input$dataset
-        if(.ds == "_all") {
-          .ds <- ds_ids[1]
-        }
       } else {
         .ds <- ds_ids[1]
       }
 
+      .ds_1 <- .ds
+      if(.ds_1 == "_all") {
+        .ds_1 <- ds_ids[1]
+      }
+
       output$db_field <- renderUI({
-        dbs <- names(tmod_res[[.ds]][[1]])
+        dbs <- names(tmod_res[[.ds_1]][[1]])
         selectInput(NS(id, "db"),  label="Database", choices=dbs, width="100%")
       })
 
       output$sort_field <- renderUI({
-        sorting <- names(tmod_res[[.ds]][[1]][[1]])
+        sorting <- names(tmod_res[[.ds_1]][[1]][[1]])
         selectInput(NS(id, "sort"),  label="Sorting", choices=sorting, width="100%")
       })
+
+      output$contrast_select_field <- renderUI({
+        #if(!is_single_ds) {
+        if(.ds == "_all") {
+          print("ds is _all")
+          choices <- c("_all", flatten_chr(map(cntr, names)))
+        } else {
+          print("ds is not _all")
+          choices <- c("_all", names(tmod_res[[.ds]]))
+        }
+        names(choices) <- c("All contrasts", choices[-1])
+        print("printing choices:")
+        print(choices)
+
+        selectInput(NS(id, "contrast_select"), label="Select contrasts", 
+                      multiple=TRUE, choices=choices, selected="_all")
+
+      })
+
     })
 
 
@@ -372,6 +404,12 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
       if(is.null(.pie)) { return(NULL) }
 
       .res <- flatten(res())
+
+      if(! "_all" %in% input$contrast_select) {
+        sel <- input$contrast_select
+        sel <- sel[ sel %in% names(.res) ]
+        .res <- .res[ sel ]
+      }
 
       mf("Saving to file %s", file)
       pdf(file=file, width=fig_size$width / 75, height=fig_size$height / 75)
@@ -407,28 +445,40 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
 
     ## prepare the list of tmod results to display
+    ## a reactive expression called whenever results are required
     res <- reactive({
-      if(!(isTruthy(input$db) && isTruthy(input$sort))) { return(NULL) }
+      if(!(isTruthy(input$db) && isTruthy(input$sort)
+           && isTruthy(input$contrast_select))) { return(NULL) }
 
       if(input$dataset == "_all") {
         .datasets <- ds_ids
       } else {
         .datasets <- input$dataset
+        warning(".datasets changed")
+        warning(paste(.datasets))
       }
 
+      # select results which correspond to the selected data sets and 
+      # selected sorting order 
       ret <- imap(tmod_res[.datasets], ~ {
              .ds <- .y
              .res <- .x
              ret <- map(.res, ~ .x[[input$db]][[input$sort]]) 
-             if(!is_single_ds) {
-               names(ret) <- paste0(.ds, ': ', names(ret))
+
+             if(! "_all" %in% input$contrast_select) {
+               if(any(names(ret) %in% input$contrast_select)) {
+                 ret <- ret[ names(ret) %in% input$contrast_select ]
+               } else {
+                 ret <- NULL
+               }
              }
+
              ret
 
       })
 
-      ## flatten the "dataset" level of results
-      #ret <- unlist(ret, recursive=FALSE)
+      ret <- ret[ !map_lgl(ret, is.null) ]
+
       return(ret)
     })
 
@@ -437,7 +487,12 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
     pie <- reactive({
 
       # following is needed for cases when the UI is not ready yet
+
       if(!(isTruthy(input$db))) { return(NULL) }
+
+      res <- res()
+
+      if(!(isTruthy(res))) { return(NULL) }
       
       .make_pie(res(), dbname=input$db, 
                      cntr=cntr, 
@@ -447,6 +502,8 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
                      gene_lfc =input$gene_lfc)
     })
 
+    ## record the details o the selected gene set when the user clicks on
+    ## the plot. The gs_id reactive variable will hold the results.
     observeEvent(input$plot_click, {
       gs_id$db    <- input$db
       gs_id$sort  <- input$sort
@@ -459,6 +516,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
     fig_size <- reactiveValues()
 
+    ## record the details of the figure size selected by the user
     observeEvent(input$figure_size, {
       fig_size$width <- 
         as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\1", input$figure_size))
@@ -467,14 +525,25 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
         as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\2", input$figure_size))
     })
 
-
     observe({ output$panelPlot <- renderPlot({
       enable("save")
+      #browser()
 
       .pie <- pie()
-      if(is.null(.pie)) { return(NULL) }
+      if(is.null(.pie)) { 
+        warning("pie() is NULL")
+        return(NULL)
+      }
 
       .res <- flatten(res())
+      if(! "_all" %in% input$contrast_select) {
+        sel <- input$contrast_select
+        sel <- sel[ sel %in% names(.res) ]
+        .res <- .res[ sel ]
+      }
+
+
+      #print(names(.res))
 
       g <- gg_panelplot(.res, pie=.pie, 
                      filter_row_auc=input$filter_auc,

@@ -78,14 +78,11 @@ different sortings are possible. The parameter tmod_gl is a hierarchical
 list:
 \itemize{
 \item First level: contrasts
-\item Second level: gene set databases
-\item Third level: sorting type
+\item Second level: sorting type
 }
 
-For example, then the \code{tmod_gl[["Contrast1"]][["tmod"]][["pval"]]} is a
-vector of gene identifiers which come from the tmod database (in this
-case, gene names). The vector is named and the names are primary IDs
-matching the contrast data frames.
+For example, then the \code{tmod_gl[["Contrast1"]][["pval"]]} is a
+vector of indices which correspond to sorting by pval in Contrast1.
 
 If this argument is NULL, then the genes will be ordered by p-values
 from the contrast object provided. However, in this case it is necessary
@@ -103,7 +100,7 @@ such as MSigDB.
 There are many ways of storing such gene set collections. One way that I
 find convenient (since I programmed it myself) is included in the
 gene set enrichment testing package \code{tmod}. Tmod database objects are
-lists with at least two elements: \code{MODULES} and \code{MODULES2GENES} (see
+lists with at least three elements: \code{gs}, \code{gv} and \code{gv2gs} (see
 details in the tmod package). They can be conveniently created using
 the tmod package.
 
@@ -112,7 +109,7 @@ gene set information to the 'bioshmods' functions. Each such structure
 is a named list with one element per gene set collection (i.e., if you
 have gene set enrichment results for KEGG and REACTOME, you will have
 two such elements). Each of these element is a tmod database object
-(returned, for example, by the \code{\link[tmod:tmod-class]{tmod::makeTmod()}} function from the 'tmod'
+(returned, for example, by the \code{\link[tmod:tmodGS-class]{tmod::makeTmod()}} function from the 'tmod'
 package). See the example dataset \link{C19_gs}.
 }
 
