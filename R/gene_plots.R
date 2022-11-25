@@ -36,16 +36,20 @@
 
 
 ## Wrapper around plot_gene, mainly to replace "N/A" with NA
-.gene_browser_plot <- function(covar, id, covarName, rld, annot, 
-                               groupBy = "N/A", colorBy = "N/A", symbolBy = "N/A", trellisBy="N/A") {
-  .args <- list(id=id, xCovar=covarName, covar=covar, exprs=rld, groupBy=groupBy, annot=annot,
+.gene_browser_plot <- function(covar, id, covarXName, covarYName, rld, annot, 
+                               groupBy = "N/A", colorBy = "N/A", symbolBy = "N/A", trellisBy="N/A",
+                               exprs_label = "Expression") {
+  if(covarYName == "Expression") { covarYName <- exprs_label }
+  if(covarXName == "Expression") { covarXName <- exprs_label }
+  .args <- list(id=id, xCovar=covarXName, yCovar=covarYName, covar=covar, exprs=rld, groupBy=groupBy, annot=annot,
+                expressionLabel = exprs_label,
                 colorBy=colorBy, symbolBy=symbolBy, trellisBy=trellisBy)
   ## weirdly, the line below is really, really slow
   #.args <- map(.args, ~ if(!is.na(.x) && .x == "N/A") { NA } else { .x })
-  if(.args$groupBy == "N/A") .args$groupBy <- NA
-  if(.args$colorBy == "N/A") .args$colorBy <- NA
-  if(.args$symbolBy == "N/A") .args$symbolBy <- NA
-  if(.args$trellisBy == "N/A") .args$trellisBy <- NA
+  if(.args$groupBy == "N/A")    .args$groupBy   <- NA
+  if(.args$colorBy == "N/A")    .args$colorBy   <- NA
+  if(.args$symbolBy == "N/A")   .args$symbolBy  <- NA
+  if(.args$trellisBy == "N/A")  .args$trellisBy <- NA
   do.call(plot_gene, .args)
 }
 
@@ -58,6 +62,7 @@
   non_unique         <- covar_sum %>% 
     filter(Class %in% c("<dbl>", "<int>") | unique < nrow(covar)) %>% 
     pull(.data$Col)
+  non_unique         <- c(non_unique, "Expression")
   default_covar <- .default_covar(covar, all_covars, default="group")
 
   ds_selector <- selectInput(NS(id, "dataset"), "Dataset", choices=datasets, selected=ds_selected) 
@@ -69,8 +74,11 @@
       fluidRow(ds_selector),
       column(width=5, 
       fluidRow(
-               tipify(selectInput(NS(id, "covarName"), "X covariate", non_unique, selected=default_covar, width="100%"),
+               tipify(selectInput(NS(id, "covarXName"), "X covariate", non_unique, selected=default_covar, width="100%"),
                       "Variable shown on the X axis", placement="right")),
+      fluidRow(
+               tipify(selectInput(NS(id, "covarYName"), "Y covariate", non_unique, selected="Expression", width="100%"),
+                      "Variable shown on the Y axis", placement="right")),
       fluidRow(
                tipify(selectInput(NS(id, "colorBy"), "Color by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Variable coded as color", placement="right")),
@@ -163,6 +171,7 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #'        symbols; use NULL if no such column
 #' @param description_col name of the column in `annot` which contains the gene
 #'        title / description; use NULL if no such column
+#' @param exprs_label Label to be used for the expression values
 #' @return does not return anything useful
 #' @importFrom shiny is.reactivevalues
 #' @examples
@@ -214,7 +223,8 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @export
 geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NULL, 
                                   primary_id="PrimaryID", symbol_col="SYMBOL", description_col="GENENAME", 
-                                  annot_linkout=NULL) {
+                                  annot_linkout=NULL,
+                                  exprs_label = "Expression") {
 ## XXX make checks
 # stopifnot(is.reactive(gene_id))
 # stopifnot(!is.reactive(covar))
@@ -271,16 +281,17 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       filename = function() {
         .id <- g_id()
         .ds <- ds()
-        ret <- sprintf("expression_profile_ds_%s_%s_covarX_%s_colorBy_%s_groupBy_%s_symbolBy_%s_trellisBy_%s.pdf",
+        ret <- sprintf("expression_profile_ds_%s_%s_covarX_%s_covarY_%s_colorBy_%s_groupBy_%s_symbolBy_%s_trellisBy_%s.pdf",
                        .ds, .id,
-                       input$covarName, input$colorBy, input$groupBy, input$symbolBy, input$trellisBy)
+                       input$covarXName, input$covarYName, input$colorBy, input$groupBy, input$symbolBy, input$trellisBy)
         ret <- gsub("[^0-9a-zA-Z_.-]", "", ret)
         return(ret)
       },
       content = function(file) {
         pdf(file=file, width=8, height=5)
         g <- .gene_browser_plot(covar[[ ds() ]], g_id(), 
-                                input$covarName, 
+                                input$covarXName, 
+                                input$covarYName, 
                                 exprs[[ ds() ]], 
                                 annot[[ ds() ]], 
                            input$groupBy, input$colorBy, input$symbolBy, input$trellisBy)
@@ -341,7 +352,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       if(!isTruthy(ds()) || !isTruthy(g_id())) {
         return(NULL)
       }
-      .gene_browser_info_tab(g_id(), covar[[g_id()]][[input$covarName]], exprs[[ds()]][ g_id(), ])
+      .gene_browser_info_tab(g_id(), covar[[g_id()]][[input$covarXName]], exprs[[ds()]][ g_id(), ])
     })
  
     ## reload the plot interface only if the data set (and covariates)
@@ -355,12 +366,14 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     ## The actual plot
     output$countsplot <- renderPlot({
       if(!isTruthy(ds()) || !isTruthy(g_id())) { return(NULL) }
-      if(!isTruthy(input$covarName)) { return(NULL) }
+      if(!isTruthy(input$covarXName)) { return(NULL) }
+      if(!isTruthy(input$covarYName)) { return(NULL) }
       if(is.na(g_id())) { return(NULL) }
       enable("save")
       
-      .gene_browser_plot(covar[[ds()]], g_id(), input$covarName, exprs[[ ds() ]], annot[[ ds() ]], 
-                         input$groupBy, input$colorBy, input$symbolBy, input$trellisBy) +
+      .gene_browser_plot(covar[[ds()]], g_id(), input$covarXName, input$covarYName, exprs[[ ds() ]], annot[[ ds() ]], 
+                         input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
+                         exprs_label = exprs_label) +
                                     theme(text=element_text(size=input$fontSize))
     })
   })

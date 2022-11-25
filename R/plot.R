@@ -567,6 +567,8 @@ plot_ly_pca <- function(mtx, covariate_data, threeD=TRUE, cov_default=NULL) {
 #'
 #' @param id PrimaryID of the gene (usually ENSEMBL ID)
 #' @param xCovar the x covariate – column name from the covariate table
+#' @param xCovar the y covariate – column name from the covariate table
+#' @param expressionLabel - what should be the label for the gene expression covariate
 #' @param exprs gene expression matrix to show on the y axis; rownames must
 #'        be PrimaryIDs. If NULL, the rld object from the pipeline is used.
 #' @param annot_symb_col name of the column in the annot data frame which should be added to the title of the plot.
@@ -584,10 +586,16 @@ plot_ly_pca <- function(mtx, covariate_data, threeD=TRUE, cov_default=NULL) {
 plot_gene <- function(id, xCovar, exprs, covar, annot=NULL, 
                                annot_id_col="PrimaryID",
                                annot_symb_col="SYMBOL",
+                               expressionLabel="Expression",
+                               yCovar=expressionLabel, 
                                groupBy = NA, colorBy = NA, symbolBy = NA,
                                trellisBy=NA) {
 
   df <- data.frame(covar, Expression=exprs[id, ])
+  colnames(df)[ncol(df)] <- expressionLabel
+  print(df)
+  print(colnames(df))
+
   if(!is.null(annot)) {
     title <- sprintf("%s (%s)", id, annot[ match(id, annot[[annot_id_col]]), ][[annot_symb_col]])
   } else {
@@ -596,15 +604,15 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
 
   if(!is.na(colorBy)) {
     if(!is.na(groupBy)) {
-      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[["Expression"]], group=.data[[groupBy]], color=.data[[colorBy]]))
+      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[[yCovar]], group=.data[[groupBy]], color=.data[[colorBy]]))
     } else {
-      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[["Expression"]], color=.data[[colorBy]]))
+      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[[yCovar]], color=.data[[colorBy]]))
     }
   } else {
     if(!is.na(groupBy)) {
-      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[["Expression"]], group=.data[[groupBy]]))
+      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[[yCovar]], group=.data[[groupBy]]))
     } else {
-      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[["Expression"]]))
+      g <- ggplot(df, aes(x=.data[[xCovar]], y=.data[[yCovar]]))
     }
   }
 
