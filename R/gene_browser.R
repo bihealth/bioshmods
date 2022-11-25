@@ -63,7 +63,6 @@
     res <- res %>%
       mutate('>'= sprintf(but, ds_id, .data[[primary_id]])) %>% 
       relocate(all_of(">"), .before=1)
-
   }
   
 
@@ -114,7 +113,7 @@ geneBrowserTableUI <- function(id, cntr_titles) {
                         ),
         fluidRow(
                  column(6,
-                 tipify(checkboxInput(NS(id, "filter"), "Filter", TRUE, width="100%"),
+                 tipify(checkboxInput(NS(id, "filter"), "Filter", FALSE, width="100%"),
                         "Choose whether the output should be filtered"),
                  tipify(numericInput(NS(id, "f_lfc"),    label="Filter by abs(LFC)", min=0, value=0.5, step=.1, width="100%"),
                         "Show only genes which have an absolute log fold change greater than this value"),
@@ -217,6 +216,16 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 #' ```
 #' annot_linkout=list(ENSEMBL="https://www.ensembl.org/id/%s")
 #' ```
+#'
+#' The parameter `gene_id` is used to communicate with other components of
+#' the shiny app, e.g. with another module (such as geneBrowserPlotServer).
+#' If not NULL, it must be a reactiveValues object. 
+#' When the gene_id is not NULL, colored buttons appear next to the gene ID
+#' in the table. Clicking on them causes changing the information in
+#' `gene_id$id` (ID of the gene) and `gene_id$ds` (dataset or "default" if
+#' there is only a single data set).
+#' 
+#'
 #' @param cntr a list of data frames containing the DE analysis results, or
 #'             a list of lists of data frames
 #' @param annot annotation data frame containing column 'PrimaryID' (
@@ -236,9 +245,11 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 #' @importFrom rlang .data
 #' @importFrom stats cor.test
 #' @importFrom bslib bs_theme
+#' @importFrom shiny is.reactivevalues
 #' @examples 
+#' data(C19)
+#'
 #' if(interactive()) {
-#'   data(C19)
 #'   ui <- fluidPage(
 #'            geneBrowserTableUI("gb", names(C19$contrasts))
 #'         )
@@ -250,12 +261,33 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 #'
 #'   shinyApp(ui, server)
 #' }
+#'
+#' ## Using the gene_id reactive value
+#' ## Clicking on the button displays the gene ID
+#' if(interactive()) {
+#'   ui <- fluidPage(
+#'            geneBrowserTableUI("gb", names(C19$contrasts)),
+#'            textOutput("gene")
+#'         )
+#'
+#'   server <- function(input, output) {
+#'     gene_id <- reactiveValues()
+#'     geneBrowserTableServer("gb", gene_id=gene_id,
+#'                                  cntr=C19$contrasts,
+#'                                  annot=C19$annotation)
+#'     output$gene <- 
+#'       renderText(sprintf("gene ID: %s, data set: %s", gene_id$id, gene_id$ds))
+#'   }
+#'
+#'   shinyApp(ui, server)
+#' }
 #' @export
 geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
                                    primary_id="PrimaryID", gene_id=NULL,
                                    cols_to_hide=c("stat", "lfcSE", "symbol", "entrez")
                                    ) {
 
+  stopifnot(is.null(gene_id) || is.reactivevalues(gene_id))
   multilevel <- .check_multilevel(cntr)
   .check_params(multilevel, cntr=cntr, annot=annot, 
                 annot_linkout=annot_linkout, primary_id=primary_id)
@@ -325,7 +357,11 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
       .cntr <- gsub(".*::", "", input$contrast)
       .ds   <- gsub("::.*", "", input$contrast)
 
-      res <- cntr[[ .ds ]][[ .cntr ]]
+      #res <- cntr[[ .ds ]][[ .cntr ]]
+      res <- .gene_browser_prep_res_single_contrast(.ds, .cntr, cntr, 
+                                                    as.character(but), 
+                                                    annot, annot_linkout, primary_id, 
+                                                    cols_to_hide)
       if(input$filter) {
         if(input$f_dir == "up") {
           res <- res %>% filter(.data[["log2FoldChange"]] > 0)
@@ -335,11 +371,7 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
 
         res <- res %>% filter(.data[["padj"]] < input$f_pval & abs(.data[["log2FoldChange"]]) > input$f_lfc) 
       }
-
-      res <- .gene_browser_prep_res_single_contrast(.ds, .cntr, cntr, 
-                                                    as.character(but), 
-                                                    annot, annot_linkout, primary_id, 
-                                                    cols_to_hide)
+      message("number of results:", nrow(res))
 
       res %>% datatable(escape=FALSE, selection='none', extensions="Buttons",
                 options=list(pageLength=5, dom="Bfrtip", scrollX=TRUE)) %>%
