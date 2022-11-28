@@ -593,8 +593,8 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
 
   df <- data.frame(covar, Expression=exprs[id, ])
   colnames(df)[ncol(df)] <- expressionLabel
-  print(df)
-  print(colnames(df))
+  #print(df)
+  #print(colnames(df))
 
   if(!is.null(annot)) {
     title <- sprintf("%s (%s)", id, annot[ match(id, annot[[annot_id_col]]), ][[annot_symb_col]])

@@ -72,29 +72,36 @@
 
   tagList(
       fluidRow(ds_selector),
-      column(width=5, 
-      fluidRow(
+      fluidRow(column(width=5, 
+        fluidRow(
                tipify(selectInput(NS(id, "covarXName"), "X covariate", non_unique, selected=default_covar, width="100%"),
                       "Variable shown on the X axis", placement="right")),
-      fluidRow(
+        fluidRow(
                tipify(selectInput(NS(id, "covarYName"), "Y covariate", non_unique, selected="Expression", width="100%"),
                       "Variable shown on the Y axis", placement="right")),
-      fluidRow(
+        fluidRow(
                tipify(selectInput(NS(id, "colorBy"), "Color by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Variable coded as color", placement="right")),
-      fluidRow(
+        fluidRow(
                tipify(selectInput(NS(id, "symbolBy"), "Symbol by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Variable coded as symbol", placement="right")),
       ),
       column(width=5,
-      fluidRow(
+        fluidRow(
                tipify(selectInput(NS(id, "groupBy"), "Link data points by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Points with identical values will be linked by a line", placement="right")),
-      fluidRow(tipify(selectInput(NS(id, "trellisBy"), "Trellis by", c("N/A", non_unique), selected="N/A", width="100%"),
+        fluidRow(tipify(selectInput(NS(id, "trellisBy"), "Trellis by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Each unique value of the variable will be shown on a separate subplot", placement="right")),
-      fluidRow(tipify(numericInput(NS(id, "fontSize"),    label="Font size", min=6, value=14, step=1, width="50%"),
+        fluidRow(tipify(numericInput(NS(id, "fontSize"),    label="Font size", min=6, value=14, step=1, width="50%"),
                       "Change the base font size of the figure", placement="right")),
+       fluidRow(figsizeInput(NS(id, "figure_size"), width="100%", selected="800x600"),
+                bsTooltip(NS(id, "figure_size"), 
+                  "Change the figure size (in pixels), width x height. Press backspace to enter your own sizes.", placement="right")),
       offset=1),
+      ),
+
+
+
       fluidRow(textOutput(NS(id, "addInfo"))),
       fluidRow(h3("Additional info:")),
       fluidRow(tableOutput(NS(id, "geneData")))
@@ -115,7 +122,8 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
                       tipify(downloadButton(NS(id, "save"), "PDF", class="bg-success"),
                              "Save as PDF")),
                column(width=11,
-                      withSpinner(plotOutput(NS(id, "countsplot")))))
+                      withSpinner(plotOutput(NS(id, "countsplot"), height="100%", width="100%")))
+      )
 
   if(contrasts) {
     return(sidebarLayout(col_control,
@@ -276,6 +284,16 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
         ds(input$dataset)
       }})
 
+    fig_size <- reactiveValues()
+    observeEvent(input$figure_size, {
+      fig_size$width <- 
+        as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\1", input$figure_size))
+
+      fig_size$height <- 
+        as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\2", input$figure_size))
+    })
+
+
     ## Save figure as a PDF
     output$save <- downloadHandler(
       filename = function() {
@@ -295,7 +313,6 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
                                 exprs[[ ds() ]], 
                                 annot[[ ds() ]], 
                            input$groupBy, input$colorBy, input$symbolBy, input$trellisBy)
-        print(g)
         dev.off()
       }
     )
@@ -363,8 +380,9 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       .dynamic_col_control(id, covar[[.ds]], names(covar), datasets[.ds])
     })
  
-    ## The actual plot
-    output$countsplot <- renderPlot({
+    ## The actual plot. need to put inside "observe" to use the reactive
+    ## figure size
+    observe({ output$countsplot <- renderPlot({
       if(!isTruthy(ds()) || !isTruthy(g_id())) { return(NULL) }
       if(!isTruthy(input$covarXName)) { return(NULL) }
       if(!isTruthy(input$covarYName)) { return(NULL) }
@@ -375,7 +393,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
                          input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
                          exprs_label = exprs_label) +
                                     theme(text=element_text(size=input$fontSize))
-    })
+    }, width=fig_size$width, height=fig_size$height) })
   })
 }
 

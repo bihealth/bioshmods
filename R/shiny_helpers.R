@@ -6,7 +6,7 @@
 #' @param selected Default figure size
 #' @param ... further arguments passed to selectizeInput
 #' @export
-figsizeInput <- function(id, label="Figure size", 
+figsizeInput <- function(id, label="Figure size (w x h)", 
                              choices=c("800x800", 
                                           "600x600",
                                           "600x800",
