@@ -200,7 +200,7 @@ pcaServer <- function(id, pca, covar, idcol="ID", threeD=FALSE, colorBy=NULL, sy
       } else {
         disable("z")
         plot_ly(data=df[[ds]], type="scatter", x=df[[ds]][[x]], y=df[[ds]][[y]], 
-                mode="markers", color=color, symbol=symbol,
+                mode="markers", color=color, symbol=symbol, size=I(100),
                 hovertext=df[[ds]][["hoverinfo"]])
       }
     })
