@@ -590,6 +590,10 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
                                yCovar=expressionLabel, 
                                groupBy = NA, colorBy = NA, symbolBy = NA,
                                trellisBy=NA) {
+  if(is.null(exprs)) { stop("No expression matrix provided") }
+  if(is.null(covar)) { stop("No covariate data frame provided") }
+  if(is.null(exprs[id, ])) { stop("No expression data for gene ", id) }
+  if(nrow(covar) != length(exprs[id, ])) { stop("Expression matrix and covariate data frame have different number of columns/rows") }
 
   df <- data.frame(covar, Expression=exprs[id, ])
   colnames(df)[ncol(df)] <- expressionLabel

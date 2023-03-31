@@ -41,15 +41,20 @@
                                exprs_label = "Expression") {
   if(covarYName == "Expression") { covarYName <- exprs_label }
   if(covarXName == "Expression") { covarXName <- exprs_label }
+
   .args <- list(id=id, xCovar=covarXName, yCovar=covarYName, covar=covar, exprs=rld, groupBy=groupBy, annot=annot,
                 expressionLabel = exprs_label,
                 colorBy=colorBy, symbolBy=symbolBy, trellisBy=trellisBy)
+
   ## weirdly, the line below is really, really slow
   #.args <- map(.args, ~ if(!is.na(.x) && .x == "N/A") { NA } else { .x })
+
   if(.args$groupBy == "N/A")    .args$groupBy   <- NA
   if(.args$colorBy == "N/A")    .args$colorBy   <- NA
   if(.args$symbolBy == "N/A")   .args$symbolBy  <- NA
   if(.args$trellisBy == "N/A")  .args$trellisBy <- NA
+  message(sprintf("Calling plot_gene with arguments: \n\tid=%s\n\txCovar=%s\n\tyCovar=%s\n\tgroupBy=%s\n\tcolorBy=%s\n\tsymbolBy=%s\n\ttrellisBy=%s",
+                  .args$id, .args$xCovar, .args$yCovar, .args$groupBy, .args$colorBy, .args$symbolBy, .args$trellisBy))
   do.call(plot_gene, .args)
 }
 
@@ -244,6 +249,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 #                 colnames(annot)))
 # }
 
+  # if we have a single dataset, we need to wrap it into a list
   if(is.data.frame(covar)) {
     covar <- list(default=covar)
     exprs <- list(default=exprs)
@@ -253,13 +259,15 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     message("geneBrowserPlotServer in multi dataset mode")
   }
 
-  ## vector holding the names of all datasets
+  # vector holding the names of all datasets
   datasets        <- names(covar)
   names(datasets) <- datasets
 
+  # start the module server
   moduleServer(id, function(input, output, session) {
     disable("save")
 
+    # if gene_id is not a reactiveValues object, wrap it into one
     if(!is.reactivevalues(gene_id)) {
       tmp <- gene_id
       gene_id <- reactiveValues()
@@ -269,10 +277,13 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       }
     }
 
+    # ds holds the dataset; g_id holds the gene ID
     ds   <- reactiveVal()
     g_id <- reactiveVal()
 
     observe({
+      # observe the "outside" gene_id object, and, if it changes, update
+      # the internal ds and g_id objects
       if(!is.null(gene_id)) {
         if(isTruthy(gene_id$ds)) { ds(gene_id$ds) }
         if(isTruthy(gene_id$id)) { g_id(gene_id$id) }
@@ -280,6 +291,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     })
 
     observe({
+      # if the dataset changes, update the ds object
       if(isTruthy(input$dataset)) {
         ds(input$dataset)
       }})
@@ -389,6 +401,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       if(is.na(g_id())) { return(NULL) }
       enable("save")
       
+      message(sprintf("plotting started with dataset=%s and gene=%s", ds(), g_id()))
       .gene_browser_plot(covar[[ds()]], g_id(), input$covarXName, input$covarYName, exprs[[ ds() ]], annot[[ ds() ]], 
                          input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
                          exprs_label = exprs_label) +
