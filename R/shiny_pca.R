@@ -33,8 +33,6 @@
 #' @export
 pcaUI <- function(id, datasets=NULL) {
 
-
-
   if(is.null(datasets)) {
     ds_selector <- hidden(selectInput(NS(id, "dataset"), "Dataset:", "default", selected="default"))
   } else {
@@ -110,6 +108,7 @@ pcaUI <- function(id, datasets=NULL) {
 #' @export
 pcaServer <- function(id, pca, covar, idcol="ID", threeD=FALSE, colorBy=NULL, symbolBy=NULL) {
 
+  if(is.null(pca)) { stop("PCA object not defined") }
   stopifnot(is.character(id))
   stopifnot(is.logical(threeD))
 

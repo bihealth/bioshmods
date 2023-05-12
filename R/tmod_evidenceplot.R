@@ -43,7 +43,6 @@
 
 .plot_evidence <- function(mod_id, cntr_id, db_id, sort_id, cntr, tmod_dbs,
                            tmod_gl=NULL, tmod_map=NULL, annot=NULL, primary_id) {
-
   mset <- tmod_dbs[[db_id]]
   cntr <- cntr[[ cntr_id ]]
 
@@ -61,8 +60,14 @@
     gl <- tmod_map$maps[[ tmod_map$dbs[[ db_id ]] ]][ cntr[[primary_id]] ]
   } else {
     gl <- tmod_gl[[cntr_id]][[sort_id]]
+    if(is.null(gl)) {
+      stop(sprintf("Gene list for contrast %s and sort %s not found", cntr_id, sort_id))
+    }
+
     gl <- tmod_map$maps[[ tmod_map$dbs[[ db_id ]] ]][ annot[[primary_id]][ gl ] ]
   }
+
+  stopifnot(!is.null(gl))
 
   symbols <- names(gl)
 
@@ -102,6 +107,9 @@
 ## given a module, contrast, sorting: prepare a module info tab contents,
 ## including which genes are significant in the given contrast
 .tmod_browser_mod_info <- function(id, ds, db_name, cntr_name, sort_name, tmod_dbs, cntr, tmod_map, tmod_res=NULL) {
+  stopifnot(!is.null(ds))
+  stopifnot(!is.null(tmod_dbs))
+
   db <- tmod_dbs[[db_name]]
 
   if(is(db, "tmodGS")) {
@@ -236,6 +244,7 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
 
   stopifnot(!is.null(tmod_gl) || !is.null(tmod_map))
 
+  # XXX not a good check
   if(!is.data.frame(annot)) {
     message("tmodBrowserPlotServer: running in multilevel mode")
   } else {
@@ -273,6 +282,7 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
       enable("save")
 
       ds <- gs_id$ds
+      message("plotting ds=", ds, " id=", gs_id$id, " cntr=", gs_id$cntr, " db=", gs_id$db, " sort=", gs_id$sort)
       .plot_evidence(mod_id=gs_id$id, cntr_id=gs_id$cntr, db_id=gs_id$db, sort_id=gs_id$sort, 
                      cntr=cntr[[ds]], tmod_dbs=tmod_dbs[[ds]], tmod_gl=tmod_gl[[ds]], 
                      tmod_map=tmod_map[[ds]], annot=annot[[ds]], primary_id)

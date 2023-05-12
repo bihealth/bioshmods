@@ -296,7 +296,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
         ds(input$dataset)
       }})
 
-    fig_size <- reactiveValues()
+    fig_size <- reactiveValues(width=600, height=600)
     observeEvent(input$figure_size, {
       fig_size$width <- 
         as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\1", input$figure_size))
