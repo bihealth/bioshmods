@@ -247,12 +247,14 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
   # XXX not a good check
   if(!is.data.frame(annot)) {
     message("tmodBrowserPlotServer: running in multilevel mode")
+    mode <- "multi"
   } else {
     tmod_dbs <- list(default=tmod_dbs)
     cntr     <- list(default=cntr)
     tmod_map <- list(default=tmod_map)
     tmod_gl  <- list(default=tmod_gl)
     annot    <- list(default=annot)
+    mode     <- "single"
   }
     
   moduleServer(id, function(input, output, session) {

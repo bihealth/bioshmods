@@ -76,7 +76,7 @@ chunk_generate_rmd <- function(chunk, dpi=72) {
     ret <- glue('{ret}\n#| fig-cap: {chunk$fig.cap}\n')
   }
 
-  ret <- glue('{ret}\n{chunk$code}\n```\n')
+  ret <- glue('{ret}\n\n{chunk$code}\n```\n')
 
   msg("generated rmd chunk:\n", ret)
   return(ret)

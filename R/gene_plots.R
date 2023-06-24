@@ -106,7 +106,9 @@
     colnames(df)[ncol(df)] <- exprs_label
   }
 
-  ret <- glue('df <- data.frame({covar_name}, Expression={exprs_name}["{id}", , drop=TRUE])')
+  ret <- glue('
+df <- data.frame({covar_name}, 
+                 Expression={exprs_name}["{id}", , drop=TRUE])')
   ret <- glue('{ret}\n\ncolnames(df)[ncol(df)] <- "{exprs_label}"')
   ret <- glue('{ret}\n\nggplot(df, aes(x={input$covarXName}, y={input$covarYName}')
 
@@ -496,6 +498,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     # generate the markdown code
     observeEvent(input$rmd, {
       msg("rmd pressed")
+      if(!isTruthy(ds()) || !isTruthy(g_id()) || !isTruthy(plot_code())) { return(NULL) }
       .add_chunk(id, plot_code(), rmd_var, g_id(), ds(), mode, fig_size)
     })
  

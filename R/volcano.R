@@ -232,7 +232,7 @@ volcanoServer <- function(id, cntr, annot, lfc_col="log2FoldChange", pval_col="p
 }
 
 
-.volcano_plot_title <- function(datsets, mode) {
+.volcano_plot_title <- function(datasets, mode) {
   ds <- .volcano_ds2str(datasets, mode)
 
   if(mode == "single") {
@@ -253,15 +253,15 @@ volcanoServer <- function(id, cntr, annot, lfc_col="log2FoldChange", pval_col="p
     return("")
   }
 
-  if(input$dataset == "_all") {
+  if(datasets == "_all") {
     return("all")
   }
 
-  if(length(input$dataset) > 1) {
-    return(paste(input$dataset, collapse=", "))
+  if(length(datasets) > 1) {
+    return(paste(datasets, collapse=", "))
   }
 
-  return(input$dataset)
+  return(datasets)
 }
 
 ## code side effects: g (the plot), df (data frame underlying plot)
