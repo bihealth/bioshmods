@@ -15,7 +15,6 @@
      return(ret)
 }
 
-## figure out the default covariate to be pre-selected in the UI
 .default_covar <- function(covar, all_covars, default="group") {
   interesting_covars <- covar %>% 
       summary_colorDF() %>% 
@@ -35,110 +34,32 @@
   return(default_covar)
 }
 
-.add_chunk <- function(id, code, rmd_var, gene_id, dataset, mode, fig_size) { 
-      message(sprintf("generate rmd started with dataset=%s and gene=%s", dataset, gene_id))
 
-      if(mode == "multi") {
-        title <- sprintf("Expression profile of gene %s in dataset %s", gene_id, dataset)
-      } else {
-        title <- sprintf("Expression profile of gene %s", gene_id)
-      }
+## Wrapper around plot_gene, mainly to replace "N/A" with NA
+.gene_browser_plot <- function(covar, id, covarXName, covarYName, rld, annot, 
+                               groupBy = "N/A", colorBy = "N/A", symbolBy = "N/A", trellisBy="N/A",
+                               exprs_label = "Expression") {
+  if(covarYName == "Expression") { covarYName <- exprs_label }
+  if(covarXName == "Expression") { covarXName <- exprs_label }
 
-      msg(".add_chunk: chunk title is", title)
-      add_chunk(id=id, type="plot", code=code, label="gene_plot", rmd_var=rmd_var, title=title, 
-                fig.cap=title, fig.width=fig_size$width, fig.height=fig_size$height)
+  .args <- list(id=id, xCovar=covarXName, yCovar=covarYName, covar=covar, exprs=rld, groupBy=groupBy, annot=annot,
+                expressionLabel = exprs_label,
+                colorBy=colorBy, symbolBy=symbolBy, trellisBy=trellisBy)
 
-}
+  ## weirdly, the line below is really, really slow
+  #.args <- map(.args, ~ if(!is.na(.x) && .x == "N/A") { NA } else { .x })
 
-.contrast_summary <- function(contrasts, dataset, gene_id, primary_id) {
-  cn <- names(contrasts[[dataset]])
-  res <- imap_dfr(contrasts, ~ {
-                    .ds <- .y
-                    imap_dfr(.x, ~ {
-                               .x %>% filter(.data[[ primary_id ]] == gene_id) %>%
-                                 mutate("Data set"=.ds, Contrast=.y)
-                    })
-              })
-
-  res <- res %>% relocate(all_of(c("Data set", "Contrast")))
-  numcol <- map_lgl(res, is.numeric)
-  res %>% datatable(escape=FALSE, selection='none', options=list(pageLength=5)) %>%
-    formatSignif(columns=colnames(res)[numcol], digits=2)
-}
-
-# returns the code to evaluate in order to generate the plot
-# if substitute is TRUE, the variable names will be substituted
-# by names of the variables in the environment which is parent to the shiny
-# module
-.gene_browser_generate_plot_code <- function(input, covar, exprs, id, dataset, mode, varnames, exprs_label=NULL, substitute=FALSE) {
-  multi <- mode == "multi"
-
-  ret <- ""
-  covar_name <- "covar"
-  exprs_name <- "exprs"
-
-  if(is_na(input$covarXName)) { warning("X covariate is not defined") ; return(NULL) }
-  if(is_na(input$covarYName)) { warning("Y covariate is not defined") ; return(NULL) }
-
-  if(is.null(exprs_label)) { exprs_label <- "Expression" }
-
-  if(substitute) {
-    covar_name <- varnames$covar
-    exprs_name <- varnames$exprs
-  } else {
-    # when running in own frame, multi is always true because we converted
-    # the data
-    multi <- TRUE
-  }
-
-  if(multi) {
-    covar_name <- paste0(covar_name, '[["', dataset, '"]]')
-    exprs_name <- paste0(exprs_name, '[["', dataset, '"]]')
-  }
-
-  # need to create this data frame to test whether variables are numerical
-  # or categorical
-  if(multi) {
-    df <- data.frame(covar[[dataset]], Expression=exprs[[dataset]][id, , drop=TRUE])
-    colnames(df)[ncol(df)] <- exprs_label
-  } else {
-    df <- data.frame(covar[[dataset]], Expression=exprs[[dataset]][id, , drop=TRUE])
-    colnames(df)[ncol(df)] <- exprs_label
-  }
-
-  ret <- glue('df <- data.frame({covar_name}, Expression={exprs_name}["{id}", , drop=TRUE])')
-  ret <- glue('{ret}\n\ncolnames(df)[ncol(df)] <- "{exprs_label}"')
-  ret <- glue('{ret}\n\nggplot(df, aes(x={input$covarXName}, y={input$covarYName}')
-
-  if(!is_na(input$colorBy))  { ret <- glue('{ret}, color={input$colorBy}') }
-  if(!is_na(input$groupBy))  { ret <- glue('{ret}, group={input$groupBy}') }
-  if(!is_na(input$symbolBy)) { ret <- glue('{ret}, shape={input$symbolBy}') }
-  ret <- glue('{ret})) + ')
-
-  if(!is.numeric(df[[input$covarXName]]) && is_na(input$groupBy)) {
-    ret <- glue('
-{ret}
-  geom_boxplot(outlier.shape = NA) + 
-  geom_jitter(size=3, alpha=.5, width=.1)')
-  } else {
-    ret <- glue('
-{ret}
-  geom_point(size=3)')
-  }
-
-  if(!is_na(input$groupBy))   { ret <- glue('
-{ret} + \n  geom_line()') }
-  if(!is_na(input$trellisBy)) { ret <- glue('
-{ret} + \n  facet_wrap( ~ {input$trellisBy})') }
-  ret <- glue('
-{ret} + \n  theme(text=element_text(size={input$fontSize}))')
-  print(ret)
-  return(ret)
+  if(.args$groupBy == "N/A")    .args$groupBy   <- NA
+  if(.args$colorBy == "N/A")    .args$colorBy   <- NA
+  if(.args$symbolBy == "N/A")   .args$symbolBy  <- NA
+  if(.args$trellisBy == "N/A")  .args$trellisBy <- NA
+  message(sprintf("Calling plot_gene with arguments: \n\tid=%s\n\txCovar=%s\n\tyCovar=%s\n\tgroupBy=%s\n\tcolorBy=%s\n\tsymbolBy=%s\n\ttrellisBy=%s",
+                  .args$id, .args$xCovar, .args$yCovar, .args$groupBy, .args$colorBy, .args$symbolBy, .args$trellisBy))
+  do.call(plot_gene, .args)
 }
 
 
-## dynamically generate the UI controls for the gene plots from the
-## actually selected data set
+
 .dynamic_col_control <- function(id, covar, datasets, ds_selected) {
 
   covar_sum <- summary_colorDF(covar)
@@ -203,9 +124,8 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
                  )
   plot_ui <- 
       fluidRow(column(width=1, 
-                      tipify(downloadButton(NS(id, "save"), "PDF", class="bg-success"), "Save as PDF"),
-                      tipify(actionButton(NS(id, "rmd"), "Add to report", class="bg-success"), "Rmarkdown")
-                      ),
+                      tipify(downloadButton(NS(id, "save"), "PDF", class="bg-success"),
+                             "Save as PDF")),
                column(width=11,
                       withSpinner(plotOutput(NS(id, "countsplot"), height="100%", width="100%")))
       )
@@ -265,11 +185,8 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @param description_col name of the column in `annot` which contains the gene
 #'        title / description; use NULL if no such column
 #' @param exprs_label Label to be used for the expression values
-#' @param rmd_var a reactive values object which will be used to store the
-#'        generated markdown chunks
 #' @return does not return anything useful
 #' @importFrom shiny is.reactivevalues
-#' @importFrom glue glue
 #' @examples
 #' mtx <- matrix(rnorm(40, mean=rep(c(0, 1), each=20)), nrow=1)
 #' rownames(mtx) <- "MUZG"
@@ -319,34 +236,26 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @export
 geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NULL, 
                                   primary_id="PrimaryID", symbol_col="SYMBOL", description_col="GENENAME", 
-                                  annot_linkout=NULL, rmd_var=NULL,
+                                  annot_linkout=NULL,
                                   exprs_label = "Expression") {
-  parent_frame <- parent.frame()
-  varnames <- list(
-                   covar           = deparse(substitute(covar)),
-                   exprs           = deparse(substitute(exprs)),
-                   annot           = deparse(substitute(annot)),
-                   exprs_label     = deparse(substitute(exprs_label)),
-                   annot_linkout   = deparse(substitute(annot_linkout)),
-                   description_col = deparse(substitute(description_col)),
-                   symbol_col      = deparse(substitute(symbol_col)),
-                   primary_id      = deparse(substitute(primary_id)),
-                   cntr            = deparse(substitute(cntr))
-                   )
+## XXX make checks
+# stopifnot(is.reactive(gene_id))
+# stopifnot(!is.reactive(covar))
+# stopifnot(!is.reactive(exprs))
+# stopifnot(!is.reactive(annot))
+# stopifnot(is.null(annot) || is.data.frame(annot))
+# if(!is.null(annot)) {
+#   stopifnot(all(c(primary_id, symbol_col, description_col) %in% 
+#                 colnames(annot)))
+# }
 
   # if we have a single dataset, we need to wrap it into a list
   if(is.data.frame(covar)) {
-    mode  <- "single"
     covar <- list(default=covar)
     exprs <- list(default=exprs)
     annot <- list(default=annot)
     cntr  <- list(default=cntr)
-
-    if(!is.null(annot_linkout)) {
-      annot_linkout <- list(default=annot_linkout)
-    }
   } else {
-    mode <- "multi"
     message("geneBrowserPlotServer in multi dataset mode")
   }
 
@@ -369,10 +278,8 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     }
 
     # ds holds the dataset; g_id holds the gene ID
-    ds        <- reactiveVal()
-    g_id      <- reactiveVal()
-    fig_size  <- reactiveValues(width=600, height=600)
-    plot_code <- reactiveVal()
+    ds   <- reactiveVal()
+    g_id <- reactiveVal()
 
     observe({
       # observe the "outside" gene_id object, and, if it changes, update
@@ -389,7 +296,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
         ds(input$dataset)
       }})
 
-
+    fig_size <- reactiveValues(width=600, height=600)
     observeEvent(input$figure_size, {
       fig_size$width <- 
         as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\1", input$figure_size))
@@ -412,8 +319,12 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       },
       content = function(file) {
         pdf(file=file, width=8, height=5)
-        code <- plot_code()
-        print(eval(parse(text=code), envir=parent_frame))
+        g <- .gene_browser_plot(covar[[ ds() ]], g_id(), 
+                                input$covarXName, 
+                                input$covarYName, 
+                                exprs[[ ds() ]], 
+                                annot[[ ds() ]], 
+                           input$groupBy, input$colorBy, input$symbolBy, input$trellisBy)
         dev.off()
       }
     )
@@ -443,14 +354,33 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 
     ## summary contrasts table
     output$contr_sum <- renderDT({
-      if(!isTruthy(ds()) || !isTruthy(g_id()) || is.null(cntr[[ ds() ]])) { return(NULL) }
-      .contrast_summary(cntr, ds(), g_id(), primary_id)
+      if(!isTruthy(ds()) || !isTruthy(g_id()) || is.null(cntr[[ ds() ]])) {
+        return(NULL)
+      }
+      cn <- names(cntr[[ ds() ]])
+      res <- imap_dfr(cntr[[ ds() ]], ~ .x %>% 
+                      filter(.data[[ primary_id ]] == g_id()) %>% 
+                  mutate(contrast=.y))
+      res <- imap_dfr(cntr, ~ {
+                        .ds <- .y
+                        imap_dfr(.x, ~ {
+                                   .x %>% filter(.data[[ primary_id ]] == g_id()) %>%
+                                     mutate("Data set"=.ds, Contrast=.y)
+                        })
+                  })
+ 
+      res <- res %>% relocate(all_of(c("Data set", "Contrast")))
+      numcol <- map_lgl(res, is.numeric)
+      res %>% datatable(escape=FALSE, selection='none', options=list(pageLength=5)) %>%
+        formatSignif(columns=colnames(res)[numcol], digits=2)
     })
  
     ## Additional information - e.g. correlation coefficient if the
     ## covariate is numeric
     output$addInfo <- renderText({
-      if(!isTruthy(ds()) || !isTruthy(g_id())) { return(NULL) }
+      if(!isTruthy(ds()) || !isTruthy(g_id())) {
+        return(NULL)
+      }
       .gene_browser_info_tab(g_id(), covar[[g_id()]][[input$covarXName]], exprs[[ds()]][ g_id(), ])
     })
  
@@ -461,57 +391,22 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       if(!isTruthy(.ds)) { .ds <- 1 }
       .dynamic_col_control(id, covar[[.ds]], names(covar), datasets[.ds])
     })
-
-    observe({
-      if(!isTruthy(ds()) || !isTruthy(g_id())) { 
-        msg("ds or g_id not truthy")
-        return(NULL) 
-      }
-      if(!isTruthy(input$covarXName)) { 
-        msg("covarXName not truthy")
-        return(NULL) 
-      }
-      if(!isTruthy(input$covarYName)) { 
-        msg("covarYName not truthy")
-        return(NULL) 
-      }
-      if(is.na(g_id())) { 
-        msg("g_id is NA")
-        return(NULL) 
-      }
-
-      if(is.null(rmd_var)) { 
-        msg("rmd_var is NULL")
-        return(NULL) 
-      }
-
-      message(sprintf("generate code started with dataset=%s and gene=%s", ds(), g_id()))
-      plot_code(.gene_browser_generate_plot_code(input=input, covar=covar, exprs=exprs,
-                                      id=g_id(), dataset=ds(), 
-                                      mode=mode, varnames=varnames, 
-                                      exprs_label=exprs_label, substitute=TRUE))
-    })
-
- 
-    # generate the markdown code
-    observeEvent(input$rmd, {
-      msg("rmd pressed")
-      .add_chunk(id, plot_code(), rmd_var, g_id(), ds(), mode, fig_size)
-    })
  
     ## The actual plot. need to put inside "observe" to use the reactive
     ## figure size
     observe({ output$countsplot <- renderPlot({
-      code <- plot_code()
-      if(!isTruthy(code)) { return(NULL) }
+      if(!isTruthy(ds()) || !isTruthy(g_id())) { return(NULL) }
+      if(!isTruthy(input$covarXName)) { return(NULL) }
+      if(!isTruthy(input$covarYName)) { return(NULL) }
+      if(is.na(g_id())) { return(NULL) }
       enable("save")
       
       message(sprintf("plotting started with dataset=%s and gene=%s", ds(), g_id()))
-      message("evaluating code:", code)
-      eval(str2expression(code), envir=parent_frame)
-      }, width=fig_size$width, height=fig_size$height) 
-    })
-
-  }) # end of moduleServer
+      .gene_browser_plot(covar[[ds()]], g_id(), input$covarXName, input$covarYName, exprs[[ ds() ]], annot[[ ds() ]], 
+                         input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
+                         exprs_label = exprs_label) +
+                                    theme(text=element_text(size=input$fontSize))
+    }, width=fig_size$width, height=fig_size$height) })
+  })
 }
 
