@@ -78,6 +78,114 @@ discoUI <- function(id, cntr_titles) {
   return(cbind(pid1, pid2))
 }
 
+.as_default_named_list <- function(x) {
+  list(default = x)
+}
+
+.is_list_of_data_frames <- function(x) {
+  is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
+}
+
+.is_list_of_list_of_data_frames <- function(x) {
+  is.list(x) && length(x) > 0L &&
+    all(vapply(x, function(ds) .is_list_of_data_frames(ds), logical(1)))
+}
+
+.cntr_primary_ids <- function(cntr_ds, primary_id) {
+  unique(unlist(lapply(cntr_ds, function(df) as.character(df[[primary_id]])), use.names = FALSE))
+}
+
+.make_annotation_from_cntr <- function(cntr_ds, primary_id) {
+  data.frame(
+    setNames(list(.cntr_primary_ids(cntr_ds, primary_id)), primary_id),
+    check.names = FALSE
+  )
+}
+
+.normalize_disco_inputs <- function(cntr, annot, primary_id) {
+  if (.is_list_of_data_frames(cntr)) {
+    cntr <- .as_default_named_list(cntr)
+    if (is.null(annot) || is.data.frame(annot)) {
+      annot <- .as_default_named_list(annot)
+    } else if (is.list(annot) && length(annot) == 1L &&
+               (is.null(annot[[1]]) || is.data.frame(annot[[1]]))) {
+      names(annot) <- "default"
+    } else {
+      stop("For single-dataset cntr, annot must be NULL, a data frame, or a single-element list.")
+    }
+  } else if (.is_list_of_list_of_data_frames(cntr)) {
+    if (is.null(names(cntr)) || any(names(cntr) == "")) {
+      stop("When cntr is a list of datasets, all datasets must be named.")
+    }
+    if (is.null(annot)) {
+      annot <- setNames(vector("list", length(cntr)), names(cntr))
+    } else if (is.data.frame(annot)) {
+      stop("When cntr is a list of datasets, annot must be a list of data frames (or NULL).")
+    }
+  } else {
+    stop("cntr must be a list of data frames, or a named list of such lists.")
+  }
+
+  if (!is.list(annot)) {
+    stop("annot must be NULL, a data frame, or a list of data frames.")
+  }
+
+  if (is.null(names(annot))) {
+    if (length(annot) != length(cntr)) {
+      stop("Unnamed annot list must have the same length as cntr.")
+    }
+    names(annot) <- names(cntr)
+  } else if (any(names(annot) == "")) {
+    stop("When annot is a list, all elements must be named.")
+  }
+
+  if (!all(names(cntr) %in% names(annot))) {
+    stop("annot must contain an entry for each dataset in cntr.")
+  }
+
+  annot <- annot[names(cntr)]
+
+  for (ds in names(cntr)) {
+    cntr_ds <- cntr[[ds]]
+
+    if (!all(vapply(cntr_ds, function(df) primary_id %in% colnames(df), logical(1)))) {
+      bad <- names(cntr_ds)[!vapply(cntr_ds, function(df) primary_id %in% colnames(df), logical(1))]
+      stop(sprintf(
+        "In dataset '%s', all contrasts must contain the '%s' column. Missing in: %s",
+        ds, primary_id, paste(bad, collapse = ", ")
+      ))
+    }
+
+    if (is.null(annot[[ds]])) {
+      annot[[ds]] <- .make_annotation_from_cntr(cntr_ds, primary_id)
+    }
+
+    if (!is.data.frame(annot[[ds]])) {
+      stop(sprintf("Annotation for dataset '%s' must be a data frame or NULL.", ds))
+    }
+
+    if (!primary_id %in% colnames(annot[[ds]])) {
+      stop(sprintf("Annotation for dataset '%s' must contain the '%s' column.", ds, primary_id))
+    }
+
+    annot_ids <- as.character(annot[[ds]][[primary_id]])
+    for (cntr_name in names(cntr_ds)) {
+      cntr_ids <- unique(as.character(cntr_ds[[cntr_name]][[primary_id]]))
+      missing_ids <- setdiff(cntr_ids, annot_ids)
+      if (length(missing_ids) > 0L) {
+        n_show <- min(length(missing_ids), 5L)
+        stop(sprintf(
+          "Annotation for dataset '%s' is missing %d '%s' values used by contrast '%s' (first %d: %s).",
+          ds, length(missing_ids), primary_id, cntr_name, n_show,
+          paste(missing_ids[seq_len(n_show)], collapse = ", ")
+        ))
+      }
+    }
+  }
+
+  list(cntr = cntr, annot = annot)
+}
+
 #' Shiny Module – disco plots
 #'
 #' Shiny Module – disco plots
@@ -103,11 +211,12 @@ discoServer <- function(id, cntr, annot=NULL,
     selcols=c("PrimaryID", "ENTREZ", "SYMBOL"),
     primary_id="PrimaryID", gene_id=NULL) {
 
-  if(!is.data.frame(cntr[[1]])) {
+  normalized <- .normalize_disco_inputs(cntr, annot, primary_id)
+  cntr <- normalized$cntr
+  annot <- normalized$annot
+
+  if(!"default" %in% names(cntr)) {
     message("discoServer in multi dataset mode")
-  } else {
-    cntr  <- list(default=cntr)
-    annot <- list(default=annot)
   }
 
   link <- actionButton(NS(id, "gene_id~%s~%s"), label="%s \U25B6 ",
@@ -214,7 +323,7 @@ discoServer <- function(id, cntr, annot=NULL,
                         by=c(input$match1, input$match2)))
 
       disco(.ds)
-      if(class(.ds) == "try-error") { 
+      if(is(.ds, "try-error")) { 
         message("An error occured")
        #output$discoplot <- renderPlot({
        #  stop(.ds)
@@ -264,7 +373,7 @@ discoServer <- function(id, cntr, annot=NULL,
     output$discoplot <- renderPlot({
       message("rendering plot")
       .ds <- disco()
-      if(class(.ds) == "try-error") { stop(.ds) }
+      if(is(.ds, "try-error")) { stop(.ds) }
       req(plot_obj())
       plot_obj()
     }, width=600, height=600, res=90)
@@ -289,14 +398,14 @@ discoServer <- function(id, cntr, annot=NULL,
 
     ## react to hover over points: enter the close genes into current list
     observeEvent(input$plot_hover, {
-      pid <- disco() %>% nearPoints(input$plot_hover) #%>% pull(.data[[primary_id]])
+      pid <- disco() %>% nearPoints(input$plot_hover, xvar = "log2FoldChange.x", yvar = "log2FoldChange.y")
       ret <- .get_gene_df(pid, selcols, primary_id, annot[[dataset1()]], annot[[dataset2()]])
       current_genes(ret)
     })
 
     ## react to points selected by brush: enter the genes into current list
     observeEvent(input$plot_brush, {
-      pid <- disco() %>% brushedPoints(input$plot_brush) #%>% pull(.data[[primary_id]])
+      pid <- disco() %>% brushedPoints(input$plot_brush, xvar = "log2FoldChange.x", yvar = "log2FoldChange.y")
       ret <- .get_gene_df(pid, selcols, primary_id, annot[[dataset1()]], annot[[dataset2()]])
       selected_genes(ret)
     })
@@ -320,4 +429,3 @@ discoServer <- function(id, cntr, annot=NULL,
 
   })
 }
-
