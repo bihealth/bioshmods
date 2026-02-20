@@ -1,3 +1,130 @@
+.volcano_as_default_named_list <- function(x) {
+  list(default = x)
+}
+
+.volcano_is_list_of_data_frames <- function(x) {
+  is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
+}
+
+.volcano_is_list_of_list_of_data_frames <- function(x) {
+  is.list(x) && length(x) > 0L &&
+    all(vapply(x, function(ds) .volcano_is_list_of_data_frames(ds), logical(1)))
+}
+
+.volcano_cntr_primary_ids <- function(cntr_ds, primary_id) {
+  unique(unlist(lapply(cntr_ds, function(df) as.character(df[[primary_id]])), use.names = FALSE))
+}
+
+.volcano_make_annotation_from_cntr <- function(cntr_ds, primary_id) {
+  data.frame(
+    setNames(list(.volcano_cntr_primary_ids(cntr_ds, primary_id)), primary_id),
+    check.names = FALSE
+  )
+}
+
+.normalize_volcano_inputs <- function(cntr, annot, primary_id, lfc_col, pval_col, annot_show) {
+  if (.volcano_is_list_of_data_frames(cntr)) {
+    cntr <- .volcano_as_default_named_list(cntr)
+    if (is.null(annot) || is.data.frame(annot)) {
+      annot <- .volcano_as_default_named_list(annot)
+    } else if (is.list(annot) && length(annot) == 1L &&
+               (is.null(annot[[1]]) || is.data.frame(annot[[1]]))) {
+      names(annot) <- "default"
+    } else {
+      stop("For single-dataset cntr, annot must be NULL, a data frame, or a single-element list.")
+    }
+  } else if (.volcano_is_list_of_list_of_data_frames(cntr)) {
+    if (is.null(names(cntr)) || any(names(cntr) == "")) {
+      stop("When cntr is a list of datasets, all datasets must be named.")
+    }
+    if (is.null(annot)) {
+      annot <- setNames(vector("list", length(cntr)), names(cntr))
+    } else if (is.data.frame(annot)) {
+      stop("When cntr is a list of datasets, annot must be a list of data frames (or NULL).")
+    }
+  } else {
+    stop("cntr must be a list of data frames, or a named list of such lists.")
+  }
+
+  if (!is.list(annot)) {
+    stop("annot must be NULL, a data frame, or a list of data frames.")
+  }
+
+  if (is.null(names(annot))) {
+    if (length(annot) != length(cntr)) {
+      stop("Unnamed annot list must have the same length as cntr.")
+    }
+    names(annot) <- names(cntr)
+  } else if (any(names(annot) == "")) {
+    stop("When annot is a list, all elements must be named.")
+  }
+
+  if (!all(names(cntr) %in% names(annot))) {
+    stop("annot must contain an entry for each dataset in cntr.")
+  }
+
+  annot <- annot[names(cntr)]
+
+  for (ds in names(cntr)) {
+    cntr_ds <- cntr[[ds]]
+
+    if (is.null(names(cntr_ds)) || any(names(cntr_ds) == "")) {
+      stop(sprintf("All contrasts in dataset '%s' must be named.", ds))
+    }
+
+    for (cntr_name in names(cntr_ds)) {
+      df <- cntr_ds[[cntr_name]]
+
+      if (!primary_id %in% colnames(df)) {
+        if (!is.null(rownames(df))) {
+          warning(sprintf(".normalize_volcano_inputs: %s not found in dataset '%s' contrast '%s'; using rownames.", primary_id, ds, cntr_name))
+          df[[primary_id]] <- rownames(df)
+          cntr_ds[[cntr_name]] <- df
+        } else {
+          stop(sprintf("Contrast '%s' in dataset '%s' is missing '%s' and has no rownames.", cntr_name, ds, primary_id))
+        }
+      }
+
+      if (!all(c(lfc_col, pval_col) %in% colnames(df))) {
+        stop(sprintf("Contrast '%s' in dataset '%s' must contain '%s' and '%s'.", cntr_name, ds, lfc_col, pval_col))
+      }
+    }
+
+    cntr[[ds]] <- cntr_ds
+
+    if (is.null(annot[[ds]])) {
+      annot[[ds]] <- .volcano_make_annotation_from_cntr(cntr_ds, primary_id)
+    }
+
+    if (!is.data.frame(annot[[ds]])) {
+      stop(sprintf("Annotation for dataset '%s' must be a data frame or NULL.", ds))
+    }
+
+    if (!primary_id %in% colnames(annot[[ds]])) {
+      stop(sprintf("Annotation for dataset '%s' must contain '%s'.", ds, primary_id))
+    }
+
+    annot_ids <- as.character(annot[[ds]][[primary_id]])
+    for (cntr_name in names(cntr_ds)) {
+      cntr_ids <- unique(as.character(cntr_ds[[cntr_name]][[primary_id]]))
+      missing_ids <- setdiff(cntr_ids, annot_ids)
+      if (length(missing_ids) > 0L) {
+        n_show <- min(length(missing_ids), 5L)
+        stop(sprintf(
+          "Annotation for dataset '%s' is missing %d '%s' values used by contrast '%s' (first %d: %s).",
+          ds, length(missing_ids), primary_id, cntr_name, n_show,
+          paste(missing_ids[seq_len(n_show)], collapse = ", ")
+        ))
+      }
+    }
+
+    keep_cols <- unique(c(primary_id, annot_show))
+    annot[[ds]] <- annot[[ds]] %>% select(any_of(keep_cols))
+  }
+
+  list(cntr = cntr, annot = annot)
+}
+
 #' @rdname volcanoServer
 #' @export
 volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
@@ -98,16 +225,13 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
                           annot=NULL, gene_id=NULL, 
                           annot_show=c("SYMBOL", "ENTREZID")) {
 
-  if(!is.data.frame(cntr[[1]])) {
+  normalized <- .normalize_volcano_inputs(cntr, annot, primary_id, lfc_col, pval_col, annot_show)
+  cntr <- normalized$cntr
+  annot <- normalized$annot
+
+  if(!"default" %in% names(cntr)) {
     message("volcanoServer: running in multi data set mode")
-  } else {
-    cntr  <- list(default=cntr)
-    annot <- list(default=annot)
   }
-
-  annot <- map(annot, ~ .x[ , colnames(.x) %in% c(primary_id, annot_show), drop=FALSE ])
-
-  stopifnot(all(names(cntr) %in% names(annot)))
 
   df <- .volcano_process_data(cntr, annot, primary_id,
     lfc_col, pval_col)
@@ -258,6 +382,4 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
   df <- df[ , selcols ]
   return(df)
 }
-
-
 
