@@ -12,6 +12,8 @@ plot_gene(
   annot = NULL,
   annot_id_col = "PrimaryID",
   annot_symb_col = "SYMBOL",
+  expressionLabel = "Expression",
+  yCovar = expressionLabel,
   groupBy = NA,
   colorBy = NA,
   symbolBy = NA,
@@ -34,6 +36,12 @@ function). If empty, it will be loaded.}
 \item{annot_id_col}{name of the column in the annot data frame which corresponds to the rownames of the expression matrix.}
 
 \item{annot_symb_col}{name of the column in the annot data frame which should be added to the title of the plot.}
+
+\item{expressionLabel}{\itemize{
+\item what should be the label for the gene expression covariate
+}}
+
+\item{yCovar}{the y covariate – column name from the covariate table}
 
 \item{groupBy}{name of the covariate column by which to group and connect by lines the data points}
 

@@ -147,8 +147,8 @@ df <- data.frame({covar_name},
   covar_sum <- summary_colorDF(covar)
   all_covars         <- covar_sum %>% filter(unique > 1) %>% pull(.data$Col)
   non_unique         <- covar_sum %>% 
-    filter(Class %in% c("<dbl>", "<int>") | unique < nrow(covar)) %>% 
-    pull(.data$Col)
+    filter(.data[["Class"]] %in% c("<dbl>", "<int>") | unique < nrow(covar)) %>% 
+    pull(.data[["Col"]])
   non_unique         <- c(non_unique, "Expression")
   default_covar <- .default_covar(covar, all_covars, default="group")
 

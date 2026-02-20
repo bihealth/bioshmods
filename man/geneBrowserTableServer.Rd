@@ -76,10 +76,19 @@ link out by specifying
 
 \if{html}{\out{<div class="sourceCode">}}\preformatted{annot_linkout=list(ENSEMBL="https://www.ensembl.org/id/\%s")
 }\if{html}{\out{</div>}}
+
+The parameter \code{gene_id} is used to communicate with other components of
+the shiny app, e.g. with another module (such as geneBrowserPlotServer).
+If not NULL, it must be a reactiveValues object.
+When the gene_id is not NULL, colored buttons appear next to the gene ID
+in the table. Clicking on them causes changing the information in
+\code{gene_id$id} (ID of the gene) and \code{gene_id$ds} (dataset or "default" if
+there is only a single data set).
 }
 \examples{
+data(C19)
+
 if(interactive()) {
-  data(C19)
   ui <- fluidPage(
            geneBrowserTableUI("gb", names(C19$contrasts))
         )
@@ -87,6 +96,26 @@ if(interactive()) {
   server <- function(input, output) {
     geneBrowserTableServer("gb", cntr=C19$contrasts,
                                  annot=C19$annotation)
+  }
+
+  shinyApp(ui, server)
+}
+
+## Using the gene_id reactive value
+## Clicking on the button displays the gene ID
+if(interactive()) {
+  ui <- fluidPage(
+           geneBrowserTableUI("gb", names(C19$contrasts)),
+           textOutput("gene")
+        )
+
+  server <- function(input, output) {
+    gene_id <- reactiveValues()
+    geneBrowserTableServer("gb", gene_id=gene_id,
+                                 cntr=C19$contrasts,
+                                 annot=C19$annotation)
+    output$gene <- 
+      renderText(sprintf("gene ID: \%s, data set: \%s", gene_id$id, gene_id$ds))
   }
 
   shinyApp(ui, server)

@@ -73,7 +73,7 @@ disco_color_scale <- function(x, lower=-100, upper=100, int=255, alpha="66") {
 #' ## Example disco plot
 #' plot_disco(c1, c2)
 #' @return a ggplot object (plot)
-#' @import ggplot2 ggrepel
+#' @import ggplot2
 #' @importFrom stats cor
 #' @importFrom shiny icon
 #' @export
@@ -119,41 +119,63 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
 
   lab_df <- NULL
 
-  if(!is.null(label_sel) && length(label_sel) > 0L && primary_id %in% colnames(cc)) {
-
-    lab_df <- data.frame(cc[[primary_id]])
-    colnames(lab_df)  <- primary_id
-    lab_df[["label"]] <- NA
-
-    ## function that looks for specified labels in the label_col column of
-    ## data frame df1, matching it with lab_df by primary_id
-    source_labels <- function(lab_df, df1, primary_id, label_col, label_sel) {
-      if(!label_col %in% colnames(df1)) {
-        return(lab_df)
-      }
-
-      sel <- grepl(label_sel, df1[[label_col]]) &
-             df1[[primary_id]] %in% lab_df[[primary_id]]
-
-      if(sum(sel) == 0L) { return(lab_df) }
-
-      m <- match(df1[[primary_id]][sel], lab_df[[primary_id]])
-      lab_df[m, "label"] <- df1[[label_col]][sel]
+  source_labels <- function(lab_df, df1, primary_id, label_col, label_sel=NULL) {
+    if(is.null(df1) || !all(c(primary_id, label_col) %in% colnames(df1))) {
       return(lab_df)
     }
 
-    lab_df <- source_labels(lab_df, contrast1, primary_id, label_col, label_sel)
-    lab_df <- source_labels(lab_df, contrast2, primary_id, label_col, label_sel)
-    lab_df <- source_labels(lab_df, annot1, primary_id, label_col, label_sel)
-    lab_df <- source_labels(lab_df, annot2, primary_id, label_col, label_sel)
-    lab_df <- lab_df[ !is.na(lab_df$label),, drop=FALSE ]
+    m <- match(lab_df[[primary_id]], df1[[primary_id]])
+    vals <- as.character(df1[[label_col]][m])
 
-    lab_df <- merge(cc, lab_df, by=primary_id)
+    if(!is.null(label_sel)) {
+      vals[!grepl(label_sel, vals)] <- NA_character_
+    }
+
+    fill <- is.na(lab_df$label) & !is.na(vals) & nzchar(vals)
+    lab_df$label[fill] <- vals[fill]
+    lab_df
+  }
+
+  if(show_top_labels > 0 && primary_id %in% colnames(cc)) {
+    top_n <- min(as.integer(show_top_labels), nrow(cc))
+    if(!is.na(top_n) && top_n > 0L) {
+      sel <- order(-abs(cc$disco))[seq_len(top_n)]
+      top_df <- cc[sel, c(primary_id, "log2FoldChange.x", "log2FoldChange.y", "disco"), drop=FALSE]
+      top_df$label <- NA_character_
+
+      top_df <- source_labels(top_df, annot1, primary_id, label_col)
+      top_df <- source_labels(top_df, annot2, primary_id, label_col)
+      top_df <- source_labels(top_df, contrast1, primary_id, label_col)
+      top_df <- source_labels(top_df, contrast2, primary_id, label_col)
+
+      top_df$label[is.na(top_df$label)] <- as.character(top_df[[primary_id]][is.na(top_df$label)])
+      lab_df <- top_df
+    }
+  }
+
+  if(!is.null(label_sel) && length(label_sel) > 0L && primary_id %in% colnames(cc)) {
+
+    manual_df <- data.frame(cc[[primary_id]])
+    colnames(manual_df) <- primary_id
+    manual_df[["label"]] <- NA_character_
+
+    manual_df <- source_labels(manual_df, contrast1, primary_id, label_col, label_sel)
+    manual_df <- source_labels(manual_df, contrast2, primary_id, label_col, label_sel)
+    manual_df <- source_labels(manual_df, annot1, primary_id, label_col, label_sel)
+    manual_df <- source_labels(manual_df, annot2, primary_id, label_col, label_sel)
+    manual_df <- manual_df[ !is.na(manual_df$label),, drop=FALSE ]
+    manual_df <- merge(cc, manual_df, by=primary_id)
+
+    if(is.null(lab_df)) {
+      lab_df <- manual_df
+    } else {
+      lab_df <- unique(rbind(lab_df, manual_df))
+    }
   }
 
 
 
-  g <- ggplot(cc, aes_string(x="log2FoldChange.x", y="log2FoldChange.y")) +
+  g <- ggplot(cc, aes(x=.data[["log2FoldChange.x"]], y=.data[["log2FoldChange.y"]])) +
     geom_point(aes(color=.data$disco), alpha=alpha) + 
     scale_color_gradient2(low="blue", mid="grey", high="red") + 
     theme(legend.position="none") +
@@ -166,12 +188,7 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
         cor(cc$log2FoldChange.x, cc$log2FoldChange.y, use="p"),
         cor(cc$log2FoldChange.x, cc$log2FoldChange.y, method="s", use="p")))
 
-# if(show_top_labels > 0) {
-#   g <- g + geom_label_repel(aes(label=.data$label, color=.data$disco,
-#     force_pull=1.5, max.overlaps=Inf))
-# }
-
-  if(!is.null(label_sel) && length(label_sel) > 0L) {
+  if(!is.null(lab_df) && nrow(lab_df) > 0L) {
     g <- g + geom_label(data=lab_df, aes(label=.data$label, color=.data$disco))
   }
 
@@ -567,7 +584,7 @@ plot_ly_pca <- function(mtx, covariate_data, threeD=TRUE, cov_default=NULL) {
 #'
 #' @param id PrimaryID of the gene (usually ENSEMBL ID)
 #' @param xCovar the x covariate – column name from the covariate table
-#' @param xCovar the y covariate – column name from the covariate table
+#' @param yCovar the y covariate – column name from the covariate table
 #' @param expressionLabel - what should be the label for the gene expression covariate
 #' @param exprs gene expression matrix to show on the y axis; rownames must
 #'        be PrimaryIDs. If NULL, the rld object from the pipeline is used.
@@ -643,6 +660,5 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
 
   return(g)
 }
-
 
 

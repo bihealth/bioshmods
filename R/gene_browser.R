@@ -57,7 +57,8 @@
   res <- cntr[[ ds_id ]][[ cntr_id ]]
 
   res <- res %>% select(all_of(setdiff(colnames(res), cols_to_hide))) %>% 
-    { merge(annot[[ ds_id ]], ., by=primary_id, all.x=TRUE) } %>% arrange(pvalue)
+    \(.) { merge(annot[[ ds_id ]], ., by=primary_id, all.x=TRUE) } %>% 
+    arrange(.data[["pvalue"]])
 
   if(!is.null(but) && length(but) == 1L) {
     res <- res %>%
@@ -158,14 +159,14 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 
   if(!is.null(annot)) {
     if(multilevel) {
-      stopifnot(all(map_lgl(annot, ~ is.data.frame(.x) || is(.x, "disk.frame"))))
+      stopifnot(all(map_lgl(annot, \(.x) is.data.frame(.x) || is(.x, "disk.frame"))))
       if(primary_id == 0) {
-        stopifnot(all(map_lgl(annot, ~ !is.null(rownames(.x)))))
+        stopifnot(all(map_lgl(annot, \(.x) !is.null(rownames(.x)))))
       } else {
-        stopifnot(all(map_lgl(annot, ~ primary_id %in% names(.x))))
+        stopifnot(all(map_lgl(annot, \(.x) primary_id %in% names(.x))))
       }
     } else {
-      stopifnot(is.data.frame(annot) || is(.x, "disk.frame"))
+      stopifnot(is.data.frame(annot) || is(annot, "disk.frame"))
       if(primary_id == 0) {
         stopifnot(!is.null(rownames(annot)))
       } else {

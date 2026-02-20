@@ -6,7 +6,7 @@
 \usage{
 figsizeInput(
   id,
-  label = "Figure size",
+  label = "Figure size (w x h)",
   choices = c("800x800", "600x600", "600x800", "800x600", "1200x600", "1200x800",
     "600x1200", "800x1200", "1200x1200"),
   selected = NULL,
