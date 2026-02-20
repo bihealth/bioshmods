@@ -17,7 +17,8 @@ geneBrowserPlotServer(
   primary_id = "PrimaryID",
   symbol_col = "SYMBOL",
   description_col = "GENENAME",
-  annot_linkout = NULL
+  annot_linkout = NULL,
+  exprs_label = "Expression"
 )
 }
 \arguments{
@@ -50,6 +51,8 @@ symbols; use NULL if no such column}
 title / description; use NULL if no such column}
 
 \item{annot_linkout}{a list; see Details.}
+
+\item{exprs_label}{Label to be used for the expression values}
 }
 \value{
 does not return anything useful
