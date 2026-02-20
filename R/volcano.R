@@ -153,19 +153,19 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
 
     observeEvent(input$plot_hover, {
       .df <- dfvar()
-      np <- nearPoints(.df, input$plot_hover)
+      np <- nearPoints(.df, input$plot_hover, xvar = lfc_col, yvar = "y")
       hover_genes(np[ , primary_id, drop=FALSE ])
     })
 
     observeEvent(input$plot_brush, {
       .df <- dfvar()
-      np <- brushedPoints(.df, input$plot_brush)
+      np <- brushedPoints(.df, input$plot_brush, xvar = lfc_col, yvar = "y")
       selected_genes(np)
     })
 
     observeEvent(input$plot_click, {
       .df <- dfvar()
-      np <- nearPoints(.df, input$plot_click)
+      np <- nearPoints(.df, input$plot_click, xvar = lfc_col, yvar = "y")
       selected_genes(np)
     })
 
@@ -182,8 +182,10 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
 
       ## trickery to fool ggplot in the unholy combination
       ## with nearPoints()
-      yvar <- sprintf("-log10(%s)", pval_col)
-      df[[ yvar ]] <- -log10(df[[pval_col]])
+      df <- df %>% mutate(y = -log10(.data[[pval_col]]))
+
+      #yvar <- sprintf("-log10(%s)", pval_col)
+      #df[[ yvar ]] <- -log10(df[[pval_col]])
 
 
       scales <- ifelse(input$samescaleX, 
@@ -200,7 +202,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       ## loads of trickery to get around the dumb decision of using
       ## unquoted vars in ggplot (because typing quotes is SO hard 
       ## so we will make living hell out of an otherwise nice framework)
-      ggplot(df, aes_string(x=lfc_col, y=yvar,
+      ggplot(df, aes(x=.data[[lfc_col]], y=.data[["y"]],
                      color   ="Significant",
                      dscon   ="Dataset_Contrast",
                      dataset ="Dataset",
