@@ -22,6 +22,8 @@ discoUI <- function(id, cntr_titles) {
         fluidRow(checkboxInput(NS(id, "autoscale"), "Automatic scale", value=TRUE)),
         fluidRow(sliderInput(NS(id, "min"), "Min", min=-150, max=0, value=-100, width="80%")),
         fluidRow(sliderInput(NS(id, "max"), "Max", min=0, max=150, value=100, width="80%")),
+        fluidRow(checkboxInput(NS(id, "show_top_labels"), "Show top labels", value=FALSE)),
+        fluidRow(numericInput(NS(id, "top_label_n"), "Top labels (N)", value=10, min=1, step=1, width="80%")),
         fluidRow(downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success")),
         fluidRow(
                  textInput(NS(id, "glabs"), 
@@ -292,6 +294,14 @@ discoServer <- function(id, cntr, annot=NULL,
       }
     })
 
+    observeEvent(input$show_top_labels, {
+      if (isTRUE(input$show_top_labels)) {
+        enable("top_label_n")
+      } else {
+        disable("top_label_n")
+      }
+    }, ignoreInit = FALSE)
+
     ## save the disco plot to a PDF file
     output$save <- downloadHandler(
       filename = function() {
@@ -340,7 +350,9 @@ discoServer <- function(id, cntr, annot=NULL,
                         cntr[[dataset2()]][[contrast2()]], 
                         annot1=annot[[dataset1()]], 
                         annot2=annot[[dataset2()]], 
-                        disco=disco(), label_sel=.glabs,
+                        disco=disco(),
+                        show_top_labels=if (isTRUE(input$show_top_labels)) input$top_label_n else 0,
+                        label_sel=.glabs,
                         by=c(input$match1, input$match2))
       } else {
         g <- plot_disco(cntr[[dataset1()]][[contrast1()]], 
@@ -348,7 +360,9 @@ discoServer <- function(id, cntr, annot=NULL,
                         annot1=annot[[dataset1()]], 
                         annot2=annot[[dataset2()]], 
                         lower=input$min, upper=input$max, 
-                        disco=disco(), label_sel=.glabs,
+                        disco=disco(),
+                        show_top_labels=if (isTRUE(input$show_top_labels)) input$top_label_n else 0,
+                        label_sel=.glabs,
                         by=c(input$match1, input$match2))
       }
 
