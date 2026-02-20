@@ -102,7 +102,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     message("volcanoServer: running in multi data set mode")
   } else {
     cntr  <- list(default=cntr)
-    annot <- list(default=cntr)
+    annot <- list(default=annot)
   }
 
   annot <- map(annot, ~ .x[ , colnames(.x) %in% c(primary_id, annot_show), drop=FALSE ])
