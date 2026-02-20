@@ -173,6 +173,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
         column(width=6, numericInput(NS(id, "font_size"), label="Font size", value = 12, 
                                  min=3, step=1, width="100%"),
                     bsTooltip(NS(id, "font_size"), "Change the font size of plot labels"))),
+      fluidRow(column(width=12,
+                      downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success"))),
       fluidRow(tableOutput(NS(id, "point_id"))),
     width=2),
     mainPanel(
@@ -243,6 +245,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     hover_genes    <- reactiveVal() ## hover gene selection, shown on the left
     selected_genes <- reactiveVal() ## active gene selection, shown on the right
     dfvar          <- reactiveVal() ## current data frame with genes
+    plot_obj       <- reactiveVal()
 
     output$point_id <- renderTable({
       hover_genes()
@@ -274,6 +277,22 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
         fig_size$height <- 
           as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\2", input$figure_size))
     })
+
+    output$save <- downloadHandler(
+      filename = function() {
+        .ds <- input$dataset
+        if(!isTruthy(.ds)) { .ds <- "_all" }
+        ret <- sprintf("volcano_plot_%s.pdf", .ds)
+        ret <- gsub("[^0-9a-zA-Z_.-]", "", ret)
+        return(ret)
+      },
+      content = function(file) {
+        req(plot_obj())
+        pdf(file=file, width=8, height=5)
+        print(plot_obj())
+        dev.off()
+      }
+    )
 
     observeEvent(input$plot_hover, {
       .df <- dfvar()
@@ -326,7 +345,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       ## loads of trickery to get around the dumb decision of using
       ## unquoted vars in ggplot (because typing quotes is SO hard 
       ## so we will make living hell out of an otherwise nice framework)
-      ggplot(df, aes(x=.data[[lfc_col]], y=.data[["y"]],
+      g <- ggplot(df, aes(x=.data[[lfc_col]], y=.data[["y"]],
                      color   ="Significant",
                      dscon   ="Dataset_Contrast",
                      dataset ="Dataset",
@@ -336,6 +355,8 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
         scale_color_manual(values=c("TRUE"="red", "FALSE"="black")) +
                                    theme(text=element_text(size=input$font_size)) +
                                    theme(legend.position="bottom")
+      plot_obj(g)
+      g
 
       }, width=fig_size$width, 
          height=fig_size$height)
@@ -382,4 +403,3 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
   df <- df[ , selcols ]
   return(df)
 }
-
