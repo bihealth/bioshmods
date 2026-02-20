@@ -142,6 +142,7 @@ df <- data.frame({covar_name},
 ## dynamically generate the UI controls for the gene plots from the
 ## actually selected data set
 .dynamic_col_control <- function(id, covar, datasets, ds_selected) {
+  ns <- NS(id)
 
   covar_sum <- summary_colorDF(covar)
   all_covars         <- covar_sum %>% filter(unique > 1) %>% pull(.data$Col)
@@ -157,40 +158,46 @@ df <- data.frame({covar_name},
   }
 
   tagList(
+      tags$script(HTML(sprintf("
+        $(document).ready(function(){
+            $('#%s').click(function(){
+                $('#%s').toggle();
+            });
+        });
+    ", ns("toggleButton"), ns("codeBlock")))),
       fluidRow(ds_selector),
       fluidRow(column(width=5, 
         fluidRow(
-               tipify(selectInput(NS(id, "covarXName"), "X covariate", non_unique, selected=default_covar, width="100%"),
+               tipify(selectInput(ns("covarXName"), "X covariate", non_unique, selected=default_covar, width="100%"),
                       "Variable shown on the X axis", placement="right")),
         fluidRow(
-               tipify(selectInput(NS(id, "covarYName"), "Y covariate", non_unique, selected="Expression", width="100%"),
+               tipify(selectInput(ns("covarYName"), "Y covariate", non_unique, selected="Expression", width="100%"),
                       "Variable shown on the Y axis", placement="right")),
         fluidRow(
-               tipify(selectInput(NS(id, "colorBy"), "Color by", c("N/A", non_unique), selected="N/A", width="100%"),
+               tipify(selectInput(ns("colorBy"), "Color by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Variable coded as color", placement="right")),
         fluidRow(
-               tipify(selectInput(NS(id, "symbolBy"), "Symbol by", c("N/A", non_unique), selected="N/A", width="100%"),
+               tipify(selectInput(ns("symbolBy"), "Symbol by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Variable coded as symbol", placement="right")),
       ),
       column(width=5,
         fluidRow(
-               tipify(selectInput(NS(id, "groupBy"), "Link data points by", c("N/A", non_unique), selected="N/A", width="100%"),
+               tipify(selectInput(ns("groupBy"), "Link data points by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Points with identical values will be linked by a line", placement="right")),
-        fluidRow(tipify(selectInput(NS(id, "trellisBy"), "Trellis by", c("N/A", non_unique), selected="N/A", width="100%"),
+        fluidRow(tipify(selectInput(ns("trellisBy"), "Trellis by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Each unique value of the variable will be shown on a separate subplot", placement="right")),
-        fluidRow(tipify(numericInput(NS(id, "fontSize"),    label="Font size", min=6, value=14, step=1, width="50%"),
+        fluidRow(tipify(numericInput(ns("fontSize"),    label="Font size", min=6, value=14, step=1, width="50%"),
                       "Change the base font size of the figure", placement="right")),
-       fluidRow(figsizeInput(NS(id, "figure_size"), width="100%", selected="800x600"),
-                bsTooltip(NS(id, "figure_size"), 
+       fluidRow(figsizeInput(ns("figure_size"), width="100%", selected="800x600"),
+                bsTooltip(ns("figure_size"), 
                   "Change the figure size (in pixels), width x height. Press backspace to enter your own sizes.", placement="right")),
       offset=1),
       ),
 
 
-
-      fluidRow(textOutput(NS(id, "addInfo"))),
+      fluidRow(textOutput(ns("addInfo"))),
       fluidRow(h3("Additional info:")),
-      fluidRow(tableOutput(NS(id, "geneData")))
+      fluidRow(tableOutput(ns("geneData")))
     )
 
 
@@ -511,6 +518,9 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       
       message(sprintf("plotting started with dataset=%s and gene=%s", ds(), g_id()))
       message("evaluating code:", code)
+
+      # we are executing the plot code in the parent frame,
+      # so we are directly using the variables from the parent frame
       eval(str2expression(code), envir=parent_frame)
       }, width=fig_size$width, height=fig_size$height) 
     })

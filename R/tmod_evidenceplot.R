@@ -41,6 +41,21 @@
   
 }
 
+
+
+.tmod_evidenceplot_code <- function(mode, mod_id, cntr_id, db_id, sort_id, cntr, tmod_dbs,
+                           tmod_gl=NULL, tmod_map=NULL, annot=NULL, primary_id) {
+
+  ret <- '## evidence plot code\n
+mod_id  <- "{mod_id}" 
+cntr_id <- "{cntr_id}"
+db_id   <- "{db_id}"
+sort_id <- "{sort_id}"\n'
+
+
+  return(ret)
+}
+
 .plot_evidence <- function(mod_id, cntr_id, db_id, sort_id, cntr, tmod_dbs,
                            tmod_gl=NULL, tmod_map=NULL, annot=NULL, primary_id) {
   mset <- tmod_dbs[[db_id]]
@@ -61,6 +76,7 @@
   } else {
     gl <- tmod_gl[[cntr_id]][[sort_id]]
     if(is.null(gl)) {
+      print(str(tmod_gl))
       stop(sprintf("Gene list for contrast %s and sort %s not found", cntr_id, sort_id))
     }
 
@@ -240,7 +256,7 @@ tmodBrowserPlotUI <- function(id) {
 #' @export
 tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod_gl=NULL, annot=NULL, 
                                   tmod_res=NULL,
-                                  primary_id="PrimaryID", gene_id=NULL) {
+                                  primary_id="PrimaryID", gene_id=NULL, rmd_var=NULL) {
 
   stopifnot(!is.null(tmod_gl) || !is.null(tmod_map))
 
