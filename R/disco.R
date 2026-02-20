@@ -58,26 +58,36 @@ discoUI <- function(id, cntr_titles) {
   pid1 <- pid[["__primary_id_1"]]
   pid2 <- pid[["__primary_id_2"]]
 
-  if(is.null(annot1)) {
-    pid1 <- data.frame(pid1)
-    colnames(pid1) <- primary_id
-  } else {
-    pid1 <- annot1 %>% slice(match(pid1, .data[[primary_id]])) %>%
-      select(any_of(selcols))
-  }
+  stopifnot(is.data.frame(annot1), is.data.frame(annot2))
+  stopifnot(primary_id %in% colnames(annot1), primary_id %in% colnames(annot2))
 
-  if(is.null(annot2)) {
-    pid2 <- data.frame(pid2)
-    colnames(pid2) <- primary_id
-  } else {
-    pid2 <- annot2 %>% slice(match(pid2, .data[[primary_id]])) %>%
-      select(any_of(selcols))
-  }
+  cols <- unique(c(primary_id, selcols))
+  pid1 <- data.frame(pid1, stringsAsFactors=FALSE)
+  pid2 <- data.frame(pid2, stringsAsFactors=FALSE)
+  colnames(pid1) <- primary_id
+  colnames(pid2) <- primary_id
+
+  pid1 <- pid1 %>%
+    left_join(annot1 %>% select(any_of(cols)), by=primary_id) %>%
+    select(any_of(cols))
+
+  pid2 <- pid2 %>%
+    left_join(annot2 %>% select(any_of(cols)), by=primary_id) %>%
+    select(any_of(cols))
 
   colnames(pid1) <- paste0(colnames(pid1), "_1")
   colnames(pid2) <- paste0(colnames(pid2), "_2")
 
   return(cbind(pid1, pid2))
+}
+
+.prep_disco_selection_df <- function(df, lower, upper) {
+  ret <- df %>%
+    filter(!is.na(.data$log2FoldChange.x) & !is.na(.data$log2FoldChange.y) & !is.na(.data$disco)) %>%
+    mutate(disco=ifelse(.data$disco > upper, upper, ifelse(.data$disco < lower, lower, .data$disco))) %>%
+    arrange(abs(.data$disco))
+  print(ret)
+  ret
 }
 
 .as_default_named_list <- function(x) {
@@ -239,6 +249,7 @@ discoServer <- function(id, cntr, annot=NULL,
     dataset2  <- reactiveVal()
     gene_labs <- reactiveVal()
     plot_obj  <- reactiveVal()
+    plot_df   <- reactiveVal()
 
     observeEvent(input$contrast1, {
       contrast1(gsub(".*::", "", input$contrast1))
@@ -335,6 +346,7 @@ discoServer <- function(id, cntr, annot=NULL,
       disco(.ds)
       if(is(.ds, "try-error")) { 
         message("An error occured")
+        plot_df(NULL)
        #output$discoplot <- renderPlot({
        #  stop(.ds)
        #})
@@ -342,6 +354,17 @@ discoServer <- function(id, cntr, annot=NULL,
        # plot_obj(.ds)
         return(NULL) 
       }
+
+      if(input$autoscale) {
+        .lower <- -100
+        .upper <- 100
+      } else {
+        .lower <- input$min
+        .upper <- input$max
+      }
+
+      .plot_df <- .prep_disco_selection_df(.ds, lower=.lower, upper=.upper)
+      plot_df(.plot_df)
 
       if(isTruthy(gene_labs)) { .glabs <- gene_labs() } else { .glabs <- NULL }
 
@@ -407,19 +430,24 @@ discoServer <- function(id, cntr, annot=NULL,
     }, sanitize.text.function=function(x) x)
 
     observeEvent(input$plot_click, {
-      selected_genes(current_genes())
+      .pdf <- req(plot_df())
+      pid <- nearPoints(.pdf, input$plot_click, xvar = "log2FoldChange.x", yvar = "log2FoldChange.y")
+      ret <- .get_gene_df(pid, selcols, primary_id, annot[[dataset1()]], annot[[dataset2()]])
+      selected_genes(ret)
     })
 
     ## react to hover over points: enter the close genes into current list
     observeEvent(input$plot_hover, {
-      pid <- disco() %>% nearPoints(input$plot_hover, xvar = "log2FoldChange.x", yvar = "log2FoldChange.y")
+      .pdf <- req(plot_df())
+      pid <- nearPoints(.pdf, input$plot_hover, xvar = "log2FoldChange.x", yvar = "log2FoldChange.y")
       ret <- .get_gene_df(pid, selcols, primary_id, annot[[dataset1()]], annot[[dataset2()]])
       current_genes(ret)
     })
 
     ## react to points selected by brush: enter the genes into current list
     observeEvent(input$plot_brush, {
-      pid <- disco() %>% brushedPoints(input$plot_brush, xvar = "log2FoldChange.x", yvar = "log2FoldChange.y")
+      .pdf <- req(plot_df())
+      pid <- brushedPoints(.pdf, input$plot_brush, xvar = "log2FoldChange.x", yvar = "log2FoldChange.y")
       ret <- .get_gene_df(pid, selcols, primary_id, annot[[dataset1()]], annot[[dataset2()]])
       selected_genes(ret)
     })
