@@ -638,7 +638,7 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
   }
 
   if(!is.numeric(df[[xCovar]]) && is.na(groupBy)) {
-    g <- g + geom_boxplot() + geom_jitter(size=3, alpha=.5, width=.1)
+    g <- g + geom_boxplot(outlier.shape = NA) + geom_jitter(size=3, alpha=.5, width=.1)
   } else {
     if(!is.na(symbolBy)) {
       g <- g + geom_point(aes(shape=.data[[symbolBy]], size=3))
@@ -660,5 +660,4 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
 
   return(g)
 }
-
 
