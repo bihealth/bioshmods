@@ -17,6 +17,8 @@ Imports:
   DT, bslib, colorDF, dplyr, plotly, purrr, rlang, shiny, shinyBS, shinycssloaders, shinyjs, thematic, tibble, tidyr,
   RColorBrewer,
   ggrepel,
+  gghalves,
+  ggdist,
   tmod,
   ggplot2, 
   methods,

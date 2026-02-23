@@ -38,13 +38,16 @@
 ## Wrapper around plot_gene, mainly to replace "N/A" with NA
 .gene_browser_plot <- function(covar, id, covarXName, covarYName, rld, annot, 
                                groupBy = "N/A", colorBy = "N/A", symbolBy = "N/A", trellisBy="N/A",
-                               exprs_label = "Expression") {
+                               exprs_label = "Expression",
+                               plotType = "box",
+                               transpose = FALSE) {
   if(covarYName == "Expression") { covarYName <- exprs_label }
   if(covarXName == "Expression") { covarXName <- exprs_label }
 
   .args <- list(id=id, xCovar=covarXName, yCovar=covarYName, covar=covar, exprs=rld, groupBy=groupBy, annot=annot,
                 expressionLabel = exprs_label,
-                colorBy=colorBy, symbolBy=symbolBy, trellisBy=trellisBy)
+                colorBy=colorBy, symbolBy=symbolBy, trellisBy=trellisBy,
+                categoricalPlot=plotType, transpose=transpose)
 
   ## weirdly, the line below is really, really slow
   #.args <- map(.args, ~ if(!is.na(.x) && .x == "N/A") { NA } else { .x })
@@ -53,8 +56,8 @@
   if(.args$colorBy == "N/A")    .args$colorBy   <- NA
   if(.args$symbolBy == "N/A")   .args$symbolBy  <- NA
   if(.args$trellisBy == "N/A")  .args$trellisBy <- NA
-  message(sprintf("Calling plot_gene with arguments: \n\tid=%s\n\txCovar=%s\n\tyCovar=%s\n\tgroupBy=%s\n\tcolorBy=%s\n\tsymbolBy=%s\n\ttrellisBy=%s",
-                  .args$id, .args$xCovar, .args$yCovar, .args$groupBy, .args$colorBy, .args$symbolBy, .args$trellisBy))
+  message(sprintf("Calling plot_gene with arguments: \n\tid=%s\n\txCovar=%s\n\tyCovar=%s\n\tgroupBy=%s\n\tcolorBy=%s\n\tsymbolBy=%s\n\ttrellisBy=%s\n\tcategoricalPlot=%s\n\ttranspose=%s",
+                  .args$id, .args$xCovar, .args$yCovar, .args$groupBy, .args$colorBy, .args$symbolBy, .args$trellisBy, .args$categoricalPlot, .args$transpose))
   do.call(plot_gene, .args)
 }
 
@@ -95,10 +98,15 @@
         fluidRow(
                tipify(selectInput(NS(id, "groupBy"), "Link data points by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Points with identical values will be linked by a line", placement="right")),
+        fluidRow(
+               tipify(selectInput(NS(id, "plotType"), "Categorical plot", c("box", "violin", "raincloud"), selected="box", width="100%"),
+                      "Display style when X covariate is categorical and points are not linked", placement="right")),
         fluidRow(tipify(selectInput(NS(id, "trellisBy"), "Trellis by", c("N/A", non_unique), selected="N/A", width="100%"),
                       "Each unique value of the variable will be shown on a separate subplot", placement="right")),
         fluidRow(tipify(numericInput(NS(id, "fontSize"),    label="Font size", min=6, value=14, step=1, width="50%"),
                       "Change the base font size of the figure", placement="right")),
+        fluidRow(tipify(checkboxInput(NS(id, "transposePlot"), "Transpose plot", value=FALSE, width="100%"),
+                      "Flip X/Y orientation of the whole plot", placement="right")),
        fluidRow(figsizeInput(NS(id, "figure_size"), width="100%", selected="800x600"),
                 bsTooltip(NS(id, "figure_size"), 
                   "Change the figure size (in pixels), width x height. Press backspace to enter your own sizes.", placement="right")),
@@ -311,9 +319,10 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       filename = function() {
         .id <- g_id()
         .ds <- ds()
-        ret <- sprintf("expression_profile_ds_%s_%s_covarX_%s_covarY_%s_colorBy_%s_groupBy_%s_symbolBy_%s_trellisBy_%s.pdf",
+        ret <- sprintf("expression_profile_ds_%s_%s_covarX_%s_covarY_%s_colorBy_%s_groupBy_%s_symbolBy_%s_trellisBy_%s_plotType_%s_transpose_%s.pdf",
                        .ds, .id,
-                       input$covarXName, input$covarYName, input$colorBy, input$groupBy, input$symbolBy, input$trellisBy)
+                       input$covarXName, input$covarYName, input$colorBy, input$groupBy, input$symbolBy, input$trellisBy,
+                       input$plotType, input$transposePlot)
         ret <- gsub("[^0-9a-zA-Z_.-]", "", ret)
         return(ret)
       },
@@ -324,7 +333,8 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
                                 input$covarYName, 
                                 exprs[[ ds() ]], 
                                 annot[[ ds() ]], 
-                           input$groupBy, input$colorBy, input$symbolBy, input$trellisBy)
+                           input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
+                           plotType = input$plotType, transpose = input$transposePlot)
         dev.off()
       }
     )
@@ -404,9 +414,8 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       message(sprintf("plotting started with dataset=%s and gene=%s", ds(), g_id()))
       .gene_browser_plot(covar[[ds()]], g_id(), input$covarXName, input$covarYName, exprs[[ ds() ]], annot[[ ds() ]], 
                          input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
-                         exprs_label = exprs_label) +
+                         exprs_label = exprs_label, plotType = input$plotType, transpose = input$transposePlot) +
                                     theme(text=element_text(size=input$fontSize))
     }, width=fig_size$width, height=fig_size$height) })
   })
 }
-

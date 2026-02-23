@@ -597,8 +597,15 @@ plot_ly_pca <- function(mtx, covariate_data, threeD=TRUE, cov_default=NULL) {
 #' @param symbolBy name of the covariate column by which to select point symbols
 #' @param colorBy name of the covariate column by which to color the data
 #' @param trellisBy name of the covariate column for use in a trellis (multipanel) plot
+#' @param categoricalPlot plot style used when `xCovar` is categorical and
+#'        `groupBy` is not set. One of `"box"`, `"violin"`, or `"raincloud"`.
+#' @param transpose logical; if TRUE, transpose the whole plot by flipping
+#'        coordinates.
 #' @return a ggplot2 object
 #' @import ggplot2 
+#' @importFrom rlang .data
+#' @importFrom gghalves geom_half_violin
+#' @importFrom ggdist stat_dots
 #' @export
 plot_gene <- function(id, xCovar, exprs, covar, annot=NULL, 
                                annot_id_col="PrimaryID",
@@ -606,7 +613,10 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
                                expressionLabel="Expression",
                                yCovar=expressionLabel, 
                                groupBy = NA, colorBy = NA, symbolBy = NA,
-                               trellisBy=NA) {
+                               trellisBy=NA,
+                               categoricalPlot = c("box", "violin", "raincloud"),
+                               transpose = FALSE) {
+  categoricalPlot <- match.arg(categoricalPlot)
   if(is.null(exprs)) { stop("No expression matrix provided") }
   if(is.null(covar)) { stop("No covariate data frame provided") }
   if(is.null(exprs[id, ])) { stop("No expression data for gene ", id) }
@@ -638,7 +648,17 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
   }
 
   if(!is.numeric(df[[xCovar]]) && is.na(groupBy)) {
-    g <- g + geom_boxplot(outlier.shape = NA) + geom_jitter(size=3, alpha=.5, width=.1)
+    if(categoricalPlot == "box") {
+      g <- g + geom_boxplot(outlier.shape = NA) + geom_jitter(size=3, alpha=.5, width=.1)
+    } else if(categoricalPlot == "violin") {
+      g <- g + geom_violin(trim=FALSE, alpha=.4) + geom_jitter(size=3, alpha=.5, width=.1)
+    } else if(categoricalPlot == "raincloud") {
+      g <- g +
+        gghalves::geom_half_violin(side="r", trim=FALSE, alpha=.45, nudge=.08) +
+        geom_boxplot(width=.1, outlier.shape=NA, alpha=.75) +
+        ggdist::stat_dots(side = "left",
+                          dotsize = .2)
+    }
   } else {
     if(!is.na(symbolBy)) {
       g <- g + geom_point(aes(shape=.data[[symbolBy]], size=3))
@@ -657,7 +677,9 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
 
 
   g  <- g + ggtitle(title)
+  if(isTRUE(transpose)) {
+    g <- g + coord_flip()
+  }
 
   return(g)
 }
-

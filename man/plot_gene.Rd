@@ -17,7 +17,9 @@ plot_gene(
   groupBy = NA,
   colorBy = NA,
   symbolBy = NA,
-  trellisBy = NA
+  trellisBy = NA,
+  categoricalPlot = c("box", "violin", "raincloud"),
+  transpose = FALSE
 )
 }
 \arguments{
@@ -50,6 +52,12 @@ function). If empty, it will be loaded.}
 \item{symbolBy}{name of the covariate column by which to select point symbols}
 
 \item{trellisBy}{name of the covariate column for use in a trellis (multipanel) plot}
+
+\item{categoricalPlot}{plot style used when \code{xCovar} is categorical and
+\code{groupBy} is not set. One of \code{"box"}, \code{"violin"}, or \code{"raincloud"}.}
+
+\item{transpose}{logical; if TRUE, transpose the whole plot by flipping
+coordinates.}
 }
 \value{
 a ggplot2 object
