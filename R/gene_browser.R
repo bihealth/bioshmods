@@ -57,7 +57,7 @@
   res <- cntr[[ ds_id ]][[ cntr_id ]]
 
   res <- res %>% select(all_of(setdiff(colnames(res), cols_to_hide))) %>% 
-    \(.) { merge(annot[[ ds_id ]], ., by=primary_id, all.x=TRUE) } %>% 
+    (\(.) merge(annot[[ ds_id ]], ., by=primary_id, all.x=TRUE))() %>% 
     arrange(.data[["pvalue"]])
 
   if(!is.null(but) && length(but) == 1L) {
