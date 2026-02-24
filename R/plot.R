@@ -597,6 +597,8 @@ plot_ly_pca <- function(mtx, covariate_data, threeD=TRUE, cov_default=NULL) {
 #' @param symbolBy name of the covariate column by which to select point symbols
 #' @param colorBy name of the covariate column by which to color the data
 #' @param trellisBy name of the covariate column for use in a trellis (multipanel) plot
+#' @param trellisScales scales argument passed to [ggplot2::facet_wrap()] when
+#'        `trellisBy` is set. One of `"fixed"`, `"free"`, `"free_x"`, `"free_y"`.
 #' @param categoricalPlot plot style used when `xCovar` is categorical and
 #'        `groupBy` is not set. One of `"box"`, `"violin"`, or `"raincloud"`.
 #' @param transpose logical; if TRUE, transpose the whole plot by flipping
@@ -614,8 +616,10 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
                                yCovar=expressionLabel, 
                                groupBy = NA, colorBy = NA, symbolBy = NA,
                                trellisBy=NA,
+                               trellisScales = c("fixed", "free", "free_x", "free_y"),
                                categoricalPlot = c("box", "violin", "raincloud"),
                                transpose = FALSE) {
+  trellisScales <- match.arg(trellisScales)
   categoricalPlot <- match.arg(categoricalPlot)
   if(is.null(exprs)) { stop("No expression matrix provided") }
   if(is.null(covar)) { stop("No covariate data frame provided") }
@@ -672,7 +676,7 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
   }
 
   if(!is.na(trellisBy)) {
-    g <- g + facet_wrap(trellisBy)
+    g <- g + facet_wrap(trellisBy, scales=trellisScales)
   }
 
 

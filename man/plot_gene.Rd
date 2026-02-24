@@ -18,6 +18,7 @@ plot_gene(
   colorBy = NA,
   symbolBy = NA,
   trellisBy = NA,
+  trellisScales = c("fixed", "free", "free_x", "free_y"),
   categoricalPlot = c("box", "violin", "raincloud"),
   transpose = FALSE
 )
@@ -52,6 +53,9 @@ function). If empty, it will be loaded.}
 \item{symbolBy}{name of the covariate column by which to select point symbols}
 
 \item{trellisBy}{name of the covariate column for use in a trellis (multipanel) plot}
+
+\item{trellisScales}{scales argument passed to \code{\link[ggplot2:facet_wrap]{ggplot2::facet_wrap()}} when
+\code{trellisBy} is set. One of \code{"fixed"}, \code{"free"}, \code{"free_x"}, \code{"free_y"}.}
 
 \item{categoricalPlot}{plot style used when \code{xCovar} is categorical and
 \code{groupBy} is not set. One of \code{"box"}, \code{"violin"}, or \code{"raincloud"}.}
