@@ -1,0 +1,21 @@
+# R package build and check artifacts
+*.Rcheck/
+*.tar.gz
+
+# R session files
+.Rhistory
+.RData
+.Ruserdata
+
+# Rendered docs generated locally
+README.html
+
+# Editor/temporary files
+*.swp
+*.swo
+*.swn
+*.swm
+*~
+
+# RStudio project metadata
+.Rproj.user/

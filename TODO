@@ -2,11 +2,11 @@
 
 ### Package metadata and docs
 
-* [ ] Replace placeholder DESCRIPTION fields:
-  * [ ] `Title: What the Package Does (One Line, Title Case)`
-  * [ ] `Description: What the package does (one paragraph).`
-* [ ] Replace template README text with real package overview and example usage.
-* [ ] Verify install instructions in README (CRAN vs GitHub dev install).
+* [x] Replace placeholder DESCRIPTION fields:
+  * [x] `Title: What the Package Does (One Line, Title Case)`
+  * [x] `Description: What the package does (one paragraph).`
+* [x] Replace template README text with real package overview and example usage.
+* [x] Verify install instructions in README (CRAN vs GitHub dev install).
 
 ### R CMD check notes
 
@@ -28,8 +28,8 @@
 
 ### Repo hygiene
 
-* [ ] Add/update `.gitignore` to exclude local editor/runtime artifacts (`*.swp`, `.Rhistory`, `*.Rcheck`, `*.tar.gz` build outputs).
-* [ ] Remove existing local swap/check/build artifacts from working tree.
+* [x] Add/update `.gitignore` to exclude local editor/runtime artifacts (`*.swp`, `.Rhistory`, `*.Rcheck`, `*.tar.gz` build outputs).
+* [x] Remove existing local swap/check/build artifacts from working tree.
 
 ### Known functional issues (existing)
 

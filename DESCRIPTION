@@ -1,14 +1,21 @@
 Package: bioshmods
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9004
+Title: Shiny Modules for Bioinformatics Data Exploration
+Version: 0.1.0
 Authors@R: 
     person(given = "January",
            family = "Weiner",
            role = c("aut", "cre"),
            email = "january.weiner@bih-charite.de",
            comment = c(ORCID = "0000-0003-1438-7819"))
-Description: What the package does (one paragraph).
+Description: Reusable shiny modules and helper functions for interactive
+    exploration of high throughput bioinformatic analyses. The package provides
+    components for result tables, gene expression profiles, volcano and disco
+    plots, PCA views, gene-set enrichment browsing, gene-group selection, and
+    export of tabular or generic R objects. It also includes example COVID-19
+    data ('C19').
 License: GPL (>= 3)
+URL: https://github.com/bihealth/bioshmods
+BugReports: https://github.com/bihealth/bioshmods/issues
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
