@@ -109,7 +109,7 @@ discoUI <- function(id, cntr_titles) {
 
 .make_annotation_from_cntr <- function(cntr_ds, primary_id) {
   data.frame(
-    setNames(list(.cntr_primary_ids(cntr_ds, primary_id)), primary_id),
+    stats::setNames(list(.cntr_primary_ids(cntr_ds, primary_id)), primary_id),
     check.names = FALSE
   )
 }
@@ -130,7 +130,7 @@ discoUI <- function(id, cntr_titles) {
       stop("When cntr is a list of datasets, all datasets must be named.")
     }
     if (is.null(annot)) {
-      annot <- setNames(vector("list", length(cntr)), names(cntr))
+      annot <- stats::setNames(vector("list", length(cntr)), names(cntr))
     } else if (is.data.frame(annot)) {
       stop("When cntr is a list of datasets, annot must be a list of data frames (or NULL).")
     }

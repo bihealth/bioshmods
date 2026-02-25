@@ -95,7 +95,7 @@
 
   if(is.data.frame(data_obj)) {
     sheet_name <- .file_export_sheet_names(fallback_sheet, prefix="Sheet")
-    return(setNames(list(data_obj), sheet_name))
+    return(stats::setNames(list(data_obj), sheet_name))
   }
 
   if(.file_export_is_df_list(data_obj)) {
@@ -114,7 +114,7 @@
     }
 
     nm <- .file_export_sheet_names(nm, prefix=.file_export_safe_name(fallback_sheet, "Sheet"))
-    return(setNames(data_obj, nm))
+    return(stats::setNames(data_obj, nm))
   }
 
   stop("Expected a data frame or a list of data frames.")
@@ -175,7 +175,7 @@
 
   if(data_type == "dataframes" && structure_type == "other") {
     cat("Invalid data structure:\n-----------------------\n")
-    print(str(data_obj))
+    utils::str(data_obj)
     stop(sprintf(
       "objects[[%d]] with data_type='dataframes' must be a data frame, list of data frames, or list of lists of data frames.",
       i

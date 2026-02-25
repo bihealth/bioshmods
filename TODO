@@ -1,0 +1,37 @@
+## TODO
+
+### Package metadata and docs
+
+* [ ] Replace placeholder DESCRIPTION fields:
+  * [ ] `Title: What the Package Does (One Line, Title Case)`
+  * [ ] `Description: What the package does (one paragraph).`
+* [ ] Replace template README text with real package overview and example usage.
+* [ ] Verify install instructions in README (CRAN vs GitHub dev install).
+
+### R CMD check notes
+
+* [x] Remove unused import `ggrepel` from DESCRIPTION.
+* [x] Resolve namespace notes for undefined globals/functions by fully qualifying calls:
+  * [x] `setNames`
+  * [x] `head`
+  * [x] `str`
+  * [x] `var`
+
+### Tests
+
+* [ ] Expand test coverage beyond the current `geneBrowserTable` smoke test.
+* [ ] Add tests for new input-normalization/validation helpers:
+  * [ ] disco normalization (`.normalize_disco_inputs`)
+  * [ ] volcano normalization (`.normalize_volcano_inputs`)
+  * [ ] gene-group selector normalization helpers
+  * [ ] file export object normalization helpers
+
+### Repo hygiene
+
+* [ ] Add/update `.gitignore` to exclude local editor/runtime artifacts (`*.swp`, `.Rhistory`, `*.Rcheck`, `*.tar.gz` build outputs).
+* [ ] Remove existing local swap/check/build artifacts from working tree.
+
+### Known functional issues (existing)
+
+* [x] `nearPoints()` issue in disco plot selection logic is resolved.
+* [ ] Gene plot UI height does not adjust when resolution is changed.
