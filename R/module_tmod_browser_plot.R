@@ -18,7 +18,7 @@
 
 ## create a datatable with the genes from a gene set
 .tmod_browser_gene_table <- function(but, ds, id, db_name, cntr_name, 
-                                     sort_name, tmod_dbs, cntr, tmod_map, primary_id) {
+                                     sort_name, tmod_dbs, cntr, tmod_map, primary_id, annot) {
 
   db        <- tmod_dbs[[db_name]]
 
@@ -30,6 +30,9 @@
   genes_pid <- .tmod_rev_db_map_ids(ids=genes, dbname=db_name, tmod_dbs_mapping_obj=tmod_map)
 
   ret <- cntr[[cntr_name]] %>% filter(.data[[primary_id]] %in% genes_pid)
+  if(!is.null(annot)) {
+    ret <- merge(annot, ret, by=primary_id, all.y=TRUE)
+  }
   ret <- ret %>% mutate('>' = sprintf(but, ds, .data[[primary_id]])) %>% relocate(all_of(">"), .before=1) %>%
     arrange(.data[["pvalue"]])
 
@@ -304,7 +307,7 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
       ds <- gs_id$ds
       .tmod_browser_gene_table(as.character(gene.but), ds,
                                     gs_id$id, gs_id$db, gs_id$cntr, gs_id$sort, 
-                                    tmod_dbs[[ds]], cntr[[ds]], tmod_map[[ds]], primary_id)
+                                    tmod_dbs[[ds]], cntr[[ds]], tmod_map[[ds]], primary_id, annot[[ds]])
     })
     
 
