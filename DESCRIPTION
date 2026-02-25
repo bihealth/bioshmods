@@ -22,7 +22,9 @@ Imports:
   tmod,
   ggplot2, 
   methods,
-  glue
+  glue,
+  writexl,
+  zip
 Depends: 
     R (>= 4.1.0)
 Suggests: 
