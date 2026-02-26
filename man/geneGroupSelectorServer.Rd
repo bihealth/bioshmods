@@ -12,8 +12,9 @@ geneGroupSelectorServer(
   annot,
   exprs = NULL,
   cntr = NULL,
-  annot_id_col = "PrimaryID",
-  cntr_id_col = annot_id_col
+  primary_id = "PrimaryID",
+  cntr_id_col = primary_id,
+  selected_ids = NULL
 )
 }
 \arguments{
@@ -28,9 +29,13 @@ frames for multiple datasets}
 \item{cntr}{optional contrasts list (named list of data frames), or named list of
 such lists for multiple datasets}
 
-\item{annot_id_col}{default annotation column used to match expression/contrast IDs}
+\item{primary_id}{default annotation column used as the primary gene identifier}
 
 \item{cntr_id_col}{contrast table column containing gene identifiers}
+
+\item{selected_ids}{optional \code{reactiveVal()} that will be updated
+with the currently selected PrimaryIDs (column \code{primary_id}) as a
+character vector}
 }
 \value{
 A list with reactives: \code{genes}, \code{annotation}, \code{dataset}, and \code{modus}.
@@ -38,13 +43,14 @@ A list with reactives: \code{genes}, \code{annotation}, \code{dataset}, and \cod
 \description{
 The module supports three selection modi:
 \enumerate{
-\item by name via free text and/or file upload
-\item by expression statistics (top variance or top average expression)
-\item by differential expression results from contrast tables
+\item by name (\code{data_type = by_name}) via free text and/or file upload;
+\item by expression statistics (top variance or top average expression);
+\item by differential expression results from contrast tables.
 }
-
-In DGE mode, users can choose ranking priority (\code{lowest p-value first}
-or \code{highest absolute logFC first}) and optionally exclude rows with
+}
+\details{
+In DGE mode, users can choose ranking priority (\verb{lowest p-value first}
+or \verb{highest absolute logFC first}) and optionally exclude rows with
 missing adjusted p-values (FDR).
 }
 \examples{
@@ -67,9 +73,26 @@ cntr <- list(
   )
 )
 if(interactive()) {
-  ui <- fluidPage(geneGroupSelectorUI("gsel"))
+  ui <- fluidPage(
+    sidebarLayout(
+      sidebarPanel(geneGroupSelectorUI("gsel")),
+      mainPanel(tableOutput("selected_ids"))
+    )
+  )
   server <- function(input, output, session) {
-    geneGroupSelectorServer("gsel", annot=annot, exprs=exprs, cntr=cntr)
+    selected_ids <- reactiveVal(character())
+
+    geneGroupSelectorServer(
+      "gsel",
+      annot=annot,
+      exprs=exprs,
+      cntr=cntr,
+      selected_ids=selected_ids
+    )
+
+    output$selected_ids <- renderTable({
+      data.frame(PrimaryID=selected_ids(), stringsAsFactors=FALSE)
+    })
   }
   shinyApp(ui, server)
 }
@@ -77,14 +100,26 @@ if(interactive()) {
 ## Example with C19 dataset
 data(C19)
 if(interactive()) {
-  ui <- fluidPage(geneGroupSelectorUI("gsel"))
+  ui <- fluidPage(
+    sidebarLayout(
+      sidebarPanel(geneGroupSelectorUI("gsel")),
+      mainPanel(tableOutput("selected_ids"))
+    )
+  )
   server <- function(input, output, session) {
+    selected_ids <- reactiveVal(character())
+
     geneGroupSelectorServer(
       "gsel",
       annot=C19$annotation,
       exprs=C19$expression,
-      cntr=C19$contrasts
+      cntr=C19$contrasts,
+      selected_ids=selected_ids
     )
+
+    output$selected_ids <- renderTable({
+      data.frame(PrimaryID=selected_ids(), stringsAsFactors=FALSE)
+    })
   }
   shinyApp(ui, server)
 }
