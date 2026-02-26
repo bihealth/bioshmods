@@ -390,10 +390,11 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
    output$save <- downloadHandler(
      filename = function() {
        req(res())
-       ret <- sprintf("tmod_panel_plot_%s_%s.pdf",
-                      input$db, input$sort)
-       ret <- gsub("[^0-9a-zA-Z_.-]", "", ret)
-       return(ret)
+       sprintf(
+         "tmod_panel_plot_%s_%s.pdf",
+         .sanitize_filename(input$db, "db"),
+         .sanitize_filename(input$sort, "sort")
+       )
      },
      content = function(file) {
        req(res())

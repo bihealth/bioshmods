@@ -25,26 +25,6 @@
   "other"
 }
 
-# Sanitize a text label into a filesystem-safe base filename.
-# Falls back to default when the input is missing or empty.
-.file_export_safe_name <- function(x, default="file") {
-  x <- trimws(as.character(x)[1])
-
-  if(is.na(x) || x == "") {
-    return(default)
-  }
-
-  x <- gsub("[^0-9A-Za-z_.-]", "_", x)
-  x <- gsub("_+", "_", x)
-  x <- gsub("^_+|_+$", "", x)
-
-  if(x == "") {
-    x <- default
-  }
-
-  x
-}
-
 # Normalize candidate Excel sheet names to valid unique names.
 # Enforces Excel constraints such as max length and illegal characters.
 .file_export_sheet_names <- function(x, prefix="Sheet") {
@@ -106,11 +86,11 @@
 
     empty <- nm == ""
     if(any(empty)) {
-      base <- .file_export_safe_name(fallback_sheet, default="Sheet")
+      base <- .sanitize_filename(fallback_sheet, default="Sheet")
       nm[empty] <- paste0(base, "_", seq_len(length(data_obj))[empty])
     }
 
-    nm <- .file_export_sheet_names(nm, prefix=.file_export_safe_name(fallback_sheet, "Sheet"))
+    nm <- .file_export_sheet_names(nm, prefix=.sanitize_filename(fallback_sheet, "Sheet"))
     return(stats::setNames(data_obj, nm))
   }
 
@@ -257,7 +237,7 @@
   on.exit(unlink(tmp_dir, recursive=TRUE), add=TRUE)
 
   base_names <- vapply(seq_along(nested_item), function(i) {
-    .file_export_safe_name(choices[[i]], default=sprintf("selection_%d", i))
+    .sanitize_filename(choices[[i]], default=sprintf("selection_%d", i))
   }, character(1))
   base_names <- make.unique(base_names, sep="_")
   xlsx_names <- paste0(base_names, ".xlsx")
@@ -361,7 +341,7 @@ fileExportServer <- function(id, objects) {
         idx <- i
         spec <- specs[[idx]]
         # Build a stable base filename from the user-visible object title.
-        base_name <- .file_export_safe_name(spec$title, default=sprintf("object_%d", idx))
+        base_name <- .sanitize_filename(spec$title, default=sprintf("object_%d", idx))
 
         # Build per-row output/input ids for download and nested selection controls.
         save_id <- sprintf("save_%d", idx)
@@ -390,7 +370,7 @@ fileExportServer <- function(id, objects) {
               if(is.null(selected) || is.na(selected) || !selected %in% choices) {
                 selected <- choices[[1]]
               }
-              sprintf("%s_%s.xlsx", base_name, .file_export_safe_name(selected, "selection"))
+              sprintf("%s_%s.xlsx", base_name, .sanitize_filename(selected, "selection"))
             },
             content = function(file) {
               selected <- input[[select_id]]

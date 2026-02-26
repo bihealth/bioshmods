@@ -312,11 +312,13 @@ discoServer <- function(id, cntr, annot=NULL,
     ## save the disco plot to a PDF file
     output$save <- downloadHandler(
       filename = function() {
-        ret <- sprintf("disco_plot_%s_%s_vs_%s_%s.pdf", 
-                       dataset1(), contrast1(),
-                       dataset2(), contrast2())
-        ret <- gsub("[^0-9a-zA-Z_.-]", "", ret)
-        return(ret)
+        sprintf(
+          "disco_plot_%s_%s_vs_%s_%s.pdf",
+          .sanitize_filename(dataset1(), "dataset1"),
+          .sanitize_filename(contrast1(), "contrast1"),
+          .sanitize_filename(dataset2(), "dataset2"),
+          .sanitize_filename(contrast2(), "contrast2")
+        )
       },
       content = function(file) {
         pdf(file=file, width=8, height=8)

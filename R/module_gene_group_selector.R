@@ -1,19 +1,3 @@
-# Convert free text into a filesystem-safe filename fragment.
-# Replaces disallowed characters and applies a fallback name when empty.
-.gene_group_sanitize_filename <- function(x, default="selected_genes") {
-  x <- trimws(as.character(x)[1])
-  if(is.na(x) || x == "") {
-    x <- default
-  }
-  x <- gsub("[^0-9A-Za-z_.-]", "_", x)
-  x <- gsub("_+", "_", x)
-  x <- gsub("^_+|_+$", "", x)
-  if(x == "") {
-    x <- default
-  }
-  x
-}
-
 # Parse comma/space separated gene identifiers from text input.
 # Returns unique non-empty tokens in their original order.
 .gene_group_parse_gene_input <- function(x) {
@@ -846,8 +830,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
         md <- input$modus %||% modes[1]
         sprintf(
           "selected_genes_%s_%s.txt",
-          .gene_group_sanitize_filename(ds, "dataset"),
-          .gene_group_sanitize_filename(md, "modus")
+          .sanitize_filename(ds, "dataset"),
+          .sanitize_filename(md, "modus")
         )
       },
       content = function(file) {

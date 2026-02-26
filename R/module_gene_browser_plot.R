@@ -330,12 +330,13 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       filename = function() {
         .id <- g_id()
         .ds <- ds()
-        ret <- sprintf("expression_profile_ds_%s_%s_covarX_%s_covarY_%s_colorBy_%s_groupBy_%s_symbolBy_%s_trellisBy_%s_trellisScales_%s_plotType_%s_transpose_%s.pdf",
-                       .ds, .id,
-                       input$covarXName, input$covarYName, input$colorBy, input$groupBy, input$symbolBy, input$trellisBy,
-                       input$trellisScales, input$plotType, input$transposePlot)
-        ret <- gsub("[^0-9a-zA-Z_.-]", "", ret)
-        return(ret)
+        base <- sprintf(
+          "expression_profile_ds_%s_%s_covarX_%s_covarY_%s_colorBy_%s_groupBy_%s_symbolBy_%s_trellisBy_%s_trellisScales_%s_plotType_%s_transpose_%s",
+          .ds, .id,
+          input$covarXName, input$covarYName, input$colorBy, input$groupBy, input$symbolBy, input$trellisBy,
+          input$trellisScales, input$plotType, input$transposePlot
+        )
+        sprintf("%s.pdf", .sanitize_filename(base, "expression_profile"))
       },
       content = function(file) {
         pdf(file=file, width=8, height=5)

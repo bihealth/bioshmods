@@ -276,9 +276,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       filename = function() {
         .ds <- input$dataset
         if(!isTruthy(.ds)) { .ds <- "_all" }
-        ret <- sprintf("volcano_plot_%s.pdf", .ds)
-        ret <- gsub("[^0-9a-zA-Z_.-]", "", ret)
-        return(ret)
+        sprintf("volcano_plot_%s.pdf", .sanitize_filename(.ds, "all"))
       },
       content = function(file) {
         req(plot_obj())
