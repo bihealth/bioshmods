@@ -315,8 +315,6 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
     ## save the plot as PDF
     output$save <- downloadHandler(
       filename = function() {
-        req(gs_id$id)
-        if(!isTruthy(gs_id$id)) { return(NULL) }
         sprintf(
           "evidence_plot_%s_%s_%s_%s.pdf",
           .sanitize_filename(gs_id$ds, "dataset"),

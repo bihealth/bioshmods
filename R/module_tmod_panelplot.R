@@ -389,7 +389,6 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
    ## Save figure as a PDF
    output$save <- downloadHandler(
      filename = function() {
-       req(res())
        sprintf(
          "tmod_panel_plot_%s_%s.pdf",
          .sanitize_filename(input$db, "db"),
