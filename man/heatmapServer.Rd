@@ -18,6 +18,7 @@ heatmapServer(
   dge_pval_col = NULL,
   dge_lfc_col = NULL,
   dge_fdr_col = NULL,
+  max_genes = 150,
   annot_row_col = NULL
 )
 }
@@ -48,6 +49,9 @@ map selected genes to row labels in \code{\link[=plot_heatmap]{plot_heatmap()}}.
 
 \item{dge_fdr_col}{Optional adjusted p-value (FDR) column name for DGE mode in
 \code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}.}
+
+\item{max_genes}{Hard limit for the number of genes shown on the heatmap.
+If more genes are selected, only the first \code{max_genes} are displayed.}
 
 \item{annot_row_col}{Optional default annotation column used for heatmap row labels.
 Can be changed interactively in the module UI.}

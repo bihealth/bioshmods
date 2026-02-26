@@ -36,9 +36,11 @@ test_that("heatmapUI builds sidebar layout with selector and options", {
   html <- as.character(ui)
 
   expect_s3_class(ui, "shiny.tag")
-  expect_true(grepl("col-sm-4", html, fixed = TRUE))
-  expect_true(grepl("col-sm-8", html, fixed = TRUE))
+  expect_true(grepl("col-sm-3", html, fixed = TRUE))
+  expect_true(grepl("col-sm-9", html, fixed = TRUE))
   expect_true(grepl("hm-gene_selector-modus", html, fixed = TRUE))
+  expect_true(grepl("hm-selected_genes_n", html, fixed = TRUE))
+  expect_true(grepl("hm-selected_genes_warning", html, fixed = TRUE))
   expect_true(grepl("hm-sel_annot", html, fixed = TRUE))
   expect_true(grepl("hm-annot_row_col", html, fixed = TRUE))
   expect_true(grepl("hm-show_legend", html, fixed = TRUE))
@@ -74,6 +76,8 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
       expect_true(methods::is(isolate(ret$heatmap()), "Heatmap"))
       expect_false(is.null(isolate(ret$heatmap())@top_annotation))
       expect_equal(isolate(ret$heatmap())@row_names_param$labels, c("A", "B"))
+      expect_equal(output$selected_genes_n, "Selected genes: 2")
+      expect_equal(output$selected_genes_warning, "")
     }
   )
 })
@@ -166,6 +170,47 @@ test_that("heatmapServer forwards DGE column params to gene selector module", {
       ret <- session$returned
       expect_equal(isolate(ret$genes()), c("g1", "g2", "g4"))
       expect_true(methods::is(isolate(ret$heatmap()), "Heatmap"))
+    }
+  )
+})
+
+test_that("heatmapServer limits shown genes and displays warning", {
+  n_genes <- 200
+  annot <- data.frame(
+    PrimaryID = paste0("g", seq_len(n_genes)),
+    SYMBOL = paste0("S", seq_len(n_genes)),
+    stringsAsFactors = FALSE
+  )
+  exprs <- matrix(
+    rnorm(n_genes * 4),
+    nrow = n_genes,
+    dimnames = list(annot$PrimaryID, paste0("s", 1:4))
+  )
+  covar <- data.frame(
+    SampleID = colnames(exprs),
+    group = c("A", "A", "B", "B"),
+    stringsAsFactors = FALSE
+  )
+
+  all_ids <- paste(annot$PrimaryID, collapse = ",")
+
+  testServer(
+    heatmapServer,
+    args = list(
+      annot = annot,
+      exprs = exprs,
+      covar = covar,
+      max_genes = 150
+    ),
+    {
+      session$setInputs(`gene_selector-modus` = "by_name")
+      session$setInputs(`gene_selector-name_list` = all_ids)
+      session$flushReact()
+
+      ret <- session$returned
+      expect_equal(length(isolate(ret$genes())), 200)
+      expect_equal(nrow(isolate(ret$heatmap())@matrix), 150)
+      expect_match(output$selected_genes_warning, "first 150")
     }
   )
 })

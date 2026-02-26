@@ -77,6 +77,14 @@ heatmapUI <- function(id) {
         class="well",
         h4("Gene selection options"),
       geneGroupSelectorUI(ns("gene_selector")),
+      shiny::tags$div(
+        style="margin-top:8px;",
+        textOutput(ns("selected_genes_n"), inline=TRUE),
+        shiny::tags$span(
+          style="margin-left:8px;color:#a94442;font-weight:600;",
+          textOutput(ns("selected_genes_warning"), inline=TRUE)
+        )
+      )
       ),
       shiny::tags$div(
         class="well",
@@ -132,6 +140,8 @@ heatmapUI <- function(id) {
 #'   [geneGroupSelectorServer()].
 #' @param dge_fdr_col Optional adjusted p-value (FDR) column name for DGE mode in
 #'   [geneGroupSelectorServer()].
+#' @param max_genes Hard limit for the number of genes shown on the heatmap.
+#'   If more genes are selected, only the first `max_genes` are displayed.
 #' @param primary_id Primary identifier column in `annot` / `cntr`, also used to
 #'   map selected genes to row labels in [plot_heatmap()].
 #' @param annot_row_col Optional default annotation column used for heatmap row labels.
@@ -196,6 +206,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
                           dge_pval_col=NULL,
                           dge_lfc_col=NULL,
                           dge_fdr_col=NULL,
+                          max_genes=150,
                           annot_row_col=NULL) {
   if(is.null(exprs)) {
     stop("`exprs` must be provided.")
@@ -206,10 +217,14 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
   exprs_norm <- .gene_group_normalize_exprs(exprs, datasets)
   covar_norm <- .heatmap_normalize_covar(covar, datasets)
   primary_id <- as.character(primary_id)[1]
+  max_genes <- suppressWarnings(as.integer(max_genes)[1])
   annot_row_col <- as.character(annot_row_col)[1]
 
   if(is.na(primary_id) || !nzchar(primary_id)) {
     stop("`primary_id` must be a non-empty column name.")
+  }
+  if(is.na(max_genes) || max_genes < 1L) {
+    stop("`max_genes` must be a positive integer.")
   }
   missing_primary_id <- datasets[!vapply(annot_norm, function(x) primary_id %in% colnames(x), logical(1))]
   if(length(missing_primary_id) > 0L) {
@@ -234,6 +249,15 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
   moduleServer(id, function(input, output, session) {
     selected_ids <- reactiveVal(character(0))
     fig_size <- reactiveValues(width=800, height=600)
+
+    selected_ids_for_heatmap <- reactive({
+      ids <- selected_ids()
+      if(length(ids) > max_genes) {
+        ids[seq_len(max_genes)]
+      } else {
+        ids
+      }
+    })
 
     observeEvent(input$figure_size, {
       size <- sanitize_figsize(input$figure_size, default=c(800, 600))
@@ -287,15 +311,27 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       )
     })
 
+    output$selected_genes_n <- renderText({
+      sprintf("Selected genes: %d", length(selected_ids()))
+    })
+
+    output$selected_genes_warning <- renderText({
+      n <- length(selected_ids())
+      if(n <= max_genes) {
+        return("")
+      }
+      sprintf("Warning: heatmap shows only first %d genes.", max_genes)
+    })
+
     heatmap_obj <- reactive({
       ds <- selector$dataset()
       req(isTruthy(ds))
       req(ds %in% datasets)
-      req(length(selected_ids()) > 0L)
+      req(length(selected_ids_for_heatmap()) > 0L)
 
       plot_heatmap(
         exprs=exprs_norm[[ds]],
-        genes=selected_ids(),
+        genes=selected_ids_for_heatmap(),
         covar=covar_norm[[ds]],
         sample_id_col=sample_id_col,
         annot=annot_norm[[ds]],
