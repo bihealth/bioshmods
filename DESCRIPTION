@@ -30,7 +30,8 @@ Imports:
   methods,
   glue,
   writexl,
-  zip
+  zip,
+  ComplexHeatmap
 Depends: 
     R (>= 4.1.0)
 Suggests: 
