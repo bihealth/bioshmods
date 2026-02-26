@@ -266,7 +266,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     })
 
     observeEvent(input$figure_size, {
-      size <- .sanitize_figsize(input$figure_size, default=c(800, 800))
+      size <- sanitize_figsize(input$figure_size, default=c(800, 800))
       fig_size$width <- size$width
       fig_size$height <- size$height
     })
@@ -275,11 +275,11 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       filename = function() {
         .ds <- input$dataset
         if(!isTruthy(.ds)) { .ds <- "_all" }
-        sprintf("volcano_plot_%s.pdf", .sanitize_filename(.ds, "all"))
+        sprintf("volcano_plot_%s.pdf", sanitize_filename(.ds, "all"))
       },
       content = function(file) {
         req(plot_obj())
-        .save_pdf(file=file, width=8, height=5, draw=function() {
+        save_pdf(file=file, width=8, height=5, draw=function() {
           print(plot_obj())
         })
       }

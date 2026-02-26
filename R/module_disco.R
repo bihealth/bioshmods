@@ -314,14 +314,14 @@ discoServer <- function(id, cntr, annot=NULL,
       filename = function() {
         sprintf(
           "disco_plot_%s_%s_vs_%s_%s.pdf",
-          .sanitize_filename(dataset1(), "dataset1"),
-          .sanitize_filename(contrast1(), "contrast1"),
-          .sanitize_filename(dataset2(), "dataset2"),
-          .sanitize_filename(contrast2(), "contrast2")
+          sanitize_filename(dataset1(), "dataset1"),
+          sanitize_filename(contrast1(), "contrast1"),
+          sanitize_filename(dataset2(), "dataset2"),
+          sanitize_filename(contrast2(), "contrast2")
         )
       },
       content = function(file) {
-        .save_pdf(file=file, width=8, height=8, draw=function() {
+        save_pdf(file=file, width=8, height=8, draw=function() {
           g <- plot_obj()
           print(g)
         })

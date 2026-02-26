@@ -12,9 +12,7 @@ fileExportServer(id, objects)
 \arguments{
 \item{id}{module identifier (same as the one passed to \code{\link[=fileExportUI]{fileExportUI()}})}
 
-\item{objects}{list of object definitions. Each entry should contain
-\code{data}, \code{title}, \code{description}, \code{data_type}
-(\code{"dataframes"} or \code{"inspecific"}), and optional \code{help}.}
+\item{objects}{list of object definitions as described above}
 }
 \value{
 \code{fileExportUI} returns UI elements. \code{fileExportServer} returns
@@ -26,24 +24,29 @@ Shiny module for exporting a list of objects as Excel (\code{.xlsx}), RDS
 specification.
 }
 \details{
-For \code{data_type = "dataframes"}, \code{data} may be:
+Each entry in \code{objects} must be a list with:
 \itemize{
-\item a data frame,
-\item a list of data frames,
-\item or a list of lists of data frames.
+\item \code{data}: data payload
+\item \code{title}: short title shown in the UI
+\item \code{description}: descriptive text shown after the title
+\item \code{data_type}: either \code{"dataframes"} or \code{"rds"}
+\item \code{help}: optional help text/tag shown below description
 }
 
-Single/list data frame objects expose a \code{"save as"} button producing
-an Excel file with one sheet per data frame.
-
-Nested list objects expose:
+For \code{data_type = "dataframes"}:
 \itemize{
-\item a dropdown to choose one list,
-\item \code{"save as"} for the selected list (Excel),
-\item \code{"save all"} for a ZIP archive containing one Excel file per list.
+\item \code{data} can be a single data frame, a list of data frames, or a list of
+lists of data frames.
+\item single/list: one \code{"save as"} button exports one Excel file (one sheet
+per data frame).
+\item list of lists: UI includes a selection dropdown, \code{"save as"} for the
+selected list, and \code{"save all"} for a ZIP of Excel files.
 }
 
-For \code{data_type = "inspecific"}, \code{"save as"} exports an RDS file.
+For \code{data_type = "rds"}:
+\itemize{
+\item \code{"save as"} exports the object as RDS.
+}
 }
 \examples{
 data(C19)
@@ -58,8 +61,8 @@ if(interactive()) {
     ),
     list(
       data = list(
-        contrasts_a = C19$contrasts[1:2],
-        contrasts_b = C19$contrasts[3:4]
+        dataset_a = C19$contrasts[1:2],
+        dataset_b = C19$contrasts[1:2]
       ),
       title = "Contrasts",
       description = "Choose one contrast set or export all",
@@ -70,7 +73,7 @@ if(interactive()) {
       data = C19,
       title = "Full C19 object",
       description = "Complete data object",
-      data_type = "inspecific",
+      data_type = "rds",
       help = "Saved as RDS"
     )
   )

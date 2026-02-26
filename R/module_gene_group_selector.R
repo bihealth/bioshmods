@@ -830,8 +830,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
         md <- input$modus %||% modes[1]
         sprintf(
           "selected_genes_%s_%s.txt",
-          .sanitize_filename(ds, "dataset"),
-          .sanitize_filename(md, "modus")
+          sanitize_filename(ds, "dataset"),
+          sanitize_filename(md, "modus")
         )
       },
       content = function(file) {

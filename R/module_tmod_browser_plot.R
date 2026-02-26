@@ -317,16 +317,16 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
       filename = function() {
         sprintf(
           "evidence_plot_%s_%s_%s_%s.pdf",
-          .sanitize_filename(gs_id$ds, "dataset"),
-          .sanitize_filename(gs_id$db, "db"),
-          .sanitize_filename(gs_id$cntr, "contrast"),
-          .sanitize_filename(gs_id$id, "module")
+          sanitize_filename(gs_id$ds, "dataset"),
+          sanitize_filename(gs_id$db, "db"),
+          sanitize_filename(gs_id$cntr, "contrast"),
+          sanitize_filename(gs_id$id, "module")
         )
       },
       content = function(file) {
         req(gs_id$id)
         if(!isTruthy(gs_id$id)) { return(NULL) }
-        .save_pdf(file=file, width=8, height=5, draw=function() {
+        save_pdf(file=file, width=8, height=5, draw=function() {
           title <- sprintf("%s / %s\nContrast: %s / %s", 
                            gs_id$id, gs_id$db, gs_id$cntr, gs_id$sort)
 

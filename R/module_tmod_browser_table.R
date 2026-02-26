@@ -329,7 +329,7 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
     fig_size <- reactiveValues()
 
     observeEvent(input$upset_fig_size, {
-      size <- .sanitize_figsize(input$upset_fig_size, default=c(800, 600))
+      size <- sanitize_figsize(input$upset_fig_size, default=c(800, 600))
       fig_size$width <- size$width
       fig_size$height <- size$height
     })

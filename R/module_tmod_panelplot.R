@@ -391,8 +391,8 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
      filename = function() {
        sprintf(
          "tmod_panel_plot_%s_%s.pdf",
-         .sanitize_filename(input$db, "db"),
-         .sanitize_filename(input$sort, "sort")
+         sanitize_filename(input$db, "db"),
+         sanitize_filename(input$sort, "sort")
        )
      },
      content = function(file) {
@@ -410,7 +410,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
       }
 
       mf("Saving to file %s", file)
-      .save_pdf(
+      save_pdf(
         file=file,
         width=fig_size$width / 75,
         height=fig_size$height / 75,
@@ -521,7 +521,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
     ## record the details of the figure size selected by the user
     observeEvent(input$figure_size, {
-      size <- .sanitize_figsize(input$figure_size, default=c(800, 800))
+      size <- sanitize_figsize(input$figure_size, default=c(800, 800))
       fig_size$width <- size$width
       fig_size$height <- size$height
     })

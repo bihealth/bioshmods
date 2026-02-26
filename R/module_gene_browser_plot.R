@@ -317,7 +317,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 
     fig_size <- reactiveValues(width=600, height=600)
     observeEvent(input$figure_size, {
-      size <- .sanitize_figsize(input$figure_size, default=c(800, 600))
+      size <- sanitize_figsize(input$figure_size, default=c(800, 600))
       fig_size$width <- size$width
       fig_size$height <- size$height
     })
@@ -334,10 +334,10 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
           input$covarXName, input$covarYName, input$colorBy, input$groupBy, input$symbolBy, input$trellisBy,
           input$trellisScales, input$plotType, input$transposePlot
         )
-        sprintf("%s.pdf", .sanitize_filename(base, "expression_profile"))
+        sprintf("%s.pdf", sanitize_filename(base, "expression_profile"))
       },
       content = function(file) {
-        .save_pdf(file=file, width=8, height=5, draw=function() {
+        save_pdf(file=file, width=8, height=5, draw=function() {
           g <- .gene_browser_plot(covar[[ ds() ]], g_id(), 
                                   input$covarXName, 
                                   input$covarYName, 
