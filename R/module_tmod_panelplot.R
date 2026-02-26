@@ -411,16 +411,21 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
       }
 
       mf("Saving to file %s", file)
-      pdf(file=file, width=fig_size$width / 75, height=fig_size$height / 75)
-      g <- gg_panelplot(.res, pie=.pie, 
-                     filter_row_auc=input$filter_auc,
-                     filter_row_q=input$filter_pval,
-                     label_angle=input$label_angle) + 
-                                   theme(text=element_text(size=input$font_size))
+      .save_pdf(
+        file=file,
+        width=fig_size$width / 75,
+        height=fig_size$height / 75,
+        draw=function() {
+          g <- gg_panelplot(.res, pie=.pie, 
+                            filter_row_auc=input$filter_auc,
+                            filter_row_q=input$filter_pval,
+                            label_angle=input$label_angle) + 
+            theme(text=element_text(size=input$font_size))
 
-       print(g)
-       dev.off()
-       message("returning")
+          print(g)
+        }
+      )
+      message("returning")
      }
    )
 
@@ -517,11 +522,9 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
     ## record the details of the figure size selected by the user
     observeEvent(input$figure_size, {
-      fig_size$width <- 
-        as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\1", input$figure_size))
-
-      fig_size$height <- 
-        as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\2", input$figure_size))
+      size <- .sanitize_figsize(input$figure_size, default=c(800, 800))
+      fig_size$width <- size$width
+      fig_size$height <- size$height
     })
 
     observe({ output$panelPlot <- renderPlot({

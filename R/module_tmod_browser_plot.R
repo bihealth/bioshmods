@@ -328,15 +328,15 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
       content = function(file) {
         req(gs_id$id)
         if(!isTruthy(gs_id$id)) { return(NULL) }
-        pdf(file=file, width=8, height=5)
-        title <- sprintf("%s / %s\nContrast: %s / %s", 
-                         gs_id$id, gs_id$db, gs_id$cntr, gs_id$sort)
+        .save_pdf(file=file, width=8, height=5, draw=function() {
+          title <- sprintf("%s / %s\nContrast: %s / %s", 
+                           gs_id$id, gs_id$db, gs_id$cntr, gs_id$sort)
 
-        ds <- gs_id$ds
-        .plot_evidence(mod_id=gs_id$id, cntr_id=gs_id$cntr, db_id=gs_id$db, sort_id=gs_id$sort, 
-                     cntr=cntr[[ds]], tmod_dbs=tmod_dbs[[ds]], tmod_gl=tmod_gl[[ds]], 
-                     tmod_map=tmod_map[[ds]], annot=annot[[ds]], primary_id)
-        dev.off()
+          ds <- gs_id$ds
+          .plot_evidence(mod_id=gs_id$id, cntr_id=gs_id$cntr, db_id=gs_id$db, sort_id=gs_id$sort, 
+                         cntr=cntr[[ds]], tmod_dbs=tmod_dbs[[ds]], tmod_gl=tmod_gl[[ds]], 
+                         tmod_map=tmod_map[[ds]], annot=annot[[ds]], primary_id)
+        })
       }
     )
   })

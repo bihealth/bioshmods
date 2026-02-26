@@ -266,10 +266,9 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     })
 
     observeEvent(input$figure_size, {
-        fig_size$width  <- 
-          as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\1", input$figure_size))
-        fig_size$height <- 
-          as.numeric(gsub(" *([0-9]+) *x *([0-9]+)", "\\2", input$figure_size))
+      size <- .sanitize_figsize(input$figure_size, default=c(800, 800))
+      fig_size$width <- size$width
+      fig_size$height <- size$height
     })
 
     output$save <- downloadHandler(
@@ -280,9 +279,9 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       },
       content = function(file) {
         req(plot_obj())
-        pdf(file=file, width=8, height=5)
-        print(plot_obj())
-        dev.off()
+        .save_pdf(file=file, width=8, height=5, draw=function() {
+          print(plot_obj())
+        })
       }
     )
 

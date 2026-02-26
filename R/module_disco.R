@@ -321,10 +321,10 @@ discoServer <- function(id, cntr, annot=NULL,
         )
       },
       content = function(file) {
-        pdf(file=file, width=8, height=8)
-        g <- plot_obj()
-        print(g)
-        dev.off()
+        .save_pdf(file=file, width=8, height=8, draw=function() {
+          g <- plot_obj()
+          print(g)
+        })
       }
     )
 
