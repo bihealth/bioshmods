@@ -133,3 +133,79 @@ save_pdf <- function(file, width=8, height=5, draw) {
 
   invisible(NULL)
 }
+
+#' Create a Grid of Shiny Columns
+#'
+#' Build a fixed grid as a `div` containing `.nrow` `fluidRow()` blocks,
+#' each with `.ncol` `column()` elements.
+#'
+#' @param ... UI elements to place in the grid.
+#' @param .ncol Number of columns per row.
+#' @param .nrow Number of rows.
+#' @param .byrow Logical; fill elements row-wise (`TRUE`) or column-wise (`FALSE`).
+#' @param .colwidths Optional bootstrap column widths. Must have length `1` or
+#'   `.ncol`, and sum to at most `12`. If `NULL`, defaults to
+#'   `floor(12 / .nrow)` for each column.
+#'
+#' @return A `shiny.tag` (`div`) containing the requested grid.
+#'
+#' @examples
+#' gridLayout("A", "B", .ncol=2, .nrow=1, .colwidths=6)
+#' gridLayout("A", "B", "C", .ncol=2, .nrow=2, .byrow=FALSE, .colwidths=c(4, 8))
+#'
+#' @export
+gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
+  .ncol <- suppressWarnings(as.integer(.ncol)[1])
+  .nrow <- suppressWarnings(as.integer(.nrow)[1])
+
+  if(is.na(.ncol) || .ncol < 1L) {
+    stop("`.ncol` must be a positive integer.")
+  }
+  if(is.na(.nrow) || .nrow < 1L) {
+    stop("`.nrow` must be a positive integer.")
+  }
+
+  if(!is.logical(.byrow) || length(.byrow) != 1L || is.na(.byrow)) {
+    stop("`.byrow` must be TRUE or FALSE.")
+  }
+
+  items <- list(...)
+  capacity <- .ncol * .nrow
+  if(length(items) > capacity) {
+    stop("Number of UI elements in `...` cannot exceed `.ncol * .nrow`.")
+  }
+
+  if(is.null(.colwidths)) {
+    .colwidths <- floor(12 / .ncol)
+  }
+
+  message(".colwidths: ", paste(.colwidths, collapse=", "))
+
+  .colwidths <- suppressWarnings(as.integer(.colwidths))
+  if(length(.colwidths) < 1L || any(is.na(.colwidths))) {
+    stop("`.colwidths` must be numeric/integer.")
+  }
+  if(length(.colwidths) == 1L) {
+    .colwidths <- rep(.colwidths[1], .ncol)
+  } else if(length(.colwidths) != .ncol) {
+    stop("`.colwidths` must have length 1 or `.ncol`.")
+  }
+  if(any(.colwidths < 1L)) {
+    stop("All values in `.colwidths` must be >= 1.")
+  }
+  if(sum(.colwidths) > 12L) {
+    stop("Sum of `.colwidths` must not be larger than 12.")
+  }
+
+  padded <- c(items, rep(list(NULL), capacity - length(items)))
+  idx <- matrix(seq_len(capacity), nrow=.nrow, ncol=.ncol, byrow=isTRUE(.byrow))
+
+  rows <- lapply(seq_len(.nrow), function(r) {
+    cols <- lapply(seq_len(.ncol), function(c) {
+      shiny::column(.colwidths[c], padded[[idx[r, c]]])
+    })
+    do.call(shiny::fluidRow, cols)
+  })
+
+  do.call(shiny::tags$div, rows)
+}

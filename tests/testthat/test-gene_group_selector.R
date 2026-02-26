@@ -26,8 +26,7 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
     ),
     {
       session$setInputs(modus = "by_name")
-      session$setInputs(name_id_col = "SYMBOL")
-      session$setInputs(name_list = "B, A, missing")
+      session$setInputs(name_list = "g2, g1, missing")
       session$flushReact()
     }
   )
@@ -42,7 +41,6 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
     ),
     {
       session$setInputs(modus = "by_name")
-      session$setInputs(name_id_col = "PrimaryID")
       session$setInputs(name_list = "")
       session$flushReact()
     }
@@ -124,4 +122,43 @@ test_that("geneGroupSelectorServer supports custom mode order and defaults", {
   )
 
   expect_equal(isolate(selected_ids()), c("g8", "g7", "g6"))
+})
+
+test_that("geneGroupSelectorServer uses server-level DGE column params", {
+  annot <- data.frame(
+    PrimaryID = paste0("g", 1:4),
+    stringsAsFactors = FALSE
+  )
+  cntr <- list(
+    contrast_a = data.frame(
+      PrimaryID = annot$PrimaryID,
+      PVAL = c(0.001, 0.02, 0.2, 0.03),
+      L2FC = c(2, 1, 0.5, 1.5),
+      QVAL = c(0.005, 0.02, 0.9, 0.04),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    geneGroupSelectorServer,
+    args = list(
+      annot = annot,
+      cntr = cntr,
+      dge_pval_col = "PVAL",
+      dge_lfc_col = "L2FC",
+      dge_fdr_col = "QVAL",
+      selected_ids = selected_ids
+    ),
+    {
+      session$setInputs(modus = "by_dge")
+      session$setInputs(dge_contrasts = "contrast_a")
+      session$setInputs(dge_pval_thr = 0.05)
+      session$setInputs(dge_lfc_thr = 0)
+      session$flushReact()
+    }
+  )
+
+  expect_equal(isolate(selected_ids()), c("g1", "g2", "g4"))
 })

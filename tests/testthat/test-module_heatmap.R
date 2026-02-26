@@ -64,7 +64,6 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
       session$flushReact()
 
       session$setInputs(
-        `gene_selector-name_id_col` = "PrimaryID",
         `gene_selector-name_list` = "g1,g2"
       )
       session$flushReact()
@@ -95,7 +94,6 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
       session$flushReact()
 
       session$setInputs(
-        `gene_selector-name_id_col` = "PrimaryID",
         `gene_selector-name_list` = "g3,g4"
       )
       session$flushReact()
@@ -127,10 +125,47 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
         annot = x$annot,
         exprs = x$exprs,
         covar = x$covar,
-        primary_id_col = "missing_primary_id_col"
+        primary_id = "missing_primary_id_col"
       ),
       {}
     ),
-    "primary_id_col"
+    "primary_id"
+  )
+})
+
+test_that("heatmapServer forwards DGE column params to gene selector module", {
+  x <- .heatmap_test_inputs()
+  cntr <- list(
+    contrast_a = data.frame(
+      PrimaryID = x$annot$PrimaryID,
+      PVAL = c(0.001, 0.02, 0.8, 0.03, 0.6, 0.9),
+      L2FC = c(2, 1.3, 0.2, 1.1, 0.1, 0.05),
+      QVAL = c(0.005, 0.02, 0.9, 0.04, 0.8, 0.95),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  testServer(
+    heatmapServer,
+    args = list(
+      annot = x$annot,
+      exprs = x$exprs,
+      cntr = cntr,
+      covar = x$covar,
+      dge_pval_col = "PVAL",
+      dge_lfc_col = "L2FC",
+      dge_fdr_col = "QVAL"
+    ),
+    {
+      session$setInputs(`gene_selector-modus` = "by_dge")
+      session$setInputs(`gene_selector-dge_contrasts` = "contrast_a")
+      session$setInputs(`gene_selector-dge_pval_thr` = 0.05)
+      session$setInputs(`gene_selector-dge_lfc_thr` = 1)
+      session$flushReact()
+
+      ret <- session$returned
+      expect_equal(isolate(ret$genes()), c("g1", "g2", "g4"))
+      expect_true(methods::is(isolate(ret$heatmap()), "Heatmap"))
+    }
   )
 })

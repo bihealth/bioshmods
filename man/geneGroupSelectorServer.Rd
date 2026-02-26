@@ -12,9 +12,11 @@ geneGroupSelectorServer(
   annot,
   exprs = NULL,
   cntr = NULL,
-  primary_id = "PrimaryID",
-  cntr_id_col = primary_id,
   mode_order = c("by_expression", "by_dge", "by_name"),
+  primary_id = "PrimaryID",
+  dge_pval_col = NULL,
+  dge_lfc_col = NULL,
+  dge_fdr_col = NULL,
   defaults = NULL,
   selected_ids = NULL
 )
@@ -31,13 +33,20 @@ frames for multiple datasets}
 \item{cntr}{optional contrasts list (named list of data frames), or named list of
 such lists for multiple datasets}
 
-\item{primary_id}{default annotation column used as the primary gene identifier}
-
-\item{cntr_id_col}{contrast table column containing gene identifiers}
-
 \item{mode_order}{order of available selection modes. Values must come from
 \code{c("by_expression", "by_dge", "by_name")}. Unavailable modes are skipped.
 Default is expression -> DGE -> by name.}
+
+\item{primary_id}{default annotation column used as the primary gene identifier}
+
+\item{dge_pval_col}{optional p-value column name in contrast tables for DGE mode.
+If \code{NULL}, the module auto-detects a suitable numeric column.}
+
+\item{dge_lfc_col}{optional log fold-change column name in contrast tables for
+DGE mode. If \code{NULL}, the module auto-detects a suitable numeric column.}
+
+\item{dge_fdr_col}{optional adjusted p-value (FDR) column name in contrast tables
+for DGE mode. If \code{NULL}, the module auto-detects a suitable numeric column.}
 
 \item{defaults}{optional list of default selector parameters. Supported keys:
 \code{expr_metric}, \code{expr_top_mode}, \code{expr_top_value}, \code{dge_top_mode},

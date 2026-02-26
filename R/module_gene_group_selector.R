@@ -320,15 +320,6 @@
   annot_df[0, , drop=FALSE]
 }
 
-# Pick preferred column when present, otherwise return the first column.
-# Keeps selector logic stable across optional UI choices.
-.gene_group_pick_col <- function(df, preferred) {
-  if(length(preferred) > 0L && !is.null(preferred) && preferred %in% colnames(df)) {
-    return(preferred)
-  }
-  colnames(df)[1]
-}
-
 # Build dataset selector UI.
 # Hidden when only one dataset is available.
 .gene_group_dataset_input_ui <- function(ns, datasets) {
@@ -339,22 +330,21 @@
 }
 
 # Controls for name-based selection mode.
-.gene_group_name_controls_ui <- function(ns, ann_cols, id_default) {
+.gene_group_name_controls_ui <- function(ns) {
   fluidRow(
     column(
-      6,
-      selectInput(ns("name_id_col"), "Identifier column", choices=ann_cols, selected=id_default),
+      12,
       shiny::fileInput(ns("name_file"), "Upload text file with gene IDs", accept=c(".txt", ".csv", ".tsv"))
     ),
     column(
-      6,
+      12,
       shiny::textAreaInput(ns("name_list"), "Gene names / IDs (space or comma separated)", rows=8)
     )
   )
 }
 
 # Controls for expression-based selection mode.
-.gene_group_expression_controls_ui <- function(ns, ann_cols, expr_id_default, metric, top_mode, top_value) {
+.gene_group_expression_controls_ui <- function(ns, metric, top_mode, top_value) {
   top_value <- suppressWarnings(as.numeric(top_value)[1])
   if(!is.finite(top_value)) {
     top_value <- if(top_mode == "pct") 10 else 100
@@ -363,37 +353,42 @@
   top_value_ui <- if(top_mode == "pct") {
     numericInput(
       ns("expr_top_value"),
-      "Top percentage",
+      "",
       value=max(0, min(100, top_value)),
       min=0,
       max=100,
       step=1
     )
   } else {
-    numericInput(ns("expr_top_value"), "Top N genes", value=max(1, floor(top_value)), min=1, step=1)
+    numericInput(ns("expr_top_value"), "", value=max(1, floor(top_value)), min=1, step=1)
   }
 
-  fluidRow(
-    column(
-      6,
-      selectInput(ns("expr_id_col"), "Annotation column matching expression IDs", choices=ann_cols, selected=expr_id_default),
-      selectInput(
-        ns("expr_metric"),
-        "Ranking metric",
-        choices=c("Top variance"="variance", "Top average expression"="mean"),
-        selected=metric
+  shiny::tags$div(
+    fluidRow(
+      column(
+        12,
+        selectInput(
+          ns("expr_metric"),
+          "Ranking by",
+          choices=c("Variance"="variance", "Average expression"="mean"),
+          selected=metric
+        )
       )
-    ),
-    column(
-      6,
-      selectInput(ns("expr_top_mode"), "Top in", choices=c("Absolute number"="n", "Percentage"="pct"), selected=top_mode),
-      top_value_ui
+    ), fluidRow(
+      column(
+        8,
+        selectInput(ns("expr_top_mode"), "", choices=c("Absolute number:"="n", "Percentage:"="pct"), selected=top_mode)
+      ),
+      column(
+        4,
+        top_value_ui
+      )
     )
   )
 }
 
-# Compute DGE mode defaults from available contrasts and current selections.
-.gene_group_dge_defaults <- function(cntr_ds, selected_contrasts, selected_p_col=NULL, selected_lfc_col=NULL, selected_fdr_col=NULL) {
+# Resolve DGE mode columns from server-level params or data-driven defaults.
+.gene_group_dge_defaults <- function(cntr_ds, selected_contrasts, p_col=NULL, lfc_col=NULL, fdr_col=NULL) {
   cntr_names <- names(cntr_ds)
   sel_cntr <- intersect(selected_contrasts, cntr_names)
   if(length(sel_cntr) == 0L) {
@@ -401,32 +396,31 @@
   }
 
   num_cols <- .gene_group_dge_numeric_cols(cntr_ds, sel_cntr)
-  p_col <- .gene_group_guess_numeric_col(num_cols, c("padj", "pvalue", "P.Value", "PValue"))
-  lfc_col <- .gene_group_guess_numeric_col(num_cols, c("log2FoldChange", "logFC", "lfc", "LFC"))
-  fdr_col <- .gene_group_guess_numeric_col(num_cols, c("padj", "adj.P.Val", "FDR", "qvalue", "q_value"))
+  resolved_p_col <- .gene_group_guess_numeric_col(num_cols, c("padj", "pvalue", "P.Value", "PValue"))
+  resolved_lfc_col <- .gene_group_guess_numeric_col(num_cols, c("log2FoldChange", "logFC", "lfc", "LFC"))
+  resolved_fdr_col <- .gene_group_guess_numeric_col(num_cols, c("padj", "adj.P.Val", "FDR", "qvalue", "q_value"))
 
-  if(isTruthy(selected_p_col) && selected_p_col %in% num_cols) {
-    p_col <- selected_p_col
+  if(isTruthy(p_col) && p_col %in% num_cols) {
+    resolved_p_col <- p_col
   }
-  if(isTruthy(selected_lfc_col) && selected_lfc_col %in% num_cols) {
-    lfc_col <- selected_lfc_col
+  if(isTruthy(lfc_col) && lfc_col %in% num_cols) {
+    resolved_lfc_col <- lfc_col
   }
-  if(isTruthy(selected_fdr_col) && selected_fdr_col %in% num_cols) {
-    fdr_col <- selected_fdr_col
+  if(isTruthy(fdr_col) && fdr_col %in% num_cols) {
+    resolved_fdr_col <- fdr_col
   }
 
   list(
     contrasts=cntr_names,
     selected_contrasts=sel_cntr,
-    numeric_cols=num_cols,
-    p_col=p_col,
-    lfc_col=lfc_col,
-    fdr_col=fdr_col
+    p_col=resolved_p_col,
+    lfc_col=resolved_lfc_col,
+    fdr_col=resolved_fdr_col
   )
 }
 
 # Controls for DGE-based selection mode.
-.gene_group_dge_controls_ui <- function(ns, ann_cols, dge_id_default, dge_defaults, top_mode, top_value,
+.gene_group_dge_controls_ui <- function(ns, dge_defaults, top_mode, top_value,
                                         rank_mode, p_thr, lfc_thr, require_fdr) {
   top_value <- suppressWarnings(as.numeric(top_value)[1])
   if(!is.finite(top_value)) {
@@ -461,15 +455,11 @@
     column(
       6,
       selectizeInput(ns("dge_contrasts"), "Contrasts", choices=dge_defaults$contrasts, selected=dge_defaults$selected_contrasts, multiple=FALSE),
-      selectInput(ns("dge_id_col"), "Annotation column matching contrast IDs", choices=ann_cols, selected=dge_id_default),
-      selectInput(ns("dge_pval_col"), "P-value column", choices=dge_defaults$numeric_cols, selected=dge_defaults$p_col),
       numericInput(ns("dge_pval_thr"), "P-value threshold", value=max(0, min(1, p_thr)), min=0, max=1, step=.001),
-      selectInput(ns("dge_fdr_col"), "Adjusted p-value (FDR) column", choices=dge_defaults$numeric_cols, selected=dge_defaults$fdr_col),
       checkboxInput(ns("dge_require_fdr"), "Exclude genes with missing adjusted p-value (FDR)", value=isTRUE(require_fdr))
     ),
     column(
       6,
-      selectInput(ns("dge_lfc_col"), "logFC column", choices=dge_defaults$numeric_cols, selected=dge_defaults$lfc_col),
       numericInput(ns("dge_lfc_thr"), "Absolute logFC threshold", value=max(0, lfc_thr), min=0, step=.1),
       selectInput(ns("dge_rank_mode"), "Ranking priority", choices=c("Lowest p-value first"="p_first", "Highest absolute logFC first"="lfc_first"), selected=rank_mode),
       selectInput(ns("dge_top_mode"), "Top filter", choices=c("All passing filters"="all", "Top N"="n", "Top %"="pct"), selected=top_mode),
@@ -479,24 +469,21 @@
 }
 
 # Build mode-specific controls for the selector UI.
-.gene_group_modus_controls_ui <- function(ns, mode, ann_df, primary_id, defaults,
+.gene_group_modus_controls_ui <- function(ns, mode, defaults,
+                                          dge_pval_col=NULL, dge_lfc_col=NULL, dge_fdr_col=NULL,
                                           expr_ds=NULL, cntr_ds=NULL, input_values=list()) {
-  ann_cols <- colnames(ann_df)
-
   if(mode == "by_name") {
-    id_default <- .gene_group_pick_col(ann_df, primary_id)
-    return(.gene_group_name_controls_ui(ns, ann_cols, id_default))
+    return(.gene_group_name_controls_ui(ns))
   }
 
   if(mode == "by_expression") {
     if(is.null(expr_ds)) {
       return(p("Expression data not available."))
     }
-    expr_id_default <- .gene_group_pick_col(ann_df, primary_id)
     metric <- input_values$expr_metric %||% defaults$expr_metric
     top_mode <- input_values$expr_top_mode %||% defaults$expr_top_mode
     top_value <- input_values$expr_top_value %||% defaults$expr_top_value
-    return(.gene_group_expression_controls_ui(ns, ann_cols, expr_id_default, metric, top_mode, top_value))
+    return(.gene_group_expression_controls_ui(ns, metric, top_mode, top_value))
   }
 
   if(mode == "by_dge") {
@@ -511,9 +498,9 @@
     dge_defaults <- .gene_group_dge_defaults(
       cntr_ds=cntr_ds,
       selected_contrasts=input_values$dge_contrasts,
-      selected_p_col=input_values$dge_pval_col,
-      selected_lfc_col=input_values$dge_lfc_col,
-      selected_fdr_col=input_values$dge_fdr_col
+      p_col=dge_pval_col,
+      lfc_col=dge_lfc_col,
+      fdr_col=dge_fdr_col
     )
     top_mode <- input_values$dge_top_mode %||% defaults$dge_top_mode
     top_value <- input_values$dge_top_value %||% defaults$dge_top_value
@@ -521,11 +508,8 @@
     p_thr <- input_values$dge_pval_thr %||% defaults$dge_pval_thr
     lfc_thr <- input_values$dge_lfc_thr %||% defaults$dge_lfc_thr
     require_fdr <- input_values$dge_require_fdr %||% defaults$dge_require_fdr
-    dge_id_default <- .gene_group_pick_col(ann_df, primary_id)
     return(.gene_group_dge_controls_ui(
       ns=ns,
-      ann_cols=ann_cols,
-      dge_id_default=dge_id_default,
       dge_defaults=dge_defaults,
       top_mode=top_mode,
       top_value=top_value,
@@ -557,15 +541,15 @@
 }
 
 # Select annotation rows from free text and uploaded gene list file.
-.gene_group_select_by_name <- function(ann_df, id_col, name_list, name_file) {
+.gene_group_select_by_name <- function(ann_df, primary_id, name_list, name_file) {
   name_ids <- .gene_group_parse_gene_input(name_list)
   file_ids <- .gene_group_read_gene_file(name_file)
   query_ids <- unique(c(name_ids, file_ids))
-  .gene_group_match_annot_rows(ann_df, id_col, query_ids)
+  .gene_group_match_annot_rows(ann_df, primary_id, query_ids)
 }
 
 # Select annotation rows based on expression ranking.
-.gene_group_select_by_expression <- function(ann_df, expr_ds, id_col, metric="variance", top_mode="n", top_value=100) {
+.gene_group_select_by_expression <- function(ann_df, expr_ds, primary_id, metric="variance", top_mode="n", top_value=100) {
   empty_df <- .gene_group_empty_annot(ann_df)
   if(is.null(expr_ds)) {
     return(empty_df)
@@ -592,14 +576,14 @@
   }
 
   ids <- names(sort(score, decreasing=TRUE))[seq_len(k)]
-  .gene_group_match_annot_rows(ann_df, id_col, ids)
+  .gene_group_match_annot_rows(ann_df, primary_id, ids)
 }
 
 # Build a compact per-gene DGE summary from selected contrasts.
-.gene_group_collect_dge_rows <- function(cntr_ds, contrasts, cntr_id_col, p_col, lfc_col, fdr_col, require_fdr, p_thr, lfc_thr) {
+.gene_group_collect_dge_rows <- function(cntr_ds, contrasts, primary_id, p_col, lfc_col, fdr_col, require_fdr, p_thr, lfc_thr) {
   dge_rows <- lapply(contrasts, function(nm) {
     df <- cntr_ds[[nm]]
-    required_cols <- c(cntr_id_col, p_col, lfc_col)
+    required_cols <- c(primary_id, p_col, lfc_col)
     if(require_fdr) {
       required_cols <- c(required_cols, fdr_col)
     }
@@ -607,7 +591,7 @@
       return(NULL)
     }
 
-    ids <- as.character(df[[cntr_id_col]])
+    ids <- as.character(df[[primary_id]])
     pv <- suppressWarnings(as.numeric(df[[p_col]]))
     lfc <- suppressWarnings(as.numeric(df[[lfc_col]]))
     fdr <- if(require_fdr) suppressWarnings(as.numeric(df[[fdr_col]])) else rep(NA_real_, nrow(df))
@@ -655,7 +639,7 @@
 }
 
 # Select annotation rows based on DGE filters/ranking.
-.gene_group_select_by_dge <- function(ann_df, cntr_ds, id_col, cntr_id_col,
+.gene_group_select_by_dge <- function(ann_df, cntr_ds, primary_id,
                                       contrasts, p_col, lfc_col, fdr_col,
                                       require_fdr=FALSE, p_thr=.05, lfc_thr=0,
                                       rank_mode="p_first", top_mode="all", top_value=100) {
@@ -682,7 +666,7 @@
   dge_rows <- .gene_group_collect_dge_rows(
     cntr_ds=cntr_ds,
     contrasts=contrasts,
-    cntr_id_col=cntr_id_col,
+    primary_id=primary_id,
     p_col=p_col,
     lfc_col=lfc_col,
     fdr_col=fdr_col,
@@ -703,40 +687,44 @@
     rank_df <- rank_df[seq_len(k), , drop=FALSE]
   }
 
-  .gene_group_match_annot_rows(ann_df, id_col, rank_df$id)
+  .gene_group_match_annot_rows(ann_df, primary_id, rank_df$id)
 }
 
 # Dispatch selection mode to the corresponding pure selection helper.
-.gene_group_selected_annotation <- function(mode, ann_df, cntr_id_col,
+.gene_group_selected_annotation <- function(mode, ann_df, primary_id,
+                                            dge_pval_col=NULL, dge_lfc_col=NULL, dge_fdr_col=NULL,
                                             expr_ds=NULL, cntr_ds=NULL, input_values=list(),
                                             defaults=.gene_group_default_settings()) {
   if(mode == "by_name") {
-    id_col <- .gene_group_pick_col(ann_df, input_values$name_id_col)
-    return(.gene_group_select_by_name(ann_df, id_col, input_values$name_list, input_values$name_file))
+    return(.gene_group_select_by_name(ann_df, primary_id, input_values$name_list, input_values$name_file))
   }
 
   if(mode == "by_expression") {
-    id_col <- .gene_group_pick_col(ann_df, input_values$expr_id_col)
     metric <- input_values$expr_metric %||% defaults$expr_metric
     top_mode <- input_values$expr_top_mode %||% defaults$expr_top_mode
     top_value <- input_values$expr_top_value %||% defaults$expr_top_value
-    return(.gene_group_select_by_expression(ann_df, expr_ds, id_col, metric, top_mode, top_value))
+    return(.gene_group_select_by_expression(ann_df, expr_ds, primary_id, metric, top_mode, top_value))
   }
 
   if(mode == "by_dge") {
-    id_col <- .gene_group_pick_col(ann_df, input_values$dge_id_col)
     rank_mode <- input_values$dge_rank_mode %||% defaults$dge_rank_mode
     top_mode <- input_values$dge_top_mode %||% defaults$dge_top_mode
     top_value <- input_values$dge_top_value %||% defaults$dge_top_value
+    dge_defaults <- .gene_group_dge_defaults(
+      cntr_ds=cntr_ds,
+      selected_contrasts=input_values$dge_contrasts,
+      p_col=dge_pval_col,
+      lfc_col=dge_lfc_col,
+      fdr_col=dge_fdr_col
+    )
     return(.gene_group_select_by_dge(
       ann_df=ann_df,
       cntr_ds=cntr_ds,
-      id_col=id_col,
-      cntr_id_col=cntr_id_col,
+      primary_id=primary_id,
       contrasts=input_values$dge_contrasts,
-      p_col=input_values$dge_pval_col,
-      lfc_col=input_values$dge_lfc_col,
-      fdr_col=input_values$dge_fdr_col,
+      p_col=dge_defaults$p_col,
+      lfc_col=dge_defaults$lfc_col,
+      fdr_col=dge_defaults$fdr_col,
       require_fdr=input_values$dge_require_fdr %||% defaults$dge_require_fdr,
       p_thr=input_values$dge_pval_thr %||% defaults$dge_pval_thr,
       lfc_thr=input_values$dge_lfc_thr %||% defaults$dge_lfc_thr,
@@ -757,13 +745,14 @@ geneGroupSelectorUI <- function(id) {
   ns <- NS(id)
 
   tagList(
-    uiOutput(ns("dataset_ui")),
-    selectizeInput(ns("modus"), "Modus", choices=character(0), selected=NULL),
+    fluidRow(
+      column(6, uiOutput(ns("dataset_ui"))),
+      column(6, selectizeInput(ns("modus"), "Modus", choices=character(0), selected=NULL))
+    ),
+    shiny::tags$hr(),
     uiOutput(ns("modus_controls")),
     br(),
-    h4("Current selection"),
     textOutput(ns("selected_count")),
-    textOutput(ns("selected_preview")),
     downloadButton(ns("save_genes"), "Export selected PrimaryIDs")
   )
 }
@@ -787,7 +776,12 @@ geneGroupSelectorUI <- function(id) {
 #' @param cntr optional contrasts list (named list of data frames), or named list of
 #'   such lists for multiple datasets
 #' @param primary_id default annotation column used as the primary gene identifier
-#' @param cntr_id_col contrast table column containing gene identifiers
+#' @param dge_pval_col optional p-value column name in contrast tables for DGE mode.
+#'   If `NULL`, the module auto-detects a suitable numeric column.
+#' @param dge_lfc_col optional log fold-change column name in contrast tables for
+#'   DGE mode. If `NULL`, the module auto-detects a suitable numeric column.
+#' @param dge_fdr_col optional adjusted p-value (FDR) column name in contrast tables
+#'   for DGE mode. If `NULL`, the module auto-detects a suitable numeric column.
 #' @param mode_order order of available selection modes. Values must come from
 #'   `c("by_expression", "by_dge", "by_name")`. Unavailable modes are skipped.
 #'   Default is expression -> DGE -> by name.
@@ -873,9 +867,11 @@ geneGroupSelectorUI <- function(id) {
 # Register server logic for mode-specific gene selection and filtering.
 # Returns reactives for selected PrimaryIDs, annotation subset, dataset, and mode.
 geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
-                                    primary_id="PrimaryID",
-                                    cntr_id_col=primary_id,
                                     mode_order=c("by_expression", "by_dge", "by_name"),
+                                    primary_id="PrimaryID",
+                                    dge_pval_col=NULL,
+                                    dge_lfc_col=NULL,
+                                    dge_fdr_col=NULL,
                                     defaults=NULL,
                                     selected_ids=NULL) {
   annot <- .gene_group_normalize_annot(annot)
@@ -893,6 +889,18 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
 
   defaults <- .gene_group_normalize_defaults(defaults)
   mode_order <- .gene_group_normalize_mode_order(mode_order)
+  dge_pval_col <- trimws(as.character(dge_pval_col %||% "")[1])
+  dge_lfc_col <- trimws(as.character(dge_lfc_col %||% "")[1])
+  dge_fdr_col <- trimws(as.character(dge_fdr_col %||% "")[1])
+  if(!nzchar(dge_pval_col)) {
+    dge_pval_col <- NULL
+  }
+  if(!nzchar(dge_lfc_col)) {
+    dge_lfc_col <- NULL
+  }
+  if(!nzchar(dge_fdr_col)) {
+    dge_fdr_col <- NULL
+  }
   datasets <- names(annot)
   exprs <- .gene_group_normalize_exprs(exprs, datasets)
   cntr <- .gene_group_normalize_cntr(cntr, datasets)
@@ -930,9 +938,10 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       .gene_group_modus_controls_ui(
         ns=session$ns,
         mode=mode,
-        ann_df=annot[[ds]],
-        primary_id=primary_id,
         defaults=defaults,
+        dge_pval_col=dge_pval_col,
+        dge_lfc_col=dge_lfc_col,
+        dge_fdr_col=dge_fdr_col,
         expr_ds=if(is.null(exprs)) NULL else exprs[[ds]],
         cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
         input_values=list(
@@ -940,9 +949,6 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
           expr_top_mode=input$expr_top_mode,
           expr_top_value=input$expr_top_value,
           dge_contrasts=input$dge_contrasts,
-          dge_pval_col=input$dge_pval_col,
-          dge_lfc_col=input$dge_lfc_col,
-          dge_fdr_col=input$dge_fdr_col,
           dge_require_fdr=input$dge_require_fdr,
           dge_pval_thr=input$dge_pval_thr,
           dge_lfc_thr=input$dge_lfc_thr,
@@ -959,23 +965,20 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       .gene_group_selected_annotation(
         mode=mode,
         ann_df=annot[[ds]],
-        cntr_id_col=cntr_id_col,
+        primary_id=primary_id,
+        dge_pval_col=dge_pval_col,
+        dge_lfc_col=dge_lfc_col,
+        dge_fdr_col=dge_fdr_col,
         expr_ds=if(is.null(exprs)) NULL else exprs[[ds]],
         cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
         defaults=defaults,
         input_values=list(
-          name_id_col=input$name_id_col,
           name_list=input$name_list,
           name_file=input$name_file,
-          expr_id_col=input$expr_id_col,
           expr_metric=input$expr_metric,
           expr_top_mode=input$expr_top_mode,
           expr_top_value=input$expr_top_value,
           dge_contrasts=input$dge_contrasts,
-          dge_id_col=input$dge_id_col,
-          dge_pval_col=input$dge_pval_col,
-          dge_lfc_col=input$dge_lfc_col,
-          dge_fdr_col=input$dge_fdr_col,
           dge_require_fdr=input$dge_require_fdr,
           dge_pval_thr=input$dge_pval_thr,
           dge_lfc_thr=input$dge_lfc_thr,
@@ -1005,16 +1008,6 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
 
     output$selected_count <- renderText({
       sprintf("Selected genes: %d", length(selected_primary_ids()))
-    })
-
-    output$selected_preview <- renderText({
-      ids <- selected_primary_ids()
-      if(length(ids) == 0L) {
-        return("First PrimaryIDs: none")
-      }
-      preview <- utils::head(ids, 10)
-      suffix <- if(length(ids) > 10L) ", ..." else ""
-      sprintf("First PrimaryIDs: %s%s", paste(preview, collapse=", "), suffix)
     })
 
     output$save_genes <- downloadHandler(

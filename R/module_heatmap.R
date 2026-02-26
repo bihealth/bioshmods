@@ -56,12 +56,12 @@
 
 # List annotation columns that can be used for heatmap row labels.
 # Excludes the identifier column used to match expression row names.
-.heatmap_row_label_choices <- function(annot_ds, primary_id_col="PrimaryID") {
+.heatmap_row_label_choices <- function(annot_ds, primary_id="PrimaryID") {
   if(is.null(annot_ds) || !is.data.frame(annot_ds) || ncol(annot_ds) < 1L) {
     return(character(0))
   }
 
-  setdiff(colnames(annot_ds), primary_id_col)
+  setdiff(colnames(annot_ds), primary_id)
 }
 
 #' Heatmap Module UI
@@ -73,34 +73,41 @@ heatmapUI <- function(id) {
 
   sidebarLayout(
     sidebarPanel(
+      shiny::tags$div(
+        class="well",
+        h4("Gene selection options"),
       geneGroupSelectorUI(ns("gene_selector")),
-      shiny::tags$hr(),
+      ),
       shiny::tags$div(
         class="well",
         h4("Heatmap options"),
-        figsizeInput(ns("figure_size"), width="100%", selected="800x600"),
-        selectizeInput(
-          ns("sel_annot"),
-          "Covariates to indicate",
-          choices=character(0),
-          selected=character(0),
-          multiple=TRUE
-        ),
-        selectizeInput(
-          ns("annot_row_col"),
-          "Row label column",
-          choices=character(0),
-          selected="",
-          multiple=FALSE
-        ),
-        checkboxInput(ns("show_legend"), "Show legend", value=TRUE),
-        downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success")
+        gridLayout(
+          selectizeInput(
+            ns("sel_annot"),
+            "Covariates to indicate",
+            choices=character(0),
+            selected=character(0),
+            multiple=TRUE
+          ),
+          selectizeInput(
+            ns("annot_row_col"),
+            "Row label column",
+            choices=character(0),
+            selected="",
+            multiple=FALSE
+          ),
+          figsizeInput(ns("figure_size"), width="100%", selected="800x600"),
+          checkboxInput(ns("show_legend"), "Show legend", value=TRUE),
+          downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success"),
+          .ncol = 2,
+          .nrow = 3
+        )
       ),
-      width=4
+      width=3
     ),
     mainPanel(
       plotOutput(ns("heatmap_plot")),
-      width=8
+      width=9
     )
   )
 }
@@ -119,10 +126,14 @@ heatmapUI <- function(id) {
 #' @param covar Sample covariate data frame (single dataset) or named list of
 #'   data frames (multi-dataset mode).
 #' @param sample_id_col Name of the sample ID column in `covar`.
-#' @param primary_id Primary identifier column in `annot` / `cntr`.
-#' @param cntr_id_col Identifier column in contrast tables.
-#' @param primary_id_col Annotation column used to map selected genes to row labels
-#'   in [plot_heatmap()].
+#' @param dge_pval_col Optional p-value column name for DGE mode in
+#'   [geneGroupSelectorServer()].
+#' @param dge_lfc_col Optional log fold-change column name for DGE mode in
+#'   [geneGroupSelectorServer()].
+#' @param dge_fdr_col Optional adjusted p-value (FDR) column name for DGE mode in
+#'   [geneGroupSelectorServer()].
+#' @param primary_id Primary identifier column in `annot` / `cntr`, also used to
+#'   map selected genes to row labels in [plot_heatmap()].
 #' @param annot_row_col Optional default annotation column used for heatmap row labels.
 #'   Can be changed interactively in the module UI.
 #'
@@ -181,8 +192,10 @@ heatmapUI <- function(id) {
 #' @export
 heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
                           sample_id_col="SampleID",
-                          primary_id="PrimaryID", cntr_id_col=primary_id,
-                          primary_id_col=primary_id,
+                          primary_id="PrimaryID",
+                          dge_pval_col=NULL,
+                          dge_lfc_col=NULL,
+                          dge_fdr_col=NULL,
                           annot_row_col=NULL) {
   if(is.null(exprs)) {
     stop("`exprs` must be provided.")
@@ -192,18 +205,18 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
   datasets <- names(annot_norm)
   exprs_norm <- .gene_group_normalize_exprs(exprs, datasets)
   covar_norm <- .heatmap_normalize_covar(covar, datasets)
-  primary_id_col <- as.character(primary_id_col)[1]
+  primary_id <- as.character(primary_id)[1]
   annot_row_col <- as.character(annot_row_col)[1]
 
-  if(is.na(primary_id_col) || !nzchar(primary_id_col)) {
-    stop("`primary_id_col` must be a non-empty column name.")
+  if(is.na(primary_id) || !nzchar(primary_id)) {
+    stop("`primary_id` must be a non-empty column name.")
   }
-  missing_primary_id_col <- datasets[!vapply(annot_norm, function(x) primary_id_col %in% colnames(x), logical(1))]
-  if(length(missing_primary_id_col) > 0L) {
+  missing_primary_id <- datasets[!vapply(annot_norm, function(x) primary_id %in% colnames(x), logical(1))]
+  if(length(missing_primary_id) > 0L) {
     stop(sprintf(
-      "`primary_id_col` ('%s') not found in annotation for dataset(s): %s",
-      primary_id_col,
-      paste(missing_primary_id_col, collapse=", ")
+      "`primary_id` ('%s') not found in annotation for dataset(s): %s",
+      primary_id,
+      paste(missing_primary_id, collapse=", ")
     ))
   }
 
@@ -234,7 +247,9 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       exprs=exprs,
       cntr=cntr,
       primary_id=primary_id,
-      cntr_id_col=cntr_id_col,
+      dge_pval_col=dge_pval_col,
+      dge_lfc_col=dge_lfc_col,
+      dge_fdr_col=dge_fdr_col,
       selected_ids=selected_ids
     )
 
@@ -254,7 +269,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         server=TRUE
       )
 
-      row_choices <- .heatmap_row_label_choices(annot_norm[[ds]], primary_id_col=primary_id_col)
+      row_choices <- .heatmap_row_label_choices(annot_norm[[ds]], primary_id=primary_id)
       isolate({ row_selected <- input$annot_row_col %||% "" })
       if(!nzchar(row_selected) && !is.na(annot_row_col) && nzchar(annot_row_col)) {
         row_selected <- annot_row_col
@@ -284,7 +299,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         covar=covar_norm[[ds]],
         sample_id_col=sample_id_col,
         annot=annot_norm[[ds]],
-        primary_id_col=primary_id_col,
+        primary_id_col=primary_id,
         annot_row_col=if(isTruthy(input$annot_row_col)) input$annot_row_col else NULL,
         sel_annot=input$sel_annot,
         legend=isTRUE(input$show_legend)

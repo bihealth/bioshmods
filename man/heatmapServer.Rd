@@ -15,8 +15,9 @@ heatmapServer(
   covar = NULL,
   sample_id_col = "SampleID",
   primary_id = "PrimaryID",
-  cntr_id_col = primary_id,
-  primary_id_col = primary_id,
+  dge_pval_col = NULL,
+  dge_lfc_col = NULL,
+  dge_fdr_col = NULL,
   annot_row_col = NULL
 )
 }
@@ -36,12 +37,17 @@ data frames (multi-dataset mode).}
 
 \item{sample_id_col}{Name of the sample ID column in \code{covar}.}
 
-\item{primary_id}{Primary identifier column in \code{annot} / \code{cntr}.}
+\item{primary_id}{Primary identifier column in \code{annot} / \code{cntr}, also used to
+map selected genes to row labels in \code{\link[=plot_heatmap]{plot_heatmap()}}.}
 
-\item{cntr_id_col}{Identifier column in contrast tables.}
+\item{dge_pval_col}{Optional p-value column name for DGE mode in
+\code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}.}
 
-\item{primary_id_col}{Annotation column used to map selected genes to row labels
-in \code{\link[=plot_heatmap]{plot_heatmap()}}.}
+\item{dge_lfc_col}{Optional log fold-change column name for DGE mode in
+\code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}.}
+
+\item{dge_fdr_col}{Optional adjusted p-value (FDR) column name for DGE mode in
+\code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}.}
 
 \item{annot_row_col}{Optional default annotation column used for heatmap row labels.
 Can be changed interactively in the module UI.}
