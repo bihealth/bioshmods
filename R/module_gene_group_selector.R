@@ -330,10 +330,20 @@
 }
 
 # Controls for name-based selection mode.
-.gene_group_name_controls_ui <- function(ns) {
+.gene_group_name_controls_ui <- function(ns, ann_cols, selected_col) {
+  if(!isTruthy(selected_col) || !selected_col %in% ann_cols) {
+    selected_col <- ann_cols[1]
+  }
+
   fluidRow(
     column(
       12,
+      selectInput(
+        ns("name_id_col"),
+        "Annotation column for names/IDs",
+        choices=ann_cols,
+        selected=selected_col
+      ),
       shiny::fileInput(ns("name_file"), "Upload text file with gene IDs", accept=c(".txt", ".csv", ".tsv"))
     ),
     column(
@@ -454,7 +464,7 @@
   fluidRow(
     column(
       6,
-      selectizeInput(ns("dge_contrasts"), "Contrasts", choices=dge_defaults$contrasts, selected=dge_defaults$selected_contrasts, multiple=FALSE),
+      selectizeInput(ns("dge_contrasts"), "Contrast", choices=dge_defaults$contrasts, selected=dge_defaults$selected_contrasts, multiple=FALSE),
       numericInput(ns("dge_pval_thr"), "P-value threshold", value=max(0, min(1, p_thr)), min=0, max=1, step=.001),
       checkboxInput(ns("dge_require_fdr"), "Exclude genes with missing adjusted p-value (FDR)", value=isTRUE(require_fdr))
     ),
@@ -471,9 +481,14 @@
 # Build mode-specific controls for the selector UI.
 .gene_group_modus_controls_ui <- function(ns, mode, defaults,
                                           dge_pval_col=NULL, dge_lfc_col=NULL, dge_fdr_col=NULL,
-                                          expr_ds=NULL, cntr_ds=NULL, input_values=list()) {
+                                          ann_df=NULL, expr_ds=NULL, cntr_ds=NULL, input_values=list()) {
   if(mode == "by_name") {
-    return(.gene_group_name_controls_ui(ns))
+    ann_cols <- colnames(ann_df)
+    selected_col <- input_values$name_id_col %||% "PrimaryID"
+    if(!selected_col %in% ann_cols && "PrimaryID" %in% ann_cols) {
+      selected_col <- "PrimaryID"
+    }
+    return(.gene_group_name_controls_ui(ns, ann_cols, selected_col))
   }
 
   if(mode == "by_expression") {
@@ -541,11 +556,11 @@
 }
 
 # Select annotation rows from free text and uploaded gene list file.
-.gene_group_select_by_name <- function(ann_df, primary_id, name_list, name_file) {
+.gene_group_select_by_name <- function(ann_df, id_col, name_list, name_file) {
   name_ids <- .gene_group_parse_gene_input(name_list)
   file_ids <- .gene_group_read_gene_file(name_file)
   query_ids <- unique(c(name_ids, file_ids))
-  .gene_group_match_annot_rows(ann_df, primary_id, query_ids)
+  .gene_group_match_annot_rows(ann_df, id_col, query_ids)
 }
 
 # Select annotation rows based on expression ranking.
@@ -696,7 +711,12 @@
                                             expr_ds=NULL, cntr_ds=NULL, input_values=list(),
                                             defaults=.gene_group_default_settings()) {
   if(mode == "by_name") {
-    return(.gene_group_select_by_name(ann_df, primary_id, input_values$name_list, input_values$name_file))
+    name_id_col <- input_values$name_id_col %||% primary_id
+    name_id_col <- as.character(name_id_col)[1]
+    if(!name_id_col %in% colnames(ann_df)) {
+      name_id_col <- primary_id
+    }
+    return(.gene_group_select_by_name(ann_df, name_id_col, input_values$name_list, input_values$name_file))
   }
 
   if(mode == "by_expression") {
@@ -942,9 +962,11 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
         dge_pval_col=dge_pval_col,
         dge_lfc_col=dge_lfc_col,
         dge_fdr_col=dge_fdr_col,
+        ann_df=annot[[ds]],
         expr_ds=if(is.null(exprs)) NULL else exprs[[ds]],
         cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
         input_values=list(
+          name_id_col=input$name_id_col,
           expr_metric=input$expr_metric,
           expr_top_mode=input$expr_top_mode,
           expr_top_value=input$expr_top_value,
@@ -973,6 +995,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
         cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
         defaults=defaults,
         input_values=list(
+          name_id_col=input$name_id_col,
           name_list=input$name_list,
           name_file=input$name_file,
           expr_metric=input$expr_metric,

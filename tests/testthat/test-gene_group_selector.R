@@ -26,7 +26,8 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
     ),
     {
       session$setInputs(modus = "by_name")
-      session$setInputs(name_list = "g2, g1, missing")
+      session$setInputs(name_id_col = "SYMBOL")
+      session$setInputs(name_list = "B, A, missing")
       session$flushReact()
     }
   )
