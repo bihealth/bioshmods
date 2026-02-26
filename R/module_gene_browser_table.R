@@ -296,7 +296,7 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
   if(!multilevel) {
     cntr <- list(default=cntr)
     annot <- list(default=annot)
-    annot_linkout=list(default=annot_linkout)
+    annot_linkout <- list(default=annot_linkout)
   }
 
   ## in this case we take primary id from row names of annot / cntr
@@ -443,4 +443,3 @@ gene_browser <- function(x, annot_linkout=NULL,
 
   shinyApp(ui, server)
 }
-

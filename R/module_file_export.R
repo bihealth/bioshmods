@@ -99,10 +99,7 @@
   }
 
   if(.file_export_is_df_list(data_obj)) {
-    nm <- names(data_obj)
-    if(is.null(nm)) {
-      nm <- rep("", length(data_obj))
-    }
+    nm <- names(data_obj) %||% rep("", length(data_obj))
     nm <- as.character(nm)
     nm[is.na(nm)] <- ""
     nm <- trimws(nm)
@@ -123,10 +120,7 @@
 # Build stable, non-empty labels for nested list selection controls.
 # Names are made unique to avoid ambiguous selectInput choices.
 .file_export_choice_names <- function(data_obj) {
-  nm <- names(data_obj)
-  if(is.null(nm)) {
-    nm <- rep("", length(data_obj))
-  }
+  nm <- names(data_obj) %||% rep("", length(data_obj))
   nm <- as.character(nm)
   nm[is.na(nm)] <- ""
   nm <- trimws(nm)

@@ -90,10 +90,6 @@ discoUI <- function(id, cntr_titles) {
   ret
 }
 
-.as_default_named_list <- function(x) {
-  list(default = x)
-}
-
 .is_list_of_data_frames <- function(x) {
   is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
 }
@@ -116,9 +112,9 @@ discoUI <- function(id, cntr_titles) {
 
 .normalize_disco_inputs <- function(cntr, annot, primary_id) {
   if (.is_list_of_data_frames(cntr)) {
-    cntr <- .as_default_named_list(cntr)
+    cntr <- list(default=cntr)
     if (is.null(annot) || is.data.frame(annot)) {
-      annot <- .as_default_named_list(annot)
+      annot <- list(default=annot)
     } else if (is.list(annot) && length(annot) == 1L &&
                (is.null(annot[[1]]) || is.data.frame(annot[[1]]))) {
       names(annot) <- "default"

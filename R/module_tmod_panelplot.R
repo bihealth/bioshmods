@@ -184,9 +184,7 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
                    "By default, the genes are ordered by the p-value.")
     )
 
-  if(is.null(datasets)) {
-    datasets <- "default"
-  }
+  datasets <- datasets %||% "default"
 
   
   if(length(datasets) == 1L) {
@@ -304,11 +302,11 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
   if(!is.data.frame(cntr[[1]])) {
     message("tmodPanelPlotServer: cntr[[1]] is not a data frame, assuming multilevel mode")
   } else {
-    cntr=list(default=cntr)
-    tmod_res=list(default=tmod_res)
-    tmod_dbs=list(default=tmod_dbs)
-    tmod_map=list(default=tmod_map)
-    annot=list(default=annot)
+    cntr <- list(default=cntr)
+    tmod_res <- list(default=tmod_res)
+    tmod_dbs <- list(default=tmod_dbs)
+    tmod_map <- list(default=tmod_map)
+    annot <- list(default=annot)
   }
 
   ds_ids       <- names(cntr)  # dataset ids
@@ -625,4 +623,3 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
   tmodPanelPlot(res, pie=pie, grid="b", ...)
 }
-

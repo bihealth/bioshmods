@@ -485,4 +485,3 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
 #   shinyApp(ui, server)
 # }
 #
-

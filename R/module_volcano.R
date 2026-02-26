@@ -1,7 +1,3 @@
-.volcano_as_default_named_list <- function(x) {
-  list(default = x)
-}
-
 .volcano_is_list_of_data_frames <- function(x) {
   is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
 }
@@ -24,9 +20,9 @@
 
 .normalize_volcano_inputs <- function(cntr, annot, primary_id, lfc_col, pval_col, annot_show) {
   if (.volcano_is_list_of_data_frames(cntr)) {
-    cntr <- .volcano_as_default_named_list(cntr)
+    cntr <- list(default=cntr)
     if (is.null(annot) || is.data.frame(annot)) {
-      annot <- .volcano_as_default_named_list(annot)
+      annot <- list(default=annot)
     } else if (is.list(annot) && length(annot) == 1L &&
                (is.null(annot[[1]]) || is.data.frame(annot[[1]]))) {
       names(annot) <- "default"
@@ -129,9 +125,7 @@
 #' @export
 volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 
-  if(is.null(datasets)) { 
-    datasets <- "default"
-  }
+  datasets <- datasets %||% "default"
 
   if(length(datasets) == 1L) {
     ds_selector <- hidden(selectInput(NS(id, "dataset"), "Dataset:", datasets, 

@@ -33,10 +33,11 @@
 #' @export
 pcaUI <- function(id, datasets=NULL) {
 
+  ds_choices <- datasets %||% "default"
   if(is.null(datasets)) {
-    ds_selector <- hidden(selectInput(NS(id, "dataset"), "Dataset:", "default", selected="default"))
+    ds_selector <- hidden(selectInput(NS(id, "dataset"), "Dataset:", ds_choices, selected=ds_choices))
   } else {
-    ds_selector <- selectInput(NS(id, "dataset"), "Dataset:", datasets, selected=datasets[1])
+    ds_selector <- selectInput(NS(id, "dataset"), "Dataset:", ds_choices, selected=ds_choices[1])
   }
 
     sidebarLayout(
@@ -272,7 +273,4 @@ plot_pca_shiny <- function(x, covar, colorBy=NULL, symbolBy=NULL) {
 
   shinyApp(ui, server)
 }
-
-
-
 

@@ -284,9 +284,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       tmp <- gene_id
       gene_id <- reactiveValues()
       gene_id$id <- tmp$id
-      if(is.null(gene_id$ds <- tmp$ds)) {
-        gene_id$ds <- "default"
-      }
+      gene_id$ds <- tmp$ds %||% "default"
     }
 
     # ds holds the dataset; g_id holds the gene ID
