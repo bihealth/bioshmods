@@ -15,7 +15,9 @@ heatmapServer(
   covar = NULL,
   sample_id_col = "SampleID",
   primary_id = "PrimaryID",
-  cntr_id_col = primary_id
+  cntr_id_col = primary_id,
+  primary_id_col = primary_id,
+  annot_row_col = NULL
 )
 }
 \arguments{
@@ -37,6 +39,12 @@ data frames (multi-dataset mode).}
 \item{primary_id}{Primary identifier column in \code{annot} / \code{cntr}.}
 
 \item{cntr_id_col}{Identifier column in contrast tables.}
+
+\item{primary_id_col}{Annotation column used to map selected genes to row labels
+in \code{\link[=plot_heatmap]{plot_heatmap()}}.}
+
+\item{annot_row_col}{Optional default annotation column used for heatmap row labels.
+Can be changed interactively in the module UI.}
 }
 \value{
 A list with reactives: \code{genes}, \code{dataset}, and \code{heatmap}.

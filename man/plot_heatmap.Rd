@@ -9,6 +9,9 @@ plot_heatmap(
   genes,
   covar = NULL,
   sample_id_col = "SampleID",
+  annot = NULL,
+  primary_id_col = "PrimaryID",
+  annot_row_col = NULL,
   sel_annot = NULL,
   legend = TRUE
 )
@@ -23,6 +26,14 @@ Row names must contain gene identifiers.}
 the column designated by \code{sample_id_col}.}
 
 \item{sample_id_col}{Name of the sample ID column in \code{covar}.}
+
+\item{annot}{Optional annotation data frame for genes.}
+
+\item{primary_id_col}{Column in \code{annot} containing gene identifiers matching
+\code{exprs} row names.}
+
+\item{annot_row_col}{Optional column in \code{annot} used as row labels in the heatmap.
+If \code{NULL} or missing in \code{annot}, row names from \code{exprs} are shown.}
 
 \item{sel_annot}{Character vector of column names from \code{covar} to display as
 top annotations. If \code{NULL} (default), no annotation bars are shown.}
@@ -48,7 +59,19 @@ covar <- data.frame(
   group=c("A", "A", "B", "B"),
   stringsAsFactors=FALSE
 )
-hm <- plot_heatmap(exprs, genes=c("g1", "g3", "g5"), covar=covar, sel_annot="group")
+annot <- data.frame(
+  PrimaryID=rownames(exprs),
+  SYMBOL=paste0("Gene_", seq_len(nrow(exprs))),
+  stringsAsFactors=FALSE
+)
+hm <- plot_heatmap(
+  exprs,
+  genes=c("g1", "g3", "g5"),
+  covar=covar,
+  annot=annot,
+  annot_row_col="SYMBOL",
+  sel_annot="group"
+)
 hm
 
 data(C19)
@@ -57,6 +80,9 @@ hm_c19 <- plot_heatmap(
   genes=utils::head(C19$annotation$PrimaryID, 30),
   covar=C19$covariates,
   sample_id_col="label",
+  annot=C19$annotation,
+  primary_id_col="PrimaryID",
+  annot_row_col="SYMBOL",
   sel_annot=c("group", "sex"),
   legend=FALSE
 )

@@ -56,6 +56,51 @@
   x
 }
 
+# Resolve row labels for plotted genes.
+# When annot_row_col is available, labels are merged from annot by primary_id_col.
+.plot_heatmap_row_labels <- function(gene_ids, annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL) {
+  gene_ids <- as.character(gene_ids)
+  row_labels <- gene_ids
+
+  annot_row_col <- as.character(annot_row_col)[1]
+  if(is.null(annot) || is.na(annot_row_col) || !nzchar(annot_row_col)) {
+    return(row_labels)
+  }
+
+  annot <- as.data.frame(annot, stringsAsFactors=FALSE)
+  if(!annot_row_col %in% colnames(annot)) {
+    return(row_labels)
+  }
+  if(!primary_id_col %in% colnames(annot)) {
+    stop(sprintf(
+      "`primary_id_col` ('%s') not found in `annot`, cannot map `annot_row_col`.",
+      primary_id_col
+    ))
+  }
+
+  hm_df <- data.frame(.row_idx=seq_along(gene_ids), stringsAsFactors=FALSE)
+  hm_df[[primary_id_col]] <- gene_ids
+
+  annot_df <- annot[, unique(c(primary_id_col, annot_row_col)), drop=FALSE]
+  annot_df[[primary_id_col]] <- as.character(annot_df[[primary_id_col]])
+  annot_df <- annot_df[!is.na(annot_df[[primary_id_col]]) & annot_df[[primary_id_col]] != "", , drop=FALSE]
+  annot_df <- annot_df[!duplicated(annot_df[[primary_id_col]]), , drop=FALSE]
+
+  hm_df <- merge(
+    hm_df,
+    annot_df,
+    by=primary_id_col,
+    all.x=TRUE,
+    sort=FALSE
+  )
+  hm_df <- hm_df[order(hm_df$.row_idx), , drop=FALSE]
+
+  lbl <- as.character(hm_df[[annot_row_col]])
+  fallback <- as.character(hm_df[[primary_id_col]])
+  lbl[is.na(lbl) | lbl == ""] <- fallback[is.na(lbl) | lbl == ""]
+  lbl
+}
+
 #' Plot Expression Heatmap
 #'
 #' Generate a heatmap object from an expression matrix, a selected gene set,
@@ -67,6 +112,11 @@
 #' @param covar Optional sample covariate data frame. Sample identifiers must be in
 #'   the column designated by `sample_id_col`.
 #' @param sample_id_col Name of the sample ID column in `covar`.
+#' @param annot Optional annotation data frame for genes.
+#' @param primary_id_col Column in `annot` containing gene identifiers matching
+#'   `exprs` row names.
+#' @param annot_row_col Optional column in `annot` used as row labels in the heatmap.
+#'   If `NULL` or missing in `annot`, row names from `exprs` are shown.
 #' @param sel_annot Character vector of column names from `covar` to display as
 #'   top annotations. If `NULL` (default), no annotation bars are shown.
 #' @param legend Logical; whether heatmap and annotation legends should be shown.
@@ -85,7 +135,19 @@
 #'   group=c("A", "A", "B", "B"),
 #'   stringsAsFactors=FALSE
 #' )
-#' hm <- plot_heatmap(exprs, genes=c("g1", "g3", "g5"), covar=covar, sel_annot="group")
+#' annot <- data.frame(
+#'   PrimaryID=rownames(exprs),
+#'   SYMBOL=paste0("Gene_", seq_len(nrow(exprs))),
+#'   stringsAsFactors=FALSE
+#' )
+#' hm <- plot_heatmap(
+#'   exprs,
+#'   genes=c("g1", "g3", "g5"),
+#'   covar=covar,
+#'   annot=annot,
+#'   annot_row_col="SYMBOL",
+#'   sel_annot="group"
+#' )
 #' hm
 #'
 #' data(C19)
@@ -94,15 +156,21 @@
 #'   genes=utils::head(C19$annotation$PrimaryID, 30),
 #'   covar=C19$covariates,
 #'   sample_id_col="label",
+#'   annot=C19$annotation,
+#'   primary_id_col="PrimaryID",
+#'   annot_row_col="SYMBOL",
 #'   sel_annot=c("group", "sex"),
 #'   legend=FALSE
 #' )
 #' hm_c19
 #'
 #' @export
-plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID", sel_annot=NULL, legend=TRUE) {
+plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
+                         annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL,
+                         sel_annot=NULL, legend=TRUE) {
   exprs <- as.matrix(exprs)
   sample_id_col <- as.character(sample_id_col)[1]
+  primary_id_col <- as.character(primary_id_col)[1]
 
   if(!is.numeric(exprs)) {
     stop("`exprs` must be numeric.")
@@ -115,6 +183,9 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID", sel
   }
   if(is.na(sample_id_col) || !nzchar(sample_id_col)) {
     stop("`sample_id_col` must be a non-empty column name.")
+  }
+  if(is.na(primary_id_col) || !nzchar(primary_id_col)) {
+    stop("`primary_id_col` must be a non-empty column name.")
   }
 
   genes <- unique(as.character(genes))
@@ -130,6 +201,12 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID", sel
 
   exprs <- exprs[genes, , drop=FALSE]
   exprs <- .plot_heatmap_scale_rows(exprs)
+  row_labels <- .plot_heatmap_row_labels(
+    gene_ids=rownames(exprs),
+    annot=annot,
+    primary_id_col=primary_id_col,
+    annot_row_col=annot_row_col
+  )
 
   ann_df <- .plot_heatmap_prepare_covar(
     covar,
@@ -145,6 +222,7 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID", sel
   ComplexHeatmap::Heatmap(
     exprs,
     name="Expression",
+    row_labels=row_labels,
     top_annotation=top_anno,
     cluster_rows=TRUE,
     cluster_columns=TRUE,

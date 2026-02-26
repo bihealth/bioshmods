@@ -40,6 +40,7 @@ test_that("heatmapUI builds sidebar layout with selector and options", {
   expect_true(grepl("col-sm-8", html, fixed = TRUE))
   expect_true(grepl("hm-gene_selector-modus", html, fixed = TRUE))
   expect_true(grepl("hm-sel_annot", html, fixed = TRUE))
+  expect_true(grepl("hm-annot_row_col", html, fixed = TRUE))
   expect_true(grepl("hm-show_legend", html, fixed = TRUE))
   expect_true(grepl("hm-save", html, fixed = TRUE))
   expect_true(grepl("hm-heatmap_plot", html, fixed = TRUE))
@@ -58,6 +59,7 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
     {
       session$setInputs(show_legend = FALSE)
       session$setInputs(sel_annot = "group")
+      session$setInputs(annot_row_col = "SYMBOL")
       session$setInputs(`gene_selector-modus` = "by_name")
       session$flushReact()
 
@@ -72,6 +74,7 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
       expect_equal(isolate(ret$dataset()), "default")
       expect_true(methods::is(isolate(ret$heatmap()), "Heatmap"))
       expect_false(is.null(isolate(ret$heatmap())@top_annotation))
+      expect_equal(isolate(ret$heatmap())@row_names_param$labels, c("A", "B"))
     }
   )
 })
@@ -115,5 +118,19 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
       {}
     ),
     "sample_id_col"
+  )
+
+  expect_error(
+    testServer(
+      heatmapServer,
+      args = list(
+        annot = x$annot,
+        exprs = x$exprs,
+        covar = x$covar,
+        primary_id_col = "missing_primary_id_col"
+      ),
+      {}
+    ),
+    "primary_id_col"
   )
 })

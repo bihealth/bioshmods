@@ -222,7 +222,7 @@
     dge_rank_mode="p_first",
     dge_pval_thr=.05,
     dge_lfc_thr=0,
-    dge_require_fdr=FALSE
+    dge_require_fdr=TRUE
   )
 }
 
