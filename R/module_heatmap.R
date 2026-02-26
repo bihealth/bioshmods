@@ -44,6 +44,17 @@
   )
 }
 
+# List covariate columns that can be shown as heatmap annotations.
+# Excludes the sample ID column used for joining.
+.heatmap_annotation_choices <- function(covar_ds, sample_id_col="SampleID") {
+  message(".heatmap_annotation_choices: Determining annotation choices from covariate dataset with columns: ", paste(colnames(covar_ds), collapse=", "))
+  if(is.null(covar_ds) || !is.data.frame(covar_ds) || ncol(covar_ds) < 1L) {
+    return(character(0))
+  }
+
+  setdiff(colnames(covar_ds), sample_id_col)
+}
+
 #' Heatmap Module UI
 #'
 #' @rdname heatmapServer
@@ -59,8 +70,15 @@ heatmapUI <- function(id) {
         class="well",
         h4("Heatmap options"),
         figsizeInput(ns("figure_size"), width="100%", selected="800x600"),
-        checkboxInput(ns("show_legend"), "Show legend", value=TRUE),
-        downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success")
+        selectizeInput(
+          ns("sel_annot"),
+          "Covariates to indicate",
+          choices=character(0),
+          selected=character(0),
+          multiple=TRUE
+        ),
+        checkboxInput(ns("show_legend"), "Show legend", value=TRUE)
+        , downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success")
       ),
       width=4
     ),
@@ -184,6 +202,24 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       selected_ids=selected_ids
     )
 
+    observe({
+      ds <- selector$dataset()
+      req(isTruthy(ds))
+      req(ds %in% datasets)
+
+      covar_choices <- .heatmap_annotation_choices(covar_norm[[ds]], sample_id_col=sample_id_col)
+      message("Updating covariate choices for dataset '", ds, "': ", paste(covar_choices, collapse=", "))
+      isolate({ selected <- intersect(input$sel_annot %||% character(0), covar_choices) })
+
+      updateSelectizeInput(
+        session=session,
+        inputId="sel_annot",
+        choices=covar_choices,
+        selected=selected,
+        server=TRUE
+      )
+    })
+
     heatmap_obj <- reactive({
       ds <- selector$dataset()
       req(isTruthy(ds))
@@ -195,6 +231,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         genes=selected_ids(),
         covar=covar_norm[[ds]],
         sample_id_col=sample_id_col,
+        sel_annot=input$sel_annot,
         legend=isTRUE(input$show_legend)
       )
     })

@@ -50,3 +50,78 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
 
   expect_equal(isolate(selected_ids()), character(0))
 })
+
+test_that("geneGroupSelectorServer defaults to expression mode and top 50 by mean", {
+  annot <- data.frame(
+    PrimaryID = paste0("g", 1:60),
+    stringsAsFactors = FALSE
+  )
+
+  x1 <- seq_len(60)
+  x2 <- x1 + (61 - x1) / 10
+  exprs <- rbind(x1, x2)
+  exprs <- t(exprs)
+  rownames(exprs) <- annot$PrimaryID
+  colnames(exprs) <- c("s1", "s2")
+
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    geneGroupSelectorServer,
+    args = list(
+      annot = annot,
+      exprs = exprs,
+      selected_ids = selected_ids
+    ),
+    {
+      session$flushReact()
+      expect_equal(isolate(session$returned$modus()), "by_expression")
+    }
+  )
+
+  expect_equal(length(isolate(selected_ids())), 50)
+  expect_equal(isolate(selected_ids()), paste0("g", 60:11))
+})
+
+test_that("geneGroupSelectorServer supports custom mode order and defaults", {
+  annot <- data.frame(
+    PrimaryID = paste0("g", 1:8),
+    stringsAsFactors = FALSE
+  )
+  exprs <- matrix(
+    seq_len(16),
+    nrow = 8,
+    dimnames = list(annot$PrimaryID, c("s1", "s2"))
+  )
+  cntr <- list(
+    contrast_a = data.frame(
+      PrimaryID = annot$PrimaryID,
+      pvalue = rep(0.01, 8),
+      log2FoldChange = seq_len(8),
+      padj = rep(0.05, 8),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    geneGroupSelectorServer,
+    args = list(
+      annot = annot,
+      exprs = exprs,
+      cntr = cntr,
+      mode_order = c("by_name", "by_expression", "by_dge"),
+      defaults = list(expr_top_value = 3),
+      selected_ids = selected_ids
+    ),
+    {
+      session$flushReact()
+      expect_equal(isolate(session$returned$modus()), "by_name")
+      session$setInputs(modus = "by_expression")
+      session$flushReact()
+    }
+  )
+
+  expect_equal(isolate(selected_ids()), c("g8", "g7", "g6"))
+})

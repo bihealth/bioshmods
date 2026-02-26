@@ -14,6 +14,8 @@ geneGroupSelectorServer(
   cntr = NULL,
   primary_id = "PrimaryID",
   cntr_id_col = primary_id,
+  mode_order = c("by_expression", "by_dge", "by_name"),
+  defaults = NULL,
   selected_ids = NULL
 )
 }
@@ -32,6 +34,15 @@ such lists for multiple datasets}
 \item{primary_id}{default annotation column used as the primary gene identifier}
 
 \item{cntr_id_col}{contrast table column containing gene identifiers}
+
+\item{mode_order}{order of available selection modes. Values must come from
+\code{c("by_expression", "by_dge", "by_name")}. Unavailable modes are skipped.
+Default is expression -> DGE -> by name.}
+
+\item{defaults}{optional list of default selector parameters. Supported keys:
+\code{expr_metric}, \code{expr_top_mode}, \code{expr_top_value}, \code{dge_top_mode},
+\code{dge_top_value}, \code{dge_rank_mode}, \code{dge_pval_thr}, \code{dge_lfc_thr},
+and \code{dge_require_fdr}.}
 
 \item{selected_ids}{optional \code{reactiveVal()} that will be updated
 with the currently selected PrimaryIDs (column \code{primary_id}) as a

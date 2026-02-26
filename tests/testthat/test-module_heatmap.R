@@ -39,6 +39,7 @@ test_that("heatmapUI builds sidebar layout with selector and options", {
   expect_true(grepl("col-sm-4", html, fixed = TRUE))
   expect_true(grepl("col-sm-8", html, fixed = TRUE))
   expect_true(grepl("hm-gene_selector-modus", html, fixed = TRUE))
+  expect_true(grepl("hm-sel_annot", html, fixed = TRUE))
   expect_true(grepl("hm-show_legend", html, fixed = TRUE))
   expect_true(grepl("hm-save", html, fixed = TRUE))
   expect_true(grepl("hm-heatmap_plot", html, fixed = TRUE))
@@ -56,6 +57,7 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
     ),
     {
       session$setInputs(show_legend = FALSE)
+      session$setInputs(sel_annot = "group")
       session$setInputs(`gene_selector-modus` = "by_name")
       session$flushReact()
 
@@ -69,6 +71,7 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
       expect_equal(isolate(ret$genes()), c("g1", "g2"))
       expect_equal(isolate(ret$dataset()), "default")
       expect_true(methods::is(isolate(ret$heatmap()), "Heatmap"))
+      expect_false(is.null(isolate(ret$heatmap())@top_annotation))
     }
   )
 })
