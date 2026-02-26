@@ -955,6 +955,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
     output$modus_controls <- renderUI({
       ds <- dataset_selected()
       mode <- input$modus %||% unname(modes[1])
+      isolate({
       .gene_group_modus_controls_ui(
         ns=session$ns,
         mode=mode,
@@ -979,6 +980,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
           dge_rank_mode=input$dge_rank_mode
         )
       )
+      })
     })
 
     selected_annotation <- reactive({
