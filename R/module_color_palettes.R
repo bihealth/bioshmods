@@ -310,6 +310,7 @@
 .color_palettes_row_ui <- function(ns, var_name, spec, row_id, compact=FALSE,
                                    selected_palette=NULL, reverse=FALSE, shift=0L) {
   palette_input_id <- paste0("palette_", row_id)
+  preview_output_id <- paste0("preview_", row_id)
   reverse_input_id <- paste0("reverse_", row_id)
   cycle_minus_id <- paste0("cycle_minus_", row_id)
   cycle_plus_id <- paste0("cycle_plus_", row_id)
@@ -321,7 +322,7 @@
     extra_controls <- checkboxInput(
       ns(reverse_input_id),
       "Reverse palette",
-      value=FALSE
+      value=isTRUE(reverse)
     )
   } else if(spec$type == "categorical") {
     extra_controls <- tags$div(
@@ -347,14 +348,7 @@
           width="100%"
         )
 
-  preview <- .color_palettes_preview_ui(
-    .color_palettes_build_entry(
-      spec=spec,
-      palette_id=selected_palette,
-      reverse=isTRUE(reverse),
-      shift=shift
-    )
-  )
+  preview <- uiOutput(ns(preview_output_id))
 
   if(compact) {
     return(list(pal_input, extra_controls))
@@ -376,7 +370,9 @@
     cycle_minus_id <- paste0("cycle_minus_", row_id)
     cycle_plus_id <- paste0("cycle_plus_", row_id)
     selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
-    shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
+    shift <- isolate({
+      (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
+    })
 
     .color_palettes_row_ui(
       ns=ns,
@@ -517,7 +513,39 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
     })
 
     observe({
-      palettes(.color_palettes_current(variables=variables_validated(), input=input))
+      vars <- variables_validated()
+      var_names <- names(vars)
+      row_ids <- .color_palettes_row_ids(length(var_names))
+
+      for(i in seq_along(var_names)) {
+        local({
+          idx <- i
+          spec <- vars[[idx]]
+          row_id <- row_ids[idx]
+          palette_input_id <- paste0("palette_", row_id)
+          reverse_input_id <- paste0("reverse_", row_id)
+          cycle_minus_id <- paste0("cycle_minus_", row_id)
+          cycle_plus_id <- paste0("cycle_plus_", row_id)
+          preview_output_id <- paste0("preview_", row_id)
+
+          output[[preview_output_id]] <- renderUI({
+            selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
+            shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
+            entry <- .color_palettes_build_entry(
+              spec=spec,
+              palette_id=selected_palette,
+              reverse=isTRUE(input[[reverse_input_id]]),
+              shift=shift
+            )
+            .color_palettes_preview_ui(entry)
+          })
+        })
+      }
+    })
+
+    observe({
+      .p <- .color_palettes_current(variables=variables_validated(), input=input)
+      palettes(.p)
     })
 
     return(palettes)
