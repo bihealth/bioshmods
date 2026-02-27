@@ -256,7 +256,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     fig_size <- reactiveValues(width=800, height=600)
     palettes <- palettes %||% reactiveVal(NULL)
 
-    heatmap_col_var <- list(values = list(type="continuous", breaks=c(min(exprs), 0, max(exprs))))
+    heatmap_col_var <- list(values = list(type="continuous", breaks = c(-2, -1, 0, 1, 2)))
     heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
 
     selected_ids_for_heatmap <- reactive({
