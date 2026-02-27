@@ -158,9 +158,6 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
   .ncol <- suppressWarnings(as.integer(.ncol)[1])
   .nrow <- suppressWarnings(as.integer(.nrow)[1])
 
-  message("gridLayout with .ncol=", .ncol, ", .nrow=", .nrow, ", .byrow=", .byrow)
-
-
   if(is.na(.ncol) || .ncol < 1L) {
     stop("`.ncol` must be a positive integer.")
   }
@@ -173,8 +170,8 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
   }
 
   items <- list(...)
-  print(items)
   capacity <- .ncol * .nrow
+
   if(length(items) > capacity) {
     stop("Number of UI elements in `...` cannot exceed `.ncol * .nrow`.")
   }
@@ -182,8 +179,6 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
   if(is.null(.colwidths)) {
     .colwidths <- floor(12 / .ncol)
   }
-
-  message(".colwidths: ", paste(.colwidths, collapse=", "))
 
   .colwidths <- suppressWarnings(as.integer(.colwidths))
   if(length(.colwidths) < 1L || any(is.na(.colwidths))) {
@@ -200,8 +195,6 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
   if(sum(.colwidths) > 12L) {
     stop("Sum of `.colwidths` must not be larger than 12.")
   }
-
-  message(".colwidths after processing: ", paste(.colwidths, collapse=", "))
 
   padded <- c(items, rep(list(NULL), capacity - length(items)))
   idx <- matrix(seq_len(capacity), nrow=.nrow, ncol=.ncol, byrow=isTRUE(.byrow))
