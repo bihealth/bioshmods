@@ -158,6 +158,9 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
   .ncol <- suppressWarnings(as.integer(.ncol)[1])
   .nrow <- suppressWarnings(as.integer(.nrow)[1])
 
+  message("gridLayout with .ncol=", .ncol, ", .nrow=", .nrow, ", .byrow=", .byrow)
+
+
   if(is.na(.ncol) || .ncol < 1L) {
     stop("`.ncol` must be a positive integer.")
   }
@@ -170,6 +173,7 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
   }
 
   items <- list(...)
+  print(items)
   capacity <- .ncol * .nrow
   if(length(items) > capacity) {
     stop("Number of UI elements in `...` cannot exceed `.ncol * .nrow`.")
@@ -197,15 +201,136 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
     stop("Sum of `.colwidths` must not be larger than 12.")
   }
 
+  message(".colwidths after processing: ", paste(.colwidths, collapse=", "))
+
   padded <- c(items, rep(list(NULL), capacity - length(items)))
   idx <- matrix(seq_len(capacity), nrow=.nrow, ncol=.ncol, byrow=isTRUE(.byrow))
 
   rows <- lapply(seq_len(.nrow), function(r) {
     cols <- lapply(seq_len(.ncol), function(c) {
-      shiny::column(.colwidths[c], padded[[idx[r, c]]])
+      column(.colwidths[c], padded[[idx[r, c]]])
     })
-    do.call(shiny::fluidRow, cols)
+    do.call(fluidRow, cols)
   })
 
-  do.call(shiny::tags$div, rows)
+  do.call(tags$div, rows)
+}
+
+# Build a safe [min, max] range for continuous palette breaks.
+.palette_breaks_from_numeric <- function(x) {
+  x <- suppressWarnings(as.numeric(x))
+  x <- x[is.finite(x)]
+
+  if(length(x) < 1L) {
+    return(c(0, 1))
+  }
+
+  br <- range(x, na.rm=TRUE)
+  if(!all(is.finite(br))) {
+    return(c(0, 1))
+  }
+
+  if(br[1] == br[2]) {
+    br <- c(br[1] - 0.5, br[2] + 0.5)
+  }
+
+  as.numeric(br)
+}
+
+#' Infer Variable Specs for Color Palette Modules
+#'
+#' Convert a data frame into a variable specification list compatible with
+#' [colorPalettesServer()], classifying each column as categorical, ordinal,
+#' or continuous.
+#'
+#' Classification rules:
+#' - Integer columns with fewer than `ordinal_n_levels` unique non-missing
+#'   values are treated as ordinal.
+#' - Other numeric columns are treated as continuous.
+#' - All other columns are treated as categorical.
+#'
+#' For factor columns, levels are taken from `levels(x)`. For non-factor
+#' categorical/ordinal columns, levels are taken from `unique(x)`.
+#' Continuous variables receive `breaks` based on the numeric range.
+#'
+#' @param df A data frame.
+#' @param ordinal_n_levels Maximum number of unique values for integer columns
+#'   to be treated as ordinal. Default is `10`.
+#'
+#' @return A named list where each item corresponds to one column of `df` and
+#'   contains:
+#'   - discrete variables: `list(type=<categorical|ordinal>, levels=<character>)`
+#'   - continuous variables: `list(type="continuous", breaks=<numeric length 2>)`
+#'
+#' @examples
+#' x <- data.frame(
+#'   sex=factor(c("F", "M", "F"), levels=c("F", "M", "U")),
+#'   stage=as.integer(c(1, 2, 3)),
+#'   expr=c(10.1, 11.4, 9.8),
+#'   cohort=c("A", "B", "A"),
+#'   stringsAsFactors=FALSE
+#' )
+#'
+#' specs <- infer_palette_variables(x)
+#' specs$sex
+#' specs$stage
+#' specs$expr
+#'
+#' @export
+infer_palette_variables <- function(df, ordinal_n_levels=10) {
+  if(!is.data.frame(df)) {
+    stop("`df` must be a data frame.")
+  }
+
+  ordinal_n_levels <- suppressWarnings(as.integer(ordinal_n_levels)[1])
+  if(is.na(ordinal_n_levels) || ordinal_n_levels < 1L) {
+    stop("`ordinal_n_levels` must be a positive integer.")
+  }
+
+  out <- stats::setNames(vector("list", ncol(df)), colnames(df))
+
+  for(nm in colnames(df)) {
+    x <- df[[nm]]
+
+    if(is.factor(x)) {
+      out[[nm]] <- list(
+        type="categorical",
+        levels=as.character(levels(x))
+      )
+      next
+    }
+
+    x_non_na <- x[!is.na(x)]
+
+    if(is.integer(x)) {
+      lev <- unique(x_non_na)
+      if(length(lev) < ordinal_n_levels) {
+        out[[nm]] <- list(
+          type="ordinal",
+          levels=as.character(lev)
+        )
+      } else {
+        out[[nm]] <- list(
+          type="continuous",
+          breaks=.palette_breaks_from_numeric(x_non_na)
+        )
+      }
+      next
+    }
+
+    if(is.numeric(x)) {
+      out[[nm]] <- list(
+        type="continuous",
+        breaks=.palette_breaks_from_numeric(x_non_na)
+      )
+      next
+    }
+
+    out[[nm]] <- list(
+      type="categorical",
+      levels=as.character(unique(x_non_na))
+    )
+  }
+
+  out
 }

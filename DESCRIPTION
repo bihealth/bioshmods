@@ -23,6 +23,8 @@ RoxygenNote: 7.3.2
 Imports: 
   DT, bslib, colorDF, dplyr, plotly, purrr, rlang, shiny, shinyBS, shinycssloaders, shinyjs, thematic, tibble, tidyr,
   RColorBrewer,
+  viridisLite,
+  circlize,
   gghalves,
   ggdist,
   tmod,
