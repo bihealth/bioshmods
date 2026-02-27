@@ -65,6 +65,77 @@
   out
 }
 
+# Return TRUE when x is a valid variable specification list.
+.color_palettes_is_varspec <- function(x) {
+  if(!is.list(x) || length(x) < 1L) {
+    return(FALSE)
+  }
+
+  isTRUE(tryCatch({
+    .color_palettes_validate_variables(x)
+    TRUE
+  }, error=function(e) FALSE))
+}
+
+# Ensure list names are present and non-empty.
+.color_palettes_ensure_names <- function(x, prefix="dataset_") {
+  if(is.null(names(x))) {
+    names(x) <- paste0(prefix, seq_along(x))
+  }
+  nm <- as.character(names(x))
+  bad <- is.na(nm) | trimws(nm) == ""
+  nm[bad] <- paste0(prefix, seq_along(x))[bad]
+  names(x) <- nm
+  x
+}
+
+# Normalize variable input to named dataset -> variable-spec-list form.
+# Supports:
+# - single variable specification list
+# - data.frame (converted via infer_palette_variables)
+# - named list of variable specification lists and/or data.frames
+.color_palettes_normalize_datasets <- function(variables) {
+  if(is.data.frame(variables)) {
+    return(list(default=infer_palette_variables(variables)))
+  }
+
+  # Treat "list of variable specs" as single-dataset input even when invalid,
+  # so detailed validation errors point to variable-level issues.
+  if(is.list(variables) && length(variables) > 0L &&
+     all(vapply(variables, function(x) is.list(x) && !is.null(x$type), logical(1)))) {
+    return(list(default=.color_palettes_validate_variables(variables)))
+  }
+
+  if(.color_palettes_is_varspec(variables)) {
+    return(list(default=.color_palettes_validate_variables(variables)))
+  }
+
+  if(!is.list(variables) || length(variables) < 1L) {
+    stop("`variables` must be a variable specification list, a data frame, or a list of datasets.")
+  }
+
+  variables <- .color_palettes_ensure_names(variables, "dataset_")
+  out <- stats::setNames(vector("list", length(variables)), names(variables))
+
+  for(i in seq_along(variables)) {
+    ds <- names(variables)[i]
+    x <- variables[[i]]
+
+    if(is.data.frame(x)) {
+      out[[i]] <- infer_palette_variables(x)
+    } else if(.color_palettes_is_varspec(x)) {
+      out[[i]] <- .color_palettes_validate_variables(x)
+    } else {
+      stop(sprintf(
+        "`variables[['%s']]` must be a data frame or a valid variable specification list.",
+        ds
+      ))
+    }
+  }
+
+  out
+}
+
 # Palette selectors per variable type.
 .color_palettes_discrete_choices <- function() {
   c(
@@ -302,8 +373,13 @@
 }
 
 # Stable internal input/output IDs per variable row.
-.color_palettes_row_ids <- function(n) {
-  paste0("var_", seq_len(n))
+.color_palettes_row_ids <- function(n, dataset=NULL) {
+  ids <- paste0("var_", seq_len(n))
+  dataset <- as.character(dataset %||% "")[1]
+  if(!is.na(dataset) && nzchar(dataset)) {
+    ids <- paste0(sanitize_filename(dataset, "dataset"), "_", ids)
+  }
+  ids
 }
 
 # Build UI for one variable palette row.
@@ -358,9 +434,9 @@
 }
 
 # Build the full palette controls UI for all variables.
-.color_palettes_ui <- function(ns, variables, input, compact=FALSE) {
+.color_palettes_ui <- function(ns, variables, input, dataset=NULL, compact=FALSE) {
   var_names <- names(variables)
-  row_ids <- .color_palettes_row_ids(length(var_names))
+  row_ids <- .color_palettes_row_ids(length(var_names), dataset=dataset)
 
   rows <- lapply(seq_along(var_names), function(i) {
     spec <- variables[[i]]
@@ -400,9 +476,9 @@
 }
 
 # Build current palette specification from UI state.
-.color_palettes_current <- function(variables, input) {
+.color_palettes_current <- function(variables, input, dataset=NULL) {
   var_names <- names(variables)
-  row_ids <- .color_palettes_row_ids(length(var_names))
+  row_ids <- .color_palettes_row_ids(length(var_names), dataset=dataset)
   out <- stats::setNames(vector("list", length(var_names)), var_names)
 
   for(i in seq_along(var_names)) {
@@ -437,7 +513,10 @@
 #' @export
 colorPalettesUI <- function(id) {
   ns <- NS(id)
-  uiOutput(ns("rows"))
+  tagList(
+    uiOutput(ns("dataset_ui")),
+    uiOutput(ns("rows"))
+  )
 }
 
 #' Color Palettes Module Server
@@ -446,15 +525,15 @@ colorPalettesUI <- function(id) {
 #' palettes as a reactive expression.
 #'
 #' @param id Shiny module id (same as passed to [colorPalettesUI()]).
-#' @param variables Variable specification as either:
-#'   - a named list, or
-#'   - a reactive value/expression returning a named list.
-#'   Each entry must contain `type` (`"categorical"`, `"ordinal"`, or
-#'   `"continuous"`). For discrete types, provide `levels`. For continuous
-#'   types, provide `breaks`.
+#' @param variables Variable specification input as either a named list or a
+#'   reactive value/expression returning one. Single-dataset input can be a
+#'   variable specification list or a covariate data frame. Multi-dataset
+#'   input must be a named list where each element is a variable specification
+#'   list or covariate data frame.
 #' @param palettes Optional reactiveVal-like placeholder kept for compatibility.
 #'   If supplied, it must be a function; the module returns its own reactive
-#'   palette specification and does not mutate external state.
+#'   palette specification and does not mutate external state. The value is a
+#'   named list with one element per dataset.
 #' @param compact Logical; whether to use a more compact layout for palette rows.
 #'
 #' @return A reactive expression returning the current palette list.
@@ -499,23 +578,61 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
 
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    variables_validated <- reactive({
-      .color_palettes_validate_variables(variables())
+    variables_by_dataset <- reactive({
+      .color_palettes_normalize_datasets(variables())
+    })
+
+    dataset_choices <- reactive({
+      names(variables_by_dataset())
+    })
+
+    selected_dataset <- reactive({
+      ds_choices <- dataset_choices()
+      if(length(ds_choices) < 1L) {
+        return("")
+      }
+
+      ds <- input$dataset %||% ds_choices[1]
+      if(is.na(ds) || !ds %in% ds_choices) {
+        ds <- ds_choices[1]
+      }
+      ds
+    })
+
+    output$dataset_ui <- renderUI({
+      ds_choices <- dataset_choices()
+      if(length(ds_choices) < 2L) {
+        return(NULL)
+      }
+
+      selectInput(
+        ns("dataset"),
+        "Dataset",
+        choices=ds_choices,
+        selected=selected_dataset()
+      )
     })
 
     output$rows <- renderUI({
+      ds <- selected_dataset()
+      req(isTruthy(ds))
+      vars <- variables_by_dataset()[[ds]]
+
       .color_palettes_ui(
         ns=ns,
-        variables=variables_validated(),
+        variables=vars,
         input=input,
+        dataset=ds,
         compact=compact
       )
     })
 
     observe({
-      vars <- variables_validated()
+      ds <- selected_dataset()
+      req(isTruthy(ds))
+      vars <- variables_by_dataset()[[ds]]
       var_names <- names(vars)
-      row_ids <- .color_palettes_row_ids(length(var_names))
+      row_ids <- .color_palettes_row_ids(length(var_names), dataset=ds)
 
       for(i in seq_along(var_names)) {
         local({
@@ -544,8 +661,28 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
     })
 
     observe({
-      .p <- .color_palettes_current(variables=variables_validated(), input=input)
-      palettes(.p)
+      vars_by_ds <- variables_by_dataset()
+      ds <- selected_dataset()
+      req(isTruthy(ds))
+
+      p_all <- isolate(palettes())
+      if(!is.list(p_all)) {
+        p_all <- list()
+      }
+
+      p_all[[ds]] <- .color_palettes_current(
+        variables=vars_by_ds[[ds]],
+        input=input,
+        dataset=ds
+      )
+      missing_ds <- setdiff(names(vars_by_ds), names(p_all))
+      if(length(missing_ds) > 0L) {
+        for(nm in missing_ds) {
+          p_all[[nm]] <- list()
+        }
+      }
+      p_all <- p_all[names(vars_by_ds)]
+      palettes(p_all)
     })
 
     return(palettes)

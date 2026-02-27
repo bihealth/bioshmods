@@ -338,6 +338,18 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       req(ds %in% datasets)
       req(length(selected_ids_for_heatmap()) > 0L)
 
+      hm_col_all <- heatmap_col()
+      hm_col_ds <- hm_col_all[[1]]
+      if(is.list(hm_col_all) && "default" %in% names(hm_col_all)) {
+        hm_col_ds <- hm_col_all[["default"]]
+      }
+
+      annot_pal_all <- palettes()
+      annot_pal <- annot_pal_all
+      if(is.list(annot_pal_all) && ds %in% names(annot_pal_all)) {
+        annot_pal <- annot_pal_all[[ds]]
+      }
+
       plot_heatmap(
         exprs=exprs_norm[[ds]],
         genes=selected_ids_for_heatmap(),
@@ -348,8 +360,8 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         annot_row_col=if(isTruthy(input$annot_row_col)) input$annot_row_col else NULL,
         sel_annot=input$sel_annot,
         legend=isTRUE(input$show_legend),
-        col=heatmap_col()$values$pal,
-        palettes=palettes()
+        col=hm_col_ds$values$pal,
+        palettes=annot_pal
       )
     })
 

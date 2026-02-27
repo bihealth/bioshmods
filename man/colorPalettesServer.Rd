@@ -12,18 +12,16 @@ colorPalettesServer(id, variables, palettes = NULL, compact = FALSE)
 \arguments{
 \item{id}{Shiny module id (same as passed to \code{\link[=colorPalettesUI]{colorPalettesUI()}}).}
 
-\item{variables}{Variable specification as either:
-\itemize{
-\item a named list, or
-\item a reactive value/expression returning a named list.
-Each entry must contain \code{type} (\code{"categorical"}, \code{"ordinal"}, or
-\code{"continuous"}). For discrete types, provide \code{levels}. For continuous
-types, provide \code{breaks}.
-}}
+\item{variables}{Variable specification input as either a named list or a
+reactive value/expression returning one. Single-dataset input can be a
+variable specification list or a covariate data frame. Multi-dataset
+input must be a named list where each element is a variable specification
+list or covariate data frame.}
 
 \item{palettes}{Optional reactiveVal-like placeholder kept for compatibility.
 If supplied, it must be a function; the module returns its own reactive
-palette specification and does not mutate external state.}
+palette specification and does not mutate external state. The value is a
+named list with one element per dataset.}
 
 \item{compact}{Logical; whether to use a more compact layout for palette rows.}
 }
