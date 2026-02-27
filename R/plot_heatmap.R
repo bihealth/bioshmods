@@ -229,14 +229,6 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     top_anno <- ComplexHeatmap::HeatmapAnnotation(df=ann_df, show_legend=isTRUE(legend), col=pal_anno)
   }
 
-  if(is.null(col)) {
-    col <- if(!is.null(palettes) && "values" %in% names(palettes)) {
-      palettes[["values"]]$pal
-    } else {
-      NULL
-    }
-  }
-
   ComplexHeatmap::Heatmap(
     exprs,
     name="Expression",
