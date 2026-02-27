@@ -307,7 +307,7 @@
 }
 
 # Build UI for one variable palette row.
-.color_palettes_row_ui <- function(ns, var_name, spec, row_id) {
+.color_palettes_row_ui <- function(ns, var_name, spec, row_id, compact=FALSE) {
   palette_input_id <- paste0("palette_", row_id)
   preview_output_id <- paste0("preview_", row_id)
   reverse_input_id <- paste0("reverse_", row_id)
@@ -348,7 +348,36 @@
 
   preview <- uiOutput(ns(preview_output_id))
 
-  list(description, pal_input, preview, extra_controls)
+  if(compact) {
+    return(list(pal_input, extra_controls))
+  } else {
+    return(list(description, pal_input, preview, extra_controls))
+  }
+}
+
+# Build the full palette controls UI for all variables.
+.color_palettes_ui <- function(ns, var_names, variables, row_ids, compact=FALSE) {
+  rows <- lapply(seq_along(var_names), function(i) {
+    .color_palettes_row_ui(
+      ns=ns,
+      var_name=var_names[i],
+      spec=variables[[i]],
+      row_id=row_ids[i],
+      compact=compact
+    )
+  })
+
+  rows <- unlist(rows, recursive=FALSE)
+  if(compact) {
+    rows$.ncol <- 2L
+    rows$.nrow <- length(var_names)
+    rows$.colwidths <- c(9, 3)
+  } else {
+    rows$.ncol <- 4L
+    rows$.nrow <- length(var_names)
+    rows$.colwidths <- c(1, 5, 3, 3)
+  }
+  do.call(gridLayout, rows)
 }
 
 #' Color Palettes Module UI
@@ -366,15 +395,17 @@ colorPalettesUI <- function(id) {
 
 #' Color Palettes Module Server
 #'
-#' Create palette controls for each declared variable and keep the selected
-#' palettes synchronized in an external `reactiveVal`.
+#' Create palette controls for each declared variable and return the selected
+#' palettes as a reactive expression.
 #'
 #' @param id Shiny module id (same as passed to [colorPalettesUI()]).
 #' @param variables Named list of variable specifications. Each entry must
 #'   contain `type` (`"categorical"`, `"ordinal"`, or `"continuous"`).
 #'   For discrete types, provide `levels`. For continuous types, provide `breaks`.
-#' @param palettes A `reactiveVal` that receives a named list of palette
-#'   definitions keyed by variable names from `variables`.
+#' @param palettes Optional reactiveVal-like placeholder kept for compatibility.
+#'   If supplied, it must be a function; the module returns its own reactive
+#'   palette specification and does not mutate external state.
+#' @param compact Logical; whether to use a more compact layout for palette rows.
 #'
 #' @return A reactive expression returning the current palette list.
 #'
@@ -393,8 +424,7 @@ colorPalettesUI <- function(id) {
 #'   )
 #'
 #'   server <- function(input, output, session) {
-#'     palettes <- reactiveVal(list())
-#'     colorPalettesServer("pal", variables=variables, palettes=palettes)
+#'     palettes <- colorPalettesServer("pal", variables=variables)
 #'
 #'     output$pal_keys <- renderPrint(names(palettes()))
 #'   }
@@ -403,8 +433,13 @@ colorPalettesUI <- function(id) {
 #' }
 #'
 #' @export
-colorPalettesServer <- function(id, variables, palettes) {
+colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE) {
   variables <- .color_palettes_validate_variables(variables)
+
+  if(is.null(palettes)) {
+    palettes <- reactiveVal(list())
+  }
+
   if(!is.function(palettes)) {
     stop("`palettes` must be a reactiveVal-like function.")
   }
@@ -417,20 +452,13 @@ colorPalettesServer <- function(id, variables, palettes) {
     shift_state <- reactiveVal(stats::setNames(rep(0L, length(var_names)), var_names))
 
     output$rows <- renderUI({
-      rows <- lapply(seq_along(var_names), function(i) {
-        .color_palettes_row_ui(
+      .color_palettes_ui(
           ns=ns,
-          var_name=var_names[i],
-          spec=variables[[i]],
-          row_id=row_ids[i]
-        )
-      })
-
-      rows <- unlist(rows, recursive=FALSE)
-      rows$.ncol <- 4L
-      rows$.nrow <- length(var_names)
-      rows$.colwidths <- c(1, 5, 3, 3)
-      do.call(gridLayout, rows)
+          var_names=var_names,
+          variables=variables,
+          row_ids=row_ids,
+          compact=compact
+          )
 
       #do.call(tagList, rows)
     })
@@ -460,7 +488,7 @@ colorPalettesServer <- function(id, variables, palettes) {
       })
     }
 
-    current_palettes <- reactive({
+    palettes <- reactive({
       out <- stats::setNames(vector("list", length(var_names)), var_names)
 
       for(i in seq_along(var_names)) {
@@ -478,10 +506,6 @@ colorPalettesServer <- function(id, variables, palettes) {
       }
 
       out
-    })
-
-    observe({
-      palettes(current_palettes())
     })
 
     for(i in seq_along(var_names)) {
@@ -506,6 +530,6 @@ colorPalettesServer <- function(id, variables, palettes) {
       })
     }
 
-    current_palettes
+    return(palettes)
   })
 }

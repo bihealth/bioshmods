@@ -120,6 +120,11 @@
 #' @param sel_annot Character vector of column names from `covar` to display as
 #'   top annotations. If `NULL` (default), no annotation bars are shown.
 #' @param legend Logical; whether heatmap and annotation legends should be shown.
+#' @param palettes Optional named list of palette definitions. When `col` is
+#'   `NULL` and `palettes$values$pal` exists, that value is used for heatmap
+#'   colors.
+#' @param col Optional heatmap color mapping passed to
+#'   `ComplexHeatmap::Heatmap(col=...)`. This overrides `palettes`.
 #'
 #' @return A `ComplexHeatmap::Heatmap` object.
 #'
@@ -160,6 +165,7 @@
 #'   primary_id_col="PrimaryID",
 #'   annot_row_col="SYMBOL",
 #'   sel_annot=c("group", "sex"),
+#'   col=circlize::colorRamp2(c(-2, 0, 2), c("#2c7bb6", "#ffffbf", "#d7191c")),
 #'   legend=FALSE
 #' )
 #' hm_c19
@@ -167,7 +173,12 @@
 #' @export
 plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
                          annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL,
-                         sel_annot=NULL, legend=TRUE) {
+                         sel_annot=NULL, legend=TRUE, palettes = NULL, col = NULL) {
+  message("palettes is:")
+  print(str(palettes))
+  print("col is:")
+  print(str(col))
+  
   exprs <- as.matrix(exprs)
   sample_id_col <- as.character(sample_id_col)[1]
   primary_id_col <- as.character(primary_id_col)[1]
@@ -214,9 +225,18 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     sample_id_col=sample_id_col,
     sel_annot=sel_annot
   )
+  print(ann_df)
   top_anno <- NULL
   if(!is.null(ann_df) && ncol(ann_df) > 0L) {
     top_anno <- ComplexHeatmap::HeatmapAnnotation(df=ann_df, show_legend=isTRUE(legend))
+  }
+
+  if(is.null(col)) {
+    col <- if(!is.null(palettes) && "values" %in% names(palettes)) {
+      palettes[["values"]]$pal
+    } else {
+      NULL
+    }
   }
 
   ComplexHeatmap::Heatmap(
@@ -228,6 +248,7 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     cluster_columns=TRUE,
     show_heatmap_legend=isTRUE(legend),
     show_column_names=FALSE,
+    col=col,
     show_row_names=TRUE
   )
 }

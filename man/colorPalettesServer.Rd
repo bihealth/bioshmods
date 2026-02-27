@@ -7,7 +7,7 @@
 \usage{
 colorPalettesUI(id)
 
-colorPalettesServer(id, variables, palettes)
+colorPalettesServer(id, variables, palettes = NULL)
 }
 \arguments{
 \item{id}{Shiny module id (same as passed to \code{\link[=colorPalettesUI]{colorPalettesUI()}}).}
@@ -16,8 +16,9 @@ colorPalettesServer(id, variables, palettes)
 contain \code{type} (\code{"categorical"}, \code{"ordinal"}, or \code{"continuous"}).
 For discrete types, provide \code{levels}. For continuous types, provide \code{breaks}.}
 
-\item{palettes}{A \code{reactiveVal} that receives a named list of palette
-definitions keyed by variable names from \code{variables}.}
+\item{palettes}{Optional reactiveVal-like placeholder kept for compatibility.
+If supplied, it must be a function; the module returns its own reactive
+palette specification and does not mutate external state.}
 }
 \value{
 A UI container for dynamic variable-specific palette controls.
@@ -25,8 +26,8 @@ A UI container for dynamic variable-specific palette controls.
 A reactive expression returning the current palette list.
 }
 \description{
-Create palette controls for each declared variable and keep the selected
-palettes synchronized in an external \code{reactiveVal}.
+Create palette controls for each declared variable and return the selected
+palettes as a reactive expression.
 }
 \examples{
 if(interactive()) {
@@ -43,8 +44,7 @@ if(interactive()) {
   )
 
   server <- function(input, output, session) {
-    palettes <- reactiveVal(list())
-    colorPalettesServer("pal", variables=variables, palettes=palettes)
+    palettes <- colorPalettesServer("pal", variables=variables)
 
     output$pal_keys <- renderPrint(names(palettes()))
   }

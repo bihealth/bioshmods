@@ -13,7 +13,9 @@ plot_heatmap(
   primary_id_col = "PrimaryID",
   annot_row_col = NULL,
   sel_annot = NULL,
-  legend = TRUE
+  legend = TRUE,
+  palettes = NULL,
+  col = NULL
 )
 }
 \arguments{
@@ -39,6 +41,13 @@ If \code{NULL} or missing in \code{annot}, row names from \code{exprs} are shown
 top annotations. If \code{NULL} (default), no annotation bars are shown.}
 
 \item{legend}{Logical; whether heatmap and annotation legends should be shown.}
+
+\item{palettes}{Optional named list of palette definitions. When \code{col} is
+\code{NULL} and \code{palettes$values$pal} exists, that value is used for heatmap
+colors.}
+
+\item{col}{Optional heatmap color mapping passed to
+\code{ComplexHeatmap::Heatmap(col=...)}. This overrides \code{palettes}.}
 }
 \value{
 A \code{ComplexHeatmap::Heatmap} object.
@@ -84,6 +93,7 @@ hm_c19 <- plot_heatmap(
   primary_id_col="PrimaryID",
   annot_row_col="SYMBOL",
   sel_annot=c("group", "sex"),
+  col=circlize::colorRamp2(c(-2, 0, 2), c("#2c7bb6", "#ffffbf", "#d7191c")),
   legend=FALSE
 )
 hm_c19

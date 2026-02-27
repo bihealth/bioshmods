@@ -109,7 +109,8 @@ heatmapUI <- function(id) {
           downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success"),
           .ncol = 2,
           .nrow = 3
-        )
+        ),
+        fluidRow(column(colorPalettesUI(ns("heatmap_color")), width=12))
       ),
       width=3
     ),
@@ -133,6 +134,9 @@ heatmapUI <- function(id) {
 #' @param cntr Optional contrast object, same format as [geneGroupSelectorServer()].
 #' @param covar Sample covariate data frame (single dataset) or named list of
 #'   data frames (multi-dataset mode).
+#' @param palettes Optional reactive expression or `reactiveVal` returning a
+#'   palette list forwarded to [plot_heatmap()]. Useful when heatmap colors are
+#'   coordinated across modules.
 #' @param sample_id_col Name of the sample ID column in `covar`.
 #' @param dge_pval_col Optional p-value column name for DGE mode in
 #'   [geneGroupSelectorServer()].
@@ -201,6 +205,7 @@ heatmapUI <- function(id) {
 #'
 #' @export
 heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
+                          palettes=NULL,
                           sample_id_col="SampleID",
                           primary_id="PrimaryID",
                           dge_pval_col=NULL,
@@ -249,6 +254,10 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
   moduleServer(id, function(input, output, session) {
     selected_ids <- reactiveVal(character(0))
     fig_size <- reactiveValues(width=800, height=600)
+    palettes <- palettes %||% reactiveVal(NULL)
+
+    heatmap_col_var <- list(values = list(type="continuous", breaks=c(min(exprs), 0, max(exprs))))
+    heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
 
     selected_ids_for_heatmap <- reactive({
       ids <- selected_ids()
@@ -338,7 +347,9 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         primary_id_col=primary_id,
         annot_row_col=if(isTruthy(input$annot_row_col)) input$annot_row_col else NULL,
         sel_annot=input$sel_annot,
-        legend=isTRUE(input$show_legend)
+        legend=isTRUE(input$show_legend),
+        col=heatmap_col()$values$pal,
+        palettes=palettes()
       )
     })
 

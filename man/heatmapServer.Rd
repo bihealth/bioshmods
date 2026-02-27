@@ -13,6 +13,7 @@ heatmapServer(
   exprs = NULL,
   cntr = NULL,
   covar = NULL,
+  palettes = NULL,
   sample_id_col = "SampleID",
   primary_id = "PrimaryID",
   dge_pval_col = NULL,
@@ -35,6 +36,10 @@ matrices/data frames (multi-dataset mode), as in \code{\link[=geneGroupSelectorS
 
 \item{covar}{Sample covariate data frame (single dataset) or named list of
 data frames (multi-dataset mode).}
+
+\item{palettes}{Optional reactive expression or \code{reactiveVal} returning a
+palette list forwarded to \code{\link[=plot_heatmap]{plot_heatmap()}}. Useful when heatmap colors are
+coordinated across modules.}
 
 \item{sample_id_col}{Name of the sample ID column in \code{covar}.}
 
