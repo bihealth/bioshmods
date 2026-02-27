@@ -461,19 +461,26 @@
     )
   }
 
-  fluidRow(
-    column(
-      6,
-      selectizeInput(ns("dge_contrasts"), "Contrast", choices=dge_defaults$contrasts, selected=dge_defaults$selected_contrasts, multiple=FALSE),
-      numericInput(ns("dge_pval_thr"), "P-value threshold", value=max(0, min(1, p_thr)), min=0, max=1, step=.001),
-      checkboxInput(ns("dge_require_fdr"), "Exclude genes with missing adjusted p-value (FDR)", value=isTRUE(require_fdr))
+  shiny::tags$div(
+    fluidRow(
+      column(
+        12,
+        selectizeInput(ns("dge_contrasts"), "Contrast", choices=dge_defaults$contrasts, selected=dge_defaults$selected_contrasts, multiple=FALSE),
+      )
     ),
-    column(
-      6,
-      numericInput(ns("dge_lfc_thr"), "Absolute logFC threshold", value=max(0, lfc_thr), min=0, step=.1),
-      selectInput(ns("dge_rank_mode"), "Ranking priority", choices=c("Lowest p-value first"="p_first", "Highest absolute logFC first"="lfc_first"), selected=rank_mode),
-      selectInput(ns("dge_top_mode"), "Top filter", choices=c("All passing filters"="all", "Top N"="n", "Top %"="pct"), selected=top_mode),
-      top_value_ui
+    fluidRow(
+      column(
+        6,
+        numericInput(ns("dge_pval_thr"), "P-value threshold", value=max(0, min(1, p_thr)), min=0, max=1, step=.001),
+        selectInput(ns("dge_rank_mode"), "Ranking priority", choices=c("Lowest p-value first"="p_first", "Highest absolute logFC first"="lfc_first"), selected=rank_mode),
+        checkboxInput(ns("dge_require_fdr"), "Exclude genes with missing adjusted p-value (FDR)", value=isTRUE(require_fdr))
+      ),
+      column(
+        6,
+        numericInput(ns("dge_lfc_thr"), "Absolute logFC threshold", value=max(0, lfc_thr), min=0, step=.1),
+        selectInput(ns("dge_top_mode"), "Top filter", choices=c("All passing filters"="all", "Top N"="n", "Top %"="pct"), selected=top_mode),
+        top_value_ui
+      )
     )
   )
 }
