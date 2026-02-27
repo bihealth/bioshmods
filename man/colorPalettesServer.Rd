@@ -7,7 +7,7 @@
 \usage{
 colorPalettesUI(id)
 
-colorPalettesServer(id, variables, palettes = NULL)
+colorPalettesServer(id, variables, palettes = NULL, compact = FALSE)
 }
 \arguments{
 \item{id}{Shiny module id (same as passed to \code{\link[=colorPalettesUI]{colorPalettesUI()}}).}
@@ -19,6 +19,8 @@ For discrete types, provide \code{levels}. For continuous types, provide \code{b
 \item{palettes}{Optional reactiveVal-like placeholder kept for compatibility.
 If supplied, it must be a function; the module returns its own reactive
 palette specification and does not mutate external state.}
+
+\item{compact}{Logical; whether to use a more compact layout for palette rows.}
 }
 \value{
 A UI container for dynamic variable-specific palette controls.

@@ -488,7 +488,7 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
       })
     }
 
-    palettes <- reactive({
+    observe({
       out <- stats::setNames(vector("list", length(var_names)), var_names)
 
       for(i in seq_along(var_names)) {
@@ -505,7 +505,7 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
         )
       }
 
-      out
+      palettes(out)
     })
 
     for(i in seq_along(var_names)) {

@@ -257,7 +257,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     palettes <- palettes %||% reactiveVal(NULL)
 
     heatmap_col_var <- list(values = list(type="continuous", breaks = c(-2, -1, 0, 1, 2)))
-    heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
+    #heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
 
     selected_ids_for_heatmap <- reactive({
       ids <- selected_ids()
@@ -348,7 +348,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         annot_row_col=if(isTruthy(input$annot_row_col)) input$annot_row_col else NULL,
         sel_annot=input$sel_annot,
         legend=isTRUE(input$show_legend),
-        col=heatmap_col()$values$pal,
+        #col=heatmap_col()$values$pal,
         palettes=palettes()
       )
     })

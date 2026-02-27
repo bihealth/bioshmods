@@ -174,11 +174,6 @@
 plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
                          annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL,
                          sel_annot=NULL, legend=TRUE, palettes = NULL, col = NULL) {
-  message("palettes is:")
-  print(str(palettes))
-  print("col is:")
-  print(str(col))
-  
   exprs <- as.matrix(exprs)
   sample_id_col <- as.character(sample_id_col)[1]
   primary_id_col <- as.character(primary_id_col)[1]
@@ -225,10 +220,13 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     sample_id_col=sample_id_col,
     sel_annot=sel_annot
   )
-  print(ann_df)
   top_anno <- NULL
   if(!is.null(ann_df) && ncol(ann_df) > 0L) {
-    top_anno <- ComplexHeatmap::HeatmapAnnotation(df=ann_df, show_legend=isTRUE(legend))
+    pal_anno <- NULL
+    if(!is.null(palettes)) {
+      pal_anno <- lapply(palettes, \(x) x$pal)
+    }
+    top_anno <- ComplexHeatmap::HeatmapAnnotation(df=ann_df, show_legend=isTRUE(legend), col=pal_anno)
   }
 
   if(is.null(col)) {
