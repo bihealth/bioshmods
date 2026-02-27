@@ -249,6 +249,11 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
 #' @param df A data frame.
 #' @param ordinal_n_levels Maximum number of unique values for integer columns
 #'   to be treated as ordinal. Default is `10`.
+#' @param cleanup Logical; if `TRUE`, drops noisy variables:
+#'   - categorical variables with all values unique,
+#'   - categorical variables with more than 10 unique observed values,
+#'   - any variable with exactly one unique non-missing value.
+#'   Default is `FALSE`.
 #'
 #' @return A named list where each item corresponds to one column of `df` and
 #'   contains:
@@ -268,9 +273,10 @@ gridLayout <- function(..., .ncol=1, .nrow=1, .byrow=TRUE, .colwidths=NULL) {
 #' specs$sex
 #' specs$stage
 #' specs$expr
+#' infer_palette_variables(x, cleanup=TRUE)
 #'
 #' @export
-infer_palette_variables <- function(df, ordinal_n_levels=10) {
+infer_palette_variables <- function(df, ordinal_n_levels=10, cleanup=FALSE) {
   if(!is.data.frame(df)) {
     stop("`df` must be a data frame.")
   }
@@ -280,20 +286,35 @@ infer_palette_variables <- function(df, ordinal_n_levels=10) {
     stop("`ordinal_n_levels` must be a positive integer.")
   }
 
-  out <- stats::setNames(vector("list", ncol(df)), colnames(df))
+  if(!is.logical(cleanup) || length(cleanup) != 1L || is.na(cleanup)) {
+    stop("`cleanup` must be TRUE or FALSE.")
+  }
+
+  out <- list()
 
   for(nm in colnames(df)) {
     x <- df[[nm]]
+    x_non_na <- x[!is.na(x)]
+    n_non_na <- length(x_non_na)
+    n_unique <- length(unique(x_non_na))
 
-    if(is.factor(x)) {
-      out[[nm]] <- list(
-        type="categorical",
-        levels=as.character(levels(x))
-      )
+    # Drop near-constant variables when cleanup is requested.
+    if(isTRUE(cleanup) && n_unique == 1L) {
       next
     }
 
-    x_non_na <- x[!is.na(x)]
+    if(is.factor(x)) {
+      if(isTRUE(cleanup)) {
+        all_unique <- n_non_na > 0L && n_unique == n_non_na
+        too_many_unique <- n_unique > 10L
+        if(all_unique || too_many_unique) {
+          next
+        }
+      }
+
+      out[[nm]] <- list(type="categorical", levels=as.character(levels(x)))
+      next
+    }
 
     if(is.integer(x)) {
       lev <- unique(x_non_na)
@@ -317,6 +338,14 @@ infer_palette_variables <- function(df, ordinal_n_levels=10) {
         breaks=.palette_breaks_from_numeric(x_non_na)
       )
       next
+    }
+
+    if(isTRUE(cleanup)) {
+      all_unique <- n_non_na > 0L && n_unique == n_non_na
+      too_many_unique <- n_unique > 10L
+      if(all_unique || too_many_unique) {
+        next
+      }
     }
 
     out[[nm]] <- list(

@@ -4,13 +4,21 @@
 \alias{infer_palette_variables}
 \title{Infer Variable Specs for Color Palette Modules}
 \usage{
-infer_palette_variables(df, ordinal_n_levels = 10)
+infer_palette_variables(df, ordinal_n_levels = 10, cleanup = FALSE)
 }
 \arguments{
 \item{df}{A data frame.}
 
 \item{ordinal_n_levels}{Maximum number of unique values for integer columns
 to be treated as ordinal. Default is \code{10}.}
+
+\item{cleanup}{Logical; if \code{TRUE}, drops noisy variables:
+\itemize{
+\item categorical variables with all values unique,
+\item categorical variables with more than 10 unique observed values,
+\item any variable with exactly one unique non-missing value.
+Default is \code{FALSE}.
+}}
 }
 \value{
 A named list where each item corresponds to one column of \code{df} and
@@ -51,5 +59,6 @@ specs <- infer_palette_variables(x)
 specs$sex
 specs$stage
 specs$expr
+infer_palette_variables(x, cleanup=TRUE)
 
 }

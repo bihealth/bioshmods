@@ -51,4 +51,28 @@ test_that("infer_palette_variables builds safe breaks for constant/empty numeric
 test_that("infer_palette_variables validates inputs", {
   expect_error(infer_palette_variables(letters), "data frame")
   expect_error(infer_palette_variables(data.frame(x=1), ordinal_n_levels=0), "ordinal_n_levels")
+  expect_error(infer_palette_variables(data.frame(x=1), cleanup=NA), "cleanup")
+  expect_error(infer_palette_variables(data.frame(x=1), cleanup="yes"), "cleanup")
+})
+
+test_that("infer_palette_variables cleanup drops noisy categorical and constant variables", {
+  df <- data.frame(
+    id=as.character(seq_len(12)),                # categorical and all unique
+    cat_many=c(paste0("L", 1:11), "L1"),        # categorical with >10 unique
+    constant_num=rep(5, 12),                     # one unique value (any type)
+    constant_chr=rep("A", 12),                   # one unique value (any type)
+    stage=as.integer(rep(1:3, 4)),               # ordinal, should stay
+    expr=seq_len(12) / 10,                       # continuous, should stay
+    cohort=rep(c("A", "B"), 6),                  # categorical, should stay
+    stringsAsFactors=FALSE
+  )
+
+  specs_clean <- infer_palette_variables(df, cleanup=TRUE)
+  expect_named(specs_clean, c("stage", "expr", "cohort"))
+  expect_equal(specs_clean$stage$type, "ordinal")
+  expect_equal(specs_clean$expr$type, "continuous")
+  expect_equal(specs_clean$cohort$type, "categorical")
+
+  specs_raw <- infer_palette_variables(df, cleanup=FALSE)
+  expect_true(all(c("id", "cat_many", "constant_num", "constant_chr") %in% names(specs_raw)))
 })
