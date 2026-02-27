@@ -73,6 +73,32 @@ test_that("colorPalettesServer updates selected palette choices", {
   expect_match(p$sex$pal[1], "^#")
 })
 
+test_that("colorPalettesServer accepts reactive variables input", {
+  variables_rv <- reactiveVal(list(
+    sex=list(type="categorical", levels=c("female", "male"))
+  ))
+  palettes <- reactiveVal(list())
+
+  testServer(
+    colorPalettesServer,
+    args=list(
+      variables=variables_rv,
+      palettes=palettes
+    ),
+    {
+      session$flushReact()
+      expect_named(isolate(palettes()), "sex")
+
+      variables_rv(list(
+        expression=list(type="continuous", breaks=c(-2, 0, 2))
+      ))
+      session$flushReact()
+      expect_named(isolate(palettes()), "expression")
+      expect_equal(isolate(palettes())$expression$type, "continuous")
+    }
+  )
+})
+
 test_that("colorPalettesServer supports reversing continuous palettes", {
   variables <- list(
     expression=list(type="continuous", breaks=c(-2, -1, 0, 1, 2))
@@ -144,7 +170,7 @@ test_that("colorPalettesServer supports cycling categorical palettes", {
 test_that("colorPalettesServer validates malformed variables specification", {
   palettes <- reactiveVal(list())
 
-  expect_error(
+  expect_warning(
     testServer(
       colorPalettesServer,
       args=list(
@@ -153,12 +179,14 @@ test_that("colorPalettesServer validates malformed variables specification", {
         ),
         palettes=palettes
       ),
-      {}
+      {
+        session$flushReact()
+      }
     ),
     "levels"
   )
 
-  expect_error(
+  expect_warning(
     testServer(
       colorPalettesServer,
       args=list(
@@ -167,7 +195,9 @@ test_that("colorPalettesServer validates malformed variables specification", {
         ),
         palettes=palettes
       ),
-      {}
+      {
+        session$flushReact()
+      }
     ),
     "breaks"
   )

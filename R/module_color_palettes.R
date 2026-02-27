@@ -307,12 +307,13 @@
 }
 
 # Build UI for one variable palette row.
-.color_palettes_row_ui <- function(ns, var_name, spec, row_id, compact=FALSE) {
+.color_palettes_row_ui <- function(ns, var_name, spec, row_id, compact=FALSE,
+                                   selected_palette=NULL, reverse=FALSE, shift=0L) {
   palette_input_id <- paste0("palette_", row_id)
-  preview_output_id <- paste0("preview_", row_id)
   reverse_input_id <- paste0("reverse_", row_id)
   cycle_minus_id <- paste0("cycle_minus_", row_id)
   cycle_plus_id <- paste0("cycle_plus_", row_id)
+  selected_palette <- selected_palette %||% .color_palettes_default_palette(spec$type)
 
   extra_controls <- NULL
 
@@ -342,11 +343,18 @@
           ns(palette_input_id),
           "",
           choices=.color_palettes_palette_choices(spec$type),
-          selected=.color_palettes_default_palette(spec$type),
+          selected=selected_palette,
           width="100%"
         )
 
-  preview <- uiOutput(ns(preview_output_id))
+  preview <- .color_palettes_preview_ui(
+    .color_palettes_build_entry(
+      spec=spec,
+      palette_id=selected_palette,
+      reverse=isTRUE(reverse),
+      shift=shift
+    )
+  )
 
   if(compact) {
     return(list(pal_input, extra_controls))
@@ -356,14 +364,29 @@
 }
 
 # Build the full palette controls UI for all variables.
-.color_palettes_ui <- function(ns, var_names, variables, row_ids, compact=FALSE) {
+.color_palettes_ui <- function(ns, variables, input, compact=FALSE) {
+  var_names <- names(variables)
+  row_ids <- .color_palettes_row_ids(length(var_names))
+
   rows <- lapply(seq_along(var_names), function(i) {
+    spec <- variables[[i]]
+    row_id <- row_ids[i]
+    palette_input_id <- paste0("palette_", row_id)
+    reverse_input_id <- paste0("reverse_", row_id)
+    cycle_minus_id <- paste0("cycle_minus_", row_id)
+    cycle_plus_id <- paste0("cycle_plus_", row_id)
+    selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
+    shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
+
     .color_palettes_row_ui(
       ns=ns,
       var_name=var_names[i],
-      spec=variables[[i]],
-      row_id=row_ids[i],
-      compact=compact
+      spec=spec,
+      row_id=row_id,
+      compact=compact,
+      selected_palette=selected_palette,
+      reverse=isTRUE(input[[reverse_input_id]]),
+      shift=shift
     )
   })
 
@@ -378,6 +401,34 @@
     rows$.colwidths <- c(1, 5, 3, 3)
   }
   do.call(gridLayout, rows)
+}
+
+# Build current palette specification from UI state.
+.color_palettes_current <- function(variables, input) {
+  var_names <- names(variables)
+  row_ids <- .color_palettes_row_ids(length(var_names))
+  out <- stats::setNames(vector("list", length(var_names)), var_names)
+
+  for(i in seq_along(var_names)) {
+    spec <- variables[[i]]
+    row_id <- row_ids[i]
+    palette_input_id <- paste0("palette_", row_id)
+    reverse_input_id <- paste0("reverse_", row_id)
+    cycle_minus_id <- paste0("cycle_minus_", row_id)
+    cycle_plus_id <- paste0("cycle_plus_", row_id)
+
+    selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
+    shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
+
+    out[[i]] <- .color_palettes_build_entry(
+      spec=spec,
+      palette_id=selected_palette,
+      reverse=isTRUE(input[[reverse_input_id]]),
+      shift=shift
+    )
+  }
+
+  out
 }
 
 #' Color Palettes Module UI
@@ -399,9 +450,12 @@ colorPalettesUI <- function(id) {
 #' palettes as a reactive expression.
 #'
 #' @param id Shiny module id (same as passed to [colorPalettesUI()]).
-#' @param variables Named list of variable specifications. Each entry must
-#'   contain `type` (`"categorical"`, `"ordinal"`, or `"continuous"`).
-#'   For discrete types, provide `levels`. For continuous types, provide `breaks`.
+#' @param variables Variable specification as either:
+#'   - a named list, or
+#'   - a reactive value/expression returning a named list.
+#'   Each entry must contain `type` (`"categorical"`, `"ordinal"`, or
+#'   `"continuous"`). For discrete types, provide `levels`. For continuous
+#'   types, provide `breaks`.
 #' @param palettes Optional reactiveVal-like placeholder kept for compatibility.
 #'   If supplied, it must be a function; the module returns its own reactive
 #'   palette specification and does not mutate external state.
@@ -424,7 +478,8 @@ colorPalettesUI <- function(id) {
 #'   )
 #'
 #'   server <- function(input, output, session) {
-#'     palettes <- colorPalettesServer("pal", variables=variables)
+#'     vars <- reactiveVal(variables)
+#'     palettes <- colorPalettesServer("pal", variables=vars)
 #'
 #'     output$pal_keys <- renderPrint(names(palettes()))
 #'   }
@@ -434,7 +489,9 @@ colorPalettesUI <- function(id) {
 #'
 #' @export
 colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE) {
-  variables <- .color_palettes_validate_variables(variables)
+  if(!is.reactive(variables)) {
+    variables <- reactiveVal(variables)
+  }
 
   if(is.null(palettes)) {
     palettes <- reactiveVal(list())
@@ -444,91 +501,24 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
     stop("`palettes` must be a reactiveVal-like function.")
   }
 
-  var_names <- names(variables)
-  row_ids <- .color_palettes_row_ids(length(var_names))
-
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    shift_state <- reactiveVal(stats::setNames(rep(0L, length(var_names)), var_names))
+    variables_validated <- reactive({
+      .color_palettes_validate_variables(variables())
+    })
 
     output$rows <- renderUI({
       .color_palettes_ui(
-          ns=ns,
-          var_names=var_names,
-          variables=variables,
-          row_ids=row_ids,
-          compact=compact
-          )
-
-      #do.call(tagList, rows)
+        ns=ns,
+        variables=variables_validated(),
+        input=input,
+        compact=compact
+      )
     })
-
-    for(i in seq_along(var_names)) {
-      if(variables[[i]]$type != "categorical") {
-        next
-      }
-
-      local({
-        idx <- i
-        var_name <- var_names[idx]
-        cycle_minus_id <- paste0("cycle_minus_", row_ids[idx])
-        cycle_plus_id <- paste0("cycle_plus_", row_ids[idx])
-
-        observeEvent(input[[cycle_plus_id]], {
-          x <- shift_state()
-          x[[var_name]] <- x[[var_name]] + 1L
-          shift_state(x)
-        }, ignoreInit=TRUE)
-
-        observeEvent(input[[cycle_minus_id]], {
-          x <- shift_state()
-          x[[var_name]] <- x[[var_name]] - 1L
-          shift_state(x)
-        }, ignoreInit=TRUE)
-      })
-    }
 
     observe({
-      out <- stats::setNames(vector("list", length(var_names)), var_names)
-
-      for(i in seq_along(var_names)) {
-        var_name <- var_names[i]
-        spec <- variables[[i]]
-        palette_input_id <- paste0("palette_", row_ids[i])
-        reverse_input_id <- paste0("reverse_", row_ids[i])
-        selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
-        out[[i]] <- .color_palettes_build_entry(
-          spec=spec,
-          palette_id=selected_palette,
-          reverse=isTRUE(input[[reverse_input_id]]),
-          shift=shift_state()[[var_name]] %||% 0L
-        )
-      }
-
-      palettes(out)
+      palettes(.color_palettes_current(variables=variables_validated(), input=input))
     })
-
-    for(i in seq_along(var_names)) {
-      local({
-        idx <- i
-        var_name <- var_names[idx]
-        spec <- variables[[idx]]
-        palette_input_id <- paste0("palette_", row_ids[idx])
-        reverse_input_id <- paste0("reverse_", row_ids[idx])
-        preview_output_id <- paste0("preview_", row_ids[idx])
-
-        output[[preview_output_id]] <- renderUI({
-          selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
-          entry <- .color_palettes_build_entry(
-            spec=spec,
-            palette_id=selected_palette,
-            reverse=isTRUE(input[[reverse_input_id]]),
-            shift=shift_state()[[var_name]] %||% 0L
-          )
-          .color_palettes_preview_ui(entry)
-        })
-      })
-    }
 
     return(palettes)
   })

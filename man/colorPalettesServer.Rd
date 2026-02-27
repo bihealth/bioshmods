@@ -12,9 +12,14 @@ colorPalettesServer(id, variables, palettes = NULL, compact = FALSE)
 \arguments{
 \item{id}{Shiny module id (same as passed to \code{\link[=colorPalettesUI]{colorPalettesUI()}}).}
 
-\item{variables}{Named list of variable specifications. Each entry must
-contain \code{type} (\code{"categorical"}, \code{"ordinal"}, or \code{"continuous"}).
-For discrete types, provide \code{levels}. For continuous types, provide \code{breaks}.}
+\item{variables}{Variable specification as either:
+\itemize{
+\item a named list, or
+\item a reactive value/expression returning a named list.
+Each entry must contain \code{type} (\code{"categorical"}, \code{"ordinal"}, or
+\code{"continuous"}). For discrete types, provide \code{levels}. For continuous
+types, provide \code{breaks}.
+}}
 
 \item{palettes}{Optional reactiveVal-like placeholder kept for compatibility.
 If supplied, it must be a function; the module returns its own reactive
@@ -46,7 +51,8 @@ if(interactive()) {
   )
 
   server <- function(input, output, session) {
-    palettes <- colorPalettesServer("pal", variables=variables)
+    vars <- reactiveVal(variables)
+    palettes <- colorPalettesServer("pal", variables=vars)
 
     output$pal_keys <- renderPrint(names(palettes()))
   }
