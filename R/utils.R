@@ -356,3 +356,53 @@ infer_palette_variables <- function(df, ordinal_n_levels=10, cleanup=FALSE) {
 
   out
 }
+
+# Convert stored palette entry into a ggplot color scale spec.
+.cast_palette_to_ggplot <- function(palette_entry) {
+  if(is.null(palette_entry) || !is.list(palette_entry)) {
+    return(NULL)
+  }
+
+  pal_type <- as.character(palette_entry$type %||% "")[1]
+
+  if(pal_type %in% c("categorical", "ordinal")) {
+    vals <- palette_entry$pal
+    if(length(vals) < 1L) {
+      return(NULL)
+    }
+    vals <- as.character(vals)
+
+    if(is.null(names(vals))) {
+      lev <- as.character(palette_entry$levels %||% "")
+      if(length(lev) == length(vals)) {
+        names(vals) <- lev
+      }
+    }
+
+    return(list(type="manual", values=vals))
+  }
+
+  if(pal_type == "continuous") {
+    br <- suppressWarnings(as.numeric(palette_entry$breaks))
+    br <- sort(unique(br[is.finite(br)]))
+    if(length(br) < 2L || !is.function(palette_entry$pal)) {
+      return(NULL)
+    }
+
+    cols <- tryCatch(as.character(palette_entry$pal(br)), error=function(e) character(0))
+    if(length(cols) != length(br)) {
+      return(NULL)
+    }
+
+    lim <- range(br)
+    denom <- lim[2] - lim[1]
+    if(!is.finite(denom) || denom <= 0) {
+      return(NULL)
+    }
+
+    vals <- (br - lim[1]) / denom
+    return(list(type="gradientn", colours=cols, values=vals, limits=lim))
+  }
+
+  NULL
+}

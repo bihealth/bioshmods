@@ -34,13 +34,37 @@
   return(default_covar)
 }
 
+.gene_browser_palette_scale <- function(palettes, dataset, color_by) {
+  if(is.null(palettes) || !isTruthy(color_by) || identical(color_by, "N/A")) {
+    return(NULL)
+  }
+
+  pal_all <- if(is.function(palettes)) palettes() else palettes
+  if(!is.list(pal_all)) {
+    return(NULL)
+  }
+
+  pal_ds <- pal_all
+  if(isTruthy(dataset) && dataset %in% names(pal_all) && is.list(pal_all[[dataset]])) {
+    pal_ds <- pal_all[[dataset]]
+  } else if("default" %in% names(pal_all) && is.list(pal_all[["default"]])) {
+    pal_ds <- pal_all[["default"]]
+  }
+
+  if(!is.list(pal_ds) || !color_by %in% names(pal_ds)) {
+    return(NULL)
+  }
+
+  .cast_palette_to_ggplot(pal_ds[[color_by]])
+}
+
 
 ## Wrapper around plot_gene, mainly to replace "N/A" with NA
 .gene_browser_plot <- function(covar, id, covarXName, covarYName, rld, annot, 
                                groupBy = "N/A", colorBy = "N/A", symbolBy = "N/A", trellisBy="N/A",
                                trellisScales = "fixed",
                                exprs_label = "Expression",
-                               plotType = "box",
+                               plotType = "box", colorScale=NULL,
                                transpose = FALSE) {
   if(covarYName == "Expression") { covarYName <- exprs_label }
   if(covarXName == "Expression") { covarXName <- exprs_label }
@@ -49,7 +73,8 @@
                 expressionLabel = exprs_label,
                 colorBy=colorBy, symbolBy=symbolBy, trellisBy=trellisBy,
                 trellisScales=trellisScales,
-                categoricalPlot=plotType, transpose=transpose)
+                categoricalPlot=plotType, colorScale=colorScale,
+                transpose=transpose)
 
   ## weirdly, the line below is really, really slow
   #.args <- map(.args, ~ if(!is.na(.x) && .x == "N/A") { NA } else { .x })
@@ -197,6 +222,7 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @param description_col name of the column in `annot` which contains the gene
 #'        title / description; use NULL if no such column
 #' @param exprs_label Label to be used for the expression values
+#' @param palettes (optional) reactive value with current color palettes
 #' @return does not return anything useful
 #' @importFrom shiny is.reactivevalues
 #' @examples
@@ -249,7 +275,7 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NULL, 
                                   primary_id="PrimaryID", symbol_col="SYMBOL", description_col="GENENAME", 
                                   annot_linkout=NULL,
-                                  exprs_label = "Expression") {
+                                  exprs_label = "Expression", palettes=NULL) {
 ## XXX make checks
 # stopifnot(is.reactive(gene_id))
 # stopifnot(!is.reactive(covar))
@@ -261,6 +287,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 #                 colnames(annot)))
 # }
 
+  message("Received palettes: ", if(is.null(palettes)) "NULL" else paste(names(palettes), collapse=", "))
   # if we have a single dataset, we need to wrap it into a list
   if(is.data.frame(covar)) {
     covar <- list(default=covar)
@@ -338,6 +365,12 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       },
       content = function(file) {
         save_pdf(file=file, width=8, height=5, draw=function() {
+          color_scale <- .gene_browser_palette_scale(
+            palettes=palettes,
+            dataset=ds(),
+            color_by=input$colorBy
+          )
+
           g <- .gene_browser_plot(covar[[ ds() ]], g_id(), 
                                   input$covarXName, 
                                   input$covarYName, 
@@ -345,7 +378,9 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
                                   annot[[ ds() ]], 
                                   input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
                                   trellisScales = input$trellisScales,
-                                  plotType = input$plotType, transpose = input$transposePlot)
+                                  exprs_label = exprs_label,
+                                  plotType = input$plotType, colorScale=color_scale,
+                                  transpose = input$transposePlot)
           print(g)
         })
       }
@@ -424,10 +459,17 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       enable("save")
       
       message(sprintf("plotting started with dataset=%s and gene=%s", ds(), g_id()))
+      color_scale <- .gene_browser_palette_scale(
+        palettes=palettes,
+        dataset=ds(),
+        color_by=input$colorBy
+      )
+
       .gene_browser_plot(covar[[ds()]], g_id(), input$covarXName, input$covarYName, exprs[[ ds() ]], annot[[ ds() ]], 
                          input$groupBy, input$colorBy, input$symbolBy, input$trellisBy,
                          trellisScales = input$trellisScales,
-                         exprs_label = exprs_label, plotType = input$plotType, transpose = input$transposePlot) +
+                         exprs_label = exprs_label, plotType = input$plotType, colorScale=color_scale,
+                         transpose = input$transposePlot) +
                                     theme(text=element_text(size=input$fontSize))
     }, width=fig_size$width, height=fig_size$height) })
   })

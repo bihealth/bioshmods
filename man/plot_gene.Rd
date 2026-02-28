@@ -17,6 +17,7 @@ plot_gene(
   groupBy = NA,
   colorBy = NA,
   symbolBy = NA,
+  colorScale = NULL,
   trellisBy = NA,
   trellisScales = c("fixed", "free", "free_x", "free_y"),
   categoricalPlot = c("box", "violin", "raincloud"),
@@ -51,6 +52,9 @@ function). If empty, it will be loaded.}
 \item{colorBy}{name of the covariate column by which to color the data}
 
 \item{symbolBy}{name of the covariate column by which to select point symbols}
+
+\item{colorScale}{optional color scale specification as produced by
+\code{.cast_palette_to_ggplot()}}
 
 \item{trellisBy}{name of the covariate column for use in a trellis (multipanel) plot}
 

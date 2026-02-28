@@ -596,6 +596,8 @@ plot_ly_pca <- function(mtx, covariate_data, threeD=TRUE, cov_default=NULL) {
 #' @param groupBy name of the covariate column by which to group and connect by lines the data points 
 #' @param symbolBy name of the covariate column by which to select point symbols
 #' @param colorBy name of the covariate column by which to color the data
+#' @param colorScale optional color scale specification as produced by
+#'        `.cast_palette_to_ggplot()`
 #' @param trellisBy name of the covariate column for use in a trellis (multipanel) plot
 #' @param trellisScales scales argument passed to [ggplot2::facet_wrap()] when
 #'        `trellisBy` is set. One of `"fixed"`, `"free"`, `"free_x"`, `"free_y"`.
@@ -615,6 +617,7 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
                                expressionLabel="Expression",
                                yCovar=expressionLabel, 
                                groupBy = NA, colorBy = NA, symbolBy = NA,
+                               colorScale = NULL,
                                trellisBy=NA,
                                trellisScales = c("fixed", "free", "free_x", "free_y"),
                                categoricalPlot = c("box", "violin", "raincloud"),
@@ -635,6 +638,10 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
     title <- sprintf("%s (%s)", id, annot[ match(id, annot[[annot_id_col]]), ][[annot_symb_col]])
   } else {
     title <- id
+  }
+
+  if(!is.na(colorBy) && is.list(colorScale) && identical(colorScale$type, "manual")) {
+    df[[colorBy]] <- as.character(df[[colorBy]])
   }
 
   if(!is.na(colorBy)) {
@@ -677,6 +684,18 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
 
   if(!is.na(trellisBy)) {
     g <- g + facet_wrap(trellisBy, scales=trellisScales)
+  }
+
+  if(!is.na(colorBy) && is.list(colorScale)) {
+    if(identical(colorScale$type, "manual") && length(colorScale$values) > 0L) {
+      g <- g + scale_color_manual(values=colorScale$values, drop=FALSE)
+    } else if(identical(colorScale$type, "gradientn") && length(colorScale$colours) > 1L) {
+      g <- g + scale_color_gradientn(
+        colours=colorScale$colours,
+        values=colorScale$values,
+        limits=colorScale$limits
+      )
+    }
   }
 
 

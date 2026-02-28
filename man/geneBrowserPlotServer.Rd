@@ -18,7 +18,8 @@ geneBrowserPlotServer(
   symbol_col = "SYMBOL",
   description_col = "GENENAME",
   annot_linkout = NULL,
-  exprs_label = "Expression"
+  exprs_label = "Expression",
+  palettes = NULL
 )
 }
 \arguments{
@@ -53,6 +54,8 @@ title / description; use NULL if no such column}
 \item{annot_linkout}{a list; see Details.}
 
 \item{exprs_label}{Label to be used for the expression values}
+
+\item{palettes}{(optional) reactive value with current color palettes}
 }
 \value{
 does not return anything useful
