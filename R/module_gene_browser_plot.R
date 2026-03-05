@@ -83,8 +83,8 @@
   if(.args$colorBy == "N/A")    .args$colorBy   <- NA
   if(.args$symbolBy == "N/A")   .args$symbolBy  <- NA
   if(.args$trellisBy == "N/A")  .args$trellisBy <- NA
-  message(sprintf("Calling plot_gene with arguments: \n\tid=%s\n\txCovar=%s\n\tyCovar=%s\n\tgroupBy=%s\n\tcolorBy=%s\n\tsymbolBy=%s\n\ttrellisBy=%s\n\ttrellisScales=%s\n\tcategoricalPlot=%s\n\ttranspose=%s",
-                  .args$id, .args$xCovar, .args$yCovar, .args$groupBy, .args$colorBy, .args$symbolBy, .args$trellisBy, .args$trellisScales, .args$categoricalPlot, .args$transpose))
+  #message(sprintf("Calling plot_gene with arguments: \n\tid=%s\n\txCovar=%s\n\tyCovar=%s\n\tgroupBy=%s\n\tcolorBy=%s\n\tsymbolBy=%s\n\ttrellisBy=%s\n\ttrellisScales=%s\n\tcategoricalPlot=%s\n\ttranspose=%s",
+  #                .args$id, .args$xCovar, .args$yCovar, .args$groupBy, .args$colorBy, .args$symbolBy, .args$trellisBy, .args$trellisScales, .args$categoricalPlot, .args$transpose))
   do.call(plot_gene, .args)
 }
 
@@ -271,6 +271,7 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' }
 #' @seealso [geneBrowserTableServer()], and [gene_browser()] for example
 #' code.
+#' @importFrom shiny updateSelectizeInput
 #' @export
 geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NULL, 
                                   primary_id="PrimaryID", symbol_col="SYMBOL", description_col="GENENAME", 
@@ -287,7 +288,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 #                 colnames(annot)))
 # }
 
-  message("Received palettes: ", if(is.null(palettes)) "NULL" else paste(names(palettes), collapse=", "))
+  #message("Received palettes: ", if(is.null(palettes)) "NULL" else paste(names(palettes), collapse=", "))
   # if we have a single dataset, we need to wrap it into a list
   if(is.data.frame(covar)) {
     covar <- list(default=covar)
@@ -458,7 +459,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       if(is.na(g_id())) { return(NULL) }
       enable("save")
       
-      message(sprintf("plotting started with dataset=%s and gene=%s", ds(), g_id()))
+      #message(sprintf("plotting started with dataset=%s and gene=%s", ds(), g_id()))
       color_scale <- .gene_browser_palette_scale(
         palettes=palettes,
         dataset=ds(),

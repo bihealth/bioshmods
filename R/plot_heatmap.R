@@ -1,11 +1,21 @@
 # Build a sample-ordered covariate table for heatmap annotations.
 # Requires an explicit sample_id_col in covar.
+.plot_heatmap_log <- function(...) {
+  .bioshmods_log(..., .prefix="plot_heatmap")
+}
+
 .plot_heatmap_prepare_covar <- function(covar, sample_ids, sample_id_col="SampleID", sel_annot=NULL) {
+  .plot_heatmap_log("prepare_covar called; sample_id_col='", sample_id_col,
+                    "', n_sample_ids=", as.character(length(sample_ids)),
+                    ", sel_annot={", paste(sel_annot %||% character(0), collapse=","), "}.")
   if(is.null(covar)) {
+    .plot_heatmap_log("covar is NULL; no top annotations will be generated.")
     return(NULL)
   }
 
   covar <- as.data.frame(covar, stringsAsFactors=FALSE)
+  .plot_heatmap_log("covar columns={", paste(colnames(covar), collapse=","), "}; nrow=",
+                    as.character(nrow(covar)), ".")
   if(!sample_id_col %in% colnames(covar)) {
     stop(sprintf("`sample_id_col` ('%s') not found in `covar`.", sample_id_col))
   }
@@ -13,11 +23,13 @@
   sel_annot <- unique(as.character(sel_annot))
   sel_annot <- sel_annot[!is.na(sel_annot) & sel_annot != ""]
   if(length(sel_annot) < 1L) {
+    .plot_heatmap_log("no selected annotation columns after cleanup; returning NULL.")
     return(NULL)
   }
 
   missing_annot <- setdiff(sel_annot, colnames(covar))
   if(length(missing_annot) > 0L) {
+    .plot_heatmap_log("missing annotation columns in covar: ", paste(missing_annot, collapse=","))
     stop(sprintf(
       "`sel_annot` column(s) not found in `covar`: %s",
       paste(missing_annot, collapse=", ")
@@ -32,6 +44,8 @@
   if(length(intersect(sample_ids, covar_ids)) < 1L) {
     stop("No matching samples between `exprs` column names and `covar[[sample_id_col]]`.")
   }
+  .plot_heatmap_log("matched samples between expression and covar: ",
+                    as.character(length(intersect(sample_ids, covar_ids))), ".")
 
   # Keep first occurrence for duplicated sample IDs.
   dedup <- !duplicated(covar_ids)
@@ -40,12 +54,16 @@
 
   ann_cols <- setdiff(sel_annot, sample_id_col)
   if(length(ann_cols) < 1L) {
+    .plot_heatmap_log("annotation columns only contained sample_id_col; returning NULL.")
     return(NULL)
   }
 
   idx <- match(sample_ids, covar_ids)
   ann_df <- covar[idx, ann_cols, drop=FALSE]
   rownames(ann_df) <- sample_ids
+  .plot_heatmap_log("prepared annotation data frame with nrow=", as.character(nrow(ann_df)),
+                    ", ncol=", as.character(ncol(ann_df)), ", columns={",
+                    paste(colnames(ann_df), collapse=","), "}.")
   ann_df
 }
 
@@ -61,14 +79,19 @@
 .plot_heatmap_row_labels <- function(gene_ids, annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL) {
   gene_ids <- as.character(gene_ids)
   row_labels <- gene_ids
+  .plot_heatmap_log("row label resolver called; n_genes=", as.character(length(gene_ids)),
+                    ", primary_id_col='", primary_id_col,
+                    "', annot_row_col='", as.character(annot_row_col)[1], "'.")
 
   annot_row_col <- as.character(annot_row_col)[1]
   if(is.null(annot) || is.na(annot_row_col) || !nzchar(annot_row_col)) {
+    .plot_heatmap_log("annotation or annot_row_col missing; using primary IDs as row labels.")
     return(row_labels)
   }
 
   annot <- as.data.frame(annot, stringsAsFactors=FALSE)
   if(!annot_row_col %in% colnames(annot)) {
+    .plot_heatmap_log("annot_row_col not found in annot; using primary IDs as row labels.")
     return(row_labels)
   }
   if(!primary_id_col %in% colnames(annot)) {
@@ -98,6 +121,8 @@
   lbl <- as.character(hm_df[[annot_row_col]])
   fallback <- as.character(hm_df[[primary_id_col]])
   lbl[is.na(lbl) | lbl == ""] <- fallback[is.na(lbl) | lbl == ""]
+  .plot_heatmap_log("row labels resolved from annotation; non-empty labels=",
+                    as.character(sum(!is.na(lbl) & lbl != "")), ".")
   lbl
 }
 
@@ -174,6 +199,9 @@
 plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
                          annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL,
                          sel_annot=NULL, legend=TRUE, palettes = NULL, col = NULL) {
+  .plot_heatmap_log("plot_heatmap called; exprs dim=", paste(dim(exprs), collapse="x"),
+                    ", genes requested=", as.character(length(genes)),
+                    ", sample_id_col='", sample_id_col, "'.")
   exprs <- as.matrix(exprs)
   sample_id_col <- as.character(sample_id_col)[1]
   primary_id_col <- as.character(primary_id_col)[1]
@@ -199,11 +227,13 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
   if(length(genes) < 1L) {
     stop("`genes` is empty.")
   }
+  .plot_heatmap_log("genes after cleanup=", as.character(length(genes)), ".")
 
   genes <- intersect(genes, rownames(exprs))
   if(length(genes) < 1L) {
     stop("None of the selected genes were found in `exprs` row names.")
   }
+  .plot_heatmap_log("genes found in expression matrix=", as.character(length(genes)), ".")
 
   exprs <- exprs[genes, , drop=FALSE]
   exprs <- .plot_heatmap_scale_rows(exprs)
@@ -226,9 +256,15 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     if(!is.null(palettes)) {
       pal_anno <- lapply(palettes, \(x) x$pal)
     }
+    .plot_heatmap_log("building top annotation with columns={",
+                      paste(colnames(ann_df), collapse=","), "} and palette keys={",
+                      paste(names(pal_anno %||% list()), collapse=","), "}.")
     top_anno <- ComplexHeatmap::HeatmapAnnotation(df=ann_df, show_legend=isTRUE(legend), col=pal_anno)
+  } else {
+    .plot_heatmap_log("no top annotation columns available; drawing heatmap without annotation bars.")
   }
 
+  .plot_heatmap_log("creating ComplexHeatmap object; legend=", as.character(isTRUE(legend)), ".")
   ComplexHeatmap::Heatmap(
     exprs,
     name="Expression",

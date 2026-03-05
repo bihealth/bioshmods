@@ -562,6 +562,7 @@ colorPalettesUI <- function(id) {
 #'   shinyApp(ui, server)
 #' }
 #'
+#' @importFrom shiny tags
 #' @export
 colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE) {
   if(!is.reactive(variables)) {

@@ -163,3 +163,38 @@ test_that("geneGroupSelectorServer uses server-level DGE column params", {
 
   expect_equal(isolate(selected_ids()), c("g1", "g2", "g4"))
 })
+
+test_that("geneGroupSelectorServer synchronizes dataset reactiveVal with UI", {
+  annot <- list(
+    ds_a = data.frame(
+      PrimaryID = c("g1", "g2"),
+      SYMBOL = c("A", "B"),
+      stringsAsFactors = FALSE
+    ),
+    ds_b = data.frame(
+      PrimaryID = c("h1", "h2"),
+      SYMBOL = c("C", "D"),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  dataset <- reactiveVal("ds_b")
+
+  testServer(
+    geneGroupSelectorServer,
+    args = list(
+      annot = annot,
+      dataset = dataset
+    ),
+    {
+      session$flushReact()
+      expect_equal(isolate(session$returned$dataset()), "ds_b")
+
+      session$setInputs(dataset = "ds_a")
+      session$flushReact()
+      expect_equal(isolate(session$returned$dataset()), "ds_a")
+    }
+  )
+
+  expect_equal(isolate(dataset()), "ds_a")
+})

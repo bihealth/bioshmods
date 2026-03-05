@@ -214,3 +214,62 @@ test_that("heatmapServer limits shown genes and displays warning", {
     }
   )
 })
+
+test_that("heatmapServer sanitizes selected covariates when dataset changes", {
+  annot <- list(
+    ds_a = data.frame(
+      PrimaryID = paste0("g", 1:4),
+      SYMBOL = LETTERS[1:4],
+      stringsAsFactors = FALSE
+    ),
+    ds_b = data.frame(
+      PrimaryID = paste0("g", 1:4),
+      SYMBOL = LETTERS[1:4],
+      stringsAsFactors = FALSE
+    )
+  )
+
+  set.seed(42)
+  exprs <- list(
+    ds_a = matrix(rnorm(16), nrow = 4, dimnames = list(annot$ds_a$PrimaryID, paste0("s", 1:4))),
+    ds_b = matrix(rnorm(16), nrow = 4, dimnames = list(annot$ds_b$PrimaryID, paste0("s", 1:4)))
+  )
+
+  covar <- list(
+    ds_a = data.frame(
+      SampleID = paste0("s", 1:4),
+      group_a = c("A", "A", "B", "B"),
+      stringsAsFactors = FALSE
+    ),
+    ds_b = data.frame(
+      SampleID = paste0("s", 1:4),
+      batch_b = c("X", "X", "Y", "Y"),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  testServer(
+    heatmapServer,
+    args = list(
+      annot = annot,
+      exprs = exprs,
+      covar = covar
+    ),
+    {
+      session$setInputs(`gene_selector-modus` = "by_name")
+      session$setInputs(`gene_selector-name_list` = "g1,g2")
+      session$setInputs(sel_annot = "group_a")
+      session$flushReact()
+
+      expect_equal(isolate(session$returned$dataset()), "ds_a")
+      expect_true(methods::is(isolate(session$returned$heatmap()), "Heatmap"))
+
+      session$setInputs(`gene_selector-dataset` = "ds_b")
+      session$flushReact()
+
+      expect_equal(isolate(session$returned$dataset()), "ds_b")
+      expect_true(methods::is(isolate(session$returned$heatmap()), "Heatmap"))
+      expect_true(is.null(isolate(session$returned$heatmap())@top_annotation))
+    }
+  )
+})

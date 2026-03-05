@@ -1,23 +1,32 @@
 # Parse comma/space separated gene identifiers from text input.
 # Returns unique non-empty tokens in their original order.
+.gene_group_log <- function(...) {
+  .bioshmods_log(..., .prefix="gene_group_selector")
+}
+
 .gene_group_parse_gene_input <- function(x) {
   x <- x %||% ""
   x <- paste(x, collapse=" ")
   tokens <- unlist(strsplit(x, "[,[:space:]]+"))
   tokens <- trimws(tokens)
   tokens <- tokens[!is.na(tokens) & tokens != ""]
-  unique(tokens)
+  tokens <- unique(tokens)
+  .gene_group_log("parsed gene input tokens n=", as.character(length(tokens)), ".")
+  tokens
 }
 
 # Read a gene list file uploaded through shiny::fileInput.
 # Returns parsed identifiers, or character(0) when input/file is missing.
 .gene_group_read_gene_file <- function(file_input) {
   if(is.null(file_input) || is.null(file_input$datapath) || !nzchar(file_input$datapath)) {
+    .gene_group_log("gene file input missing; returning empty list.")
     return(character(0))
   }
   if(!file.exists(file_input$datapath)) {
+    .gene_group_log("gene file path does not exist: ", file_input$datapath)
     return(character(0))
   }
+  .gene_group_log("reading gene file from: ", file_input$datapath)
   txt <- readLines(file_input$datapath, warn=FALSE)
   .gene_group_parse_gene_input(txt)
 }
@@ -78,11 +87,14 @@
 # Normalize annotation input to a named list keyed by dataset.
 # Accepts a single data frame or a list of data frames.
 .gene_group_normalize_annot <- function(annot) {
+  .gene_group_log("normalize annot input class=", paste(class(annot), collapse="/"), ".")
   if(is.data.frame(annot)) {
+    .gene_group_log("annot provided as data.frame; assigning dataset 'default'.")
     return(list(default=annot))
   }
   if(.gene_group_is_named_df_list(annot)) {
     annot <- .gene_group_ensure_names(annot, "dataset_")
+    .gene_group_log("annot datasets={", paste(names(annot), collapse=","), "}.")
     return(annot)
   }
   stop("`annot` must be a data frame or a named list of data frames.")
@@ -91,7 +103,10 @@
 # Normalize expression input to a named list aligned to datasets.
 # Supports single matrix/data.frame or per-dataset list input.
 .gene_group_normalize_exprs <- function(exprs, datasets) {
+  .gene_group_log("normalize exprs input class=", paste(class(exprs), collapse="/"),
+                  "; expected datasets={", paste(datasets, collapse=","), "}.")
   if(is.null(exprs)) {
+    .gene_group_log("exprs is NULL.")
     return(NULL)
   }
 
@@ -99,6 +114,7 @@
     if(length(datasets) != 1L) {
       stop("If multiple datasets are present, `exprs` must be a named list.")
     }
+    .gene_group_log("exprs provided as matrix/data.frame for single dataset '", datasets, "'.")
     return(stats::setNames(list(exprs), datasets))
   }
 
@@ -112,16 +128,21 @@
   }
   missing_ds <- setdiff(datasets, names(exprs))
   if(length(missing_ds) > 0L) {
+    .gene_group_log("exprs missing datasets: ", paste(missing_ds, collapse=","))
     stop(sprintf("`exprs` is missing dataset(s): %s", paste(missing_ds, collapse=", ")))
   }
 
+  .gene_group_log("normalized exprs datasets={", paste(datasets, collapse=","), "}.")
   exprs[datasets]
 }
 
 # Normalize contrast input to a named list aligned to datasets.
 # Supports single contrast list or per-dataset nested contrast lists.
 .gene_group_normalize_cntr <- function(cntr, datasets) {
+  .gene_group_log("normalize cntr input class=", paste(class(cntr), collapse="/"),
+                  "; expected datasets={", paste(datasets, collapse=","), "}.")
   if(is.null(cntr)) {
+    .gene_group_log("cntr is NULL.")
     return(NULL)
   }
 
@@ -129,6 +150,7 @@
     if(length(datasets) != 1L) {
       stop("If multiple datasets are present, `cntr` must be a named list of contrast lists.")
     }
+    .gene_group_log("cntr provided as contrast list for single dataset '", datasets, "'.")
     return(stats::setNames(list(cntr), datasets))
   }
 
@@ -142,9 +164,11 @@
   }
   missing_ds <- setdiff(datasets, names(cntr))
   if(length(missing_ds) > 0L) {
+    .gene_group_log("cntr missing datasets: ", paste(missing_ds, collapse=","))
     stop(sprintf("`cntr` is missing dataset(s): %s", paste(missing_ds, collapse=", ")))
   }
 
+  .gene_group_log("normalized cntr datasets={", paste(datasets, collapse=","), "}.")
   cntr[datasets]
 }
 
@@ -311,6 +335,8 @@
 
   ordered <- .gene_group_normalize_mode_order(mode_order)
   ordered <- c(intersect(ordered, available), setdiff(available, ordered))
+  .gene_group_log("available modes={", paste(available, collapse=","),
+                  "}; ordered modes={", paste(ordered, collapse=","), "}.")
   stats::setNames(ordered, mode_labels[ordered])
 }
 
@@ -322,11 +348,18 @@
 
 # Build dataset selector UI.
 # Hidden when only one dataset is available.
-.gene_group_dataset_input_ui <- function(ns, datasets) {
-  if(length(datasets) < 2L) {
-    return(hidden(selectizeInput(ns("dataset"), "Dataset", choices=datasets, selected=datasets[1])))
+.gene_group_dataset_input_ui <- function(ns, datasets, selected=NULL) {
+  if(!isTruthy(selected) || !selected %in% datasets) {
+    selected <- datasets[1]
   }
-  selectizeInput(ns("dataset"), "Dataset", choices=datasets, selected=datasets[1])
+
+  if(length(datasets) < 2L) {
+    .gene_group_log("dataset UI hidden (single dataset='", selected, "').")
+    return(hidden(selectizeInput(ns("dataset"), "Dataset", choices=datasets, selected=selected)))
+  }
+  .gene_group_log("dataset UI shown; datasets={", paste(datasets, collapse=","),
+                  "}, selected='", selected, "'.")
+  selectizeInput(ns("dataset"), "Dataset", choices=datasets, selected=selected)
 }
 
 # Controls for name-based selection mode.
@@ -567,6 +600,8 @@
   name_ids <- .gene_group_parse_gene_input(name_list)
   file_ids <- .gene_group_read_gene_file(name_file)
   query_ids <- unique(c(name_ids, file_ids))
+  .gene_group_log("select_by_name using column='", id_col, "'; query_ids n=",
+                  as.character(length(query_ids)), ".")
   .gene_group_match_annot_rows(ann_df, id_col, query_ids)
 }
 
@@ -574,11 +609,13 @@
 .gene_group_select_by_expression <- function(ann_df, expr_ds, primary_id, metric="variance", top_mode="n", top_value=100) {
   empty_df <- .gene_group_empty_annot(ann_df)
   if(is.null(expr_ds)) {
+    .gene_group_log("select_by_expression skipped: expr_ds is NULL.")
     return(empty_df)
   }
 
   expr_ds <- as.matrix(expr_ds)
   if(nrow(expr_ds) < 1L || is.null(rownames(expr_ds))) {
+    .gene_group_log("select_by_expression skipped: expression has no rows or rownames.")
     return(empty_df)
   }
 
@@ -589,15 +626,20 @@
   }
   score <- score[!is.na(score)]
   if(length(score) == 0L) {
+    .gene_group_log("select_by_expression skipped: no finite scores.")
     return(empty_df)
   }
 
   k <- .gene_group_top_k(length(score), top_mode, top_value)
   if(k < 1L) {
+    .gene_group_log("select_by_expression skipped: top-k resolved to 0.")
     return(empty_df)
   }
 
   ids <- names(sort(score, decreasing=TRUE))[seq_len(k)]
+  .gene_group_log("select_by_expression metric='", metric, "', top_mode='", top_mode,
+                  "', top_value=", as.character(top_value), ", selected n=",
+                  as.character(length(ids)), ".")
   .gene_group_match_annot_rows(ann_df, primary_id, ids)
 }
 
@@ -667,21 +709,28 @@
                                       rank_mode="p_first", top_mode="all", top_value=100) {
   empty_df <- .gene_group_empty_annot(ann_df)
   if(is.null(cntr_ds) || length(cntr_ds) < 1L) {
+    .gene_group_log("select_by_dge skipped: cntr_ds is NULL/empty.")
     return(empty_df)
   }
 
   contrasts <- intersect(contrasts, names(cntr_ds))
   if(length(contrasts) == 0L) {
+    .gene_group_log("select_by_dge skipped: no matching contrasts selected.")
     return(empty_df)
   }
 
   if(!isTruthy(p_col) || !isTruthy(lfc_col) || (isTRUE(require_fdr) && !isTruthy(fdr_col))) {
+    .gene_group_log("select_by_dge skipped: invalid DGE column configuration ",
+                    "(p_col='", as.character(p_col), "', lfc_col='", as.character(lfc_col),
+                    "', fdr_col='", as.character(fdr_col), "', require_fdr=",
+                    as.character(isTRUE(require_fdr)), ").")
     return(empty_df)
   }
 
   p_thr <- suppressWarnings(as.numeric(p_thr)[1])
   lfc_thr <- suppressWarnings(as.numeric(lfc_thr)[1])
   if(is.na(p_thr) || is.na(lfc_thr)) {
+    .gene_group_log("select_by_dge skipped: invalid numeric thresholds.")
     return(empty_df)
   }
 
@@ -697,6 +746,7 @@
     lfc_thr=lfc_thr
   )
   if(is.null(dge_rows) || nrow(dge_rows) == 0L) {
+    .gene_group_log("select_by_dge: no rows passed filters.")
     return(empty_df)
   }
 
@@ -704,11 +754,18 @@
   if(top_mode %in% c("n", "pct")) {
     k <- .gene_group_top_k(nrow(rank_df), top_mode, top_value)
     if(k < 1L) {
+      .gene_group_log("select_by_dge: top filter reduced selection to 0.")
       return(empty_df)
     }
     rank_df <- rank_df[seq_len(k), , drop=FALSE]
   }
 
+  .gene_group_log(
+    "select_by_dge contrasts={", paste(contrasts, collapse=","), "}, rank_mode='", rank_mode,
+    "', top_mode='", top_mode, "', top_value=", as.character(top_value),
+    ", thresholds(p=", as.character(p_thr), ", lfc=", as.character(lfc_thr),
+    "), selected n=", as.character(nrow(rank_df)), "."
+  )
   .gene_group_match_annot_rows(ann_df, primary_id, rank_df$id)
 }
 
@@ -717,6 +774,7 @@
                                             dge_pval_col=NULL, dge_lfc_col=NULL, dge_fdr_col=NULL,
                                             expr_ds=NULL, cntr_ds=NULL, input_values=list(),
                                             defaults=.gene_group_default_settings()) {
+  .gene_group_log("selected_annotation dispatch mode='", mode, "'.")
   if(mode == "by_name") {
     name_id_col <- input_values$name_id_col %||% primary_id
     name_id_col <- as.character(name_id_col)[1]
@@ -819,6 +877,8 @@ geneGroupSelectorUI <- function(id) {
 #' @param selected_ids optional `reactiveVal()` that will be updated
 #'   with the currently selected PrimaryIDs (column `primary_id`) as a
 #'   character vector
+#' @param dataset optional `reactiveVal()` that stores the currently selected
+#'   dataset name. If `NULL`, it is initialized internally with `reactiveVal()`.
 #' @return A list with reactives: `genes`, `annotation`, `dataset`, and `modus`.
 #' @examples
 #' ## Minimal example
@@ -900,7 +960,9 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
                                     dge_lfc_col=NULL,
                                     dge_fdr_col=NULL,
                                     defaults=NULL,
-                                    selected_ids=NULL) {
+                                    selected_ids=NULL,
+                                    dataset=NULL) {
+  .gene_group_log("geneGroupSelectorServer init id='", id, "'.")
   annot <- .gene_group_normalize_annot(annot)
   for(ds in names(annot)) {
     if(!primary_id %in% colnames(annot[[ds]])) {
@@ -912,6 +974,9 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
     if(!inherits(selected_ids, "reactiveVal")) {
       stop("`selected_ids` must be NULL or a `reactiveVal()`.")
     }
+  }
+  if(!is.null(dataset) && !inherits(dataset, "reactiveVal")) {
+    stop("`dataset` must be NULL or a `reactiveVal()`.")
   }
 
   defaults <- .gene_group_normalize_defaults(defaults)
@@ -929,16 +994,22 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
     dge_fdr_col <- NULL
   }
   datasets <- names(annot)
+  dataset <- dataset %||% reactiveVal()
   exprs <- .gene_group_normalize_exprs(exprs, datasets)
   cntr <- .gene_group_normalize_cntr(cntr, datasets)
   modes <- .gene_group_modes(!is.null(exprs), !is.null(cntr), mode_order=mode_order)
+  .gene_group_log("server datasets={", paste(datasets, collapse=","), "}; modes={",
+                  paste(unname(modes), collapse=","), "}.")
 
   moduleServer(id, function(input, output, session) {
+    .gene_group_log("moduleServer started for id='", id, "'.")
     output$dataset_ui <- renderUI({
-      .gene_group_dataset_input_ui(session$ns, datasets)
+      .gene_group_log("rendering dataset UI with dataset()='", as.character(dataset()), "'.")
+      .gene_group_dataset_input_ui(session$ns, datasets, selected=dataset())
     })
 
     observeEvent(TRUE, {
+      .gene_group_log("initializing modus choices={", paste(unname(modes), collapse=","), "}.")
       shiny::updateSelectizeInput(
         session=session,
         inputId="modus",
@@ -948,20 +1019,33 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       )
     }, once=TRUE)
 
-    dataset_selected <- reactive({
-      if(length(datasets) == 1L) {
-        return(datasets[1])
-      }
-      .ds <- input$dataset
+    observe({
+      .ds <- dataset()
       if(!isTruthy(.ds) || !.ds %in% datasets) {
-        return(datasets[1])
+        .gene_group_log("dataset reactive invalid ('", as.character(.ds),
+                        "'); resetting to '", datasets[1], "'.")
+        isolate({ dataset(datasets[1]) })
       }
-      .ds
     })
 
+    observeEvent(input$dataset, {
+      .ds <- input$dataset
+      if(!isTruthy(.ds) || !.ds %in% datasets) {
+        .ds <- datasets[1]
+      }
+      .gene_group_log("dataset input changed to '", as.character(input$dataset),
+                      "'; effective dataset='", .ds, "'.")
+      isolate({ 
+        if(!identical(dataset(), .ds)) {
+          dataset(.ds)
+        }
+      })
+    }, ignoreInit=FALSE)
+
     output$modus_controls <- renderUI({
-      ds <- dataset_selected()
+      ds <- dataset()
       mode <- input$modus %||% unname(modes[1])
+      .gene_group_log("rendering modus controls for dataset='", ds, "', mode='", mode, "'.")
       isolate({
       .gene_group_modus_controls_ui(
         ns=session$ns,
@@ -991,9 +1075,9 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
     })
 
     selected_annotation <- reactive({
-      ds <- dataset_selected()
+      ds <- dataset()
       mode <- input$modus %||% unname(modes[1])
-      .gene_group_selected_annotation(
+      out <- .gene_group_selected_annotation(
         mode=mode,
         ann_df=annot[[ds]],
         primary_id=primary_id,
@@ -1019,21 +1103,29 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
           dge_top_value=input$dge_top_value
         )
       )
+      .gene_group_log("selected_annotation dataset='", ds, "', mode='", mode,
+                      "' -> nrows=", as.character(nrow(out)), ".")
+      out
     })
 
     selected_primary_ids <- reactive({
       sel <- selected_annotation()
       if(nrow(sel) == 0L) {
+        .gene_group_log("selected_primary_ids: no rows selected.")
         return(character(0))
       }
 
       ids <- as.character(sel[[primary_id]])
       ids <- ids[!is.na(ids) & ids != ""]
-      unique(ids)
+      ids <- unique(ids)
+      .gene_group_log("selected_primary_ids n=", as.character(length(ids)), ".")
+      ids
     })
 
     observe({
       if(!is.null(selected_ids)) {
+        .gene_group_log("updating external selected_ids reactiveVal with n=",
+                        as.character(length(selected_primary_ids())), ".")
         selected_ids(selected_primary_ids())
       }
     })
@@ -1044,8 +1136,9 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
 
     output$save_genes <- downloadHandler(
       filename = function() {
-        ds <- dataset_selected()
+        ds <- dataset()
         md <- input$modus %||% unname(modes[1])
+        .gene_group_log("preparing gene export filename for dataset='", ds, "', mode='", md, "'.")
         sprintf(
           "selected_genes_%s_%s.txt",
           sanitize_filename(ds, "dataset"),
@@ -1053,6 +1146,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
         )
       },
       content = function(file) {
+        .gene_group_log("writing selected genes to file='", file, "'; n=",
+                        as.character(length(selected_primary_ids())), ".")
         writeLines(selected_primary_ids(), con=file)
       }
     )
@@ -1060,7 +1155,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
     return(list(
       genes=selected_primary_ids,
       annotation=selected_annotation,
-      dataset=dataset_selected,
+      dataset=dataset,
       modus=reactive(input$modus %||% unname(modes[1]))
     ))
   })

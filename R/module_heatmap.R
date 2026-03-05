@@ -1,7 +1,19 @@
 # Normalize covariates to dataset-keyed list form.
 # Supports single-data-frame and multi-dataset list inputs.
+.heatmap_log <- function(...) {
+  .bioshmods_log(..., .prefix="heatmap")
+}
+
 .heatmap_normalize_covar <- function(covar, datasets) {
+  .heatmap_log(
+    "normalize covar called with datasets={",
+    paste(datasets, collapse=","),
+    "}, covar class=",
+    paste(class(covar), collapse="/")
+  )
+
   if(is.null(covar)) {
+    .heatmap_log("covar is NULL; creating empty covar list for all datasets.")
     return(stats::setNames(vector("list", length(datasets)), datasets))
   }
 
@@ -9,6 +21,7 @@
     if(length(datasets) != 1L) {
       stop("If multiple datasets are present, `covar` must be a named list.")
     }
+    .heatmap_log("covar is a data.frame; assigning to dataset '", datasets, "'.")
     return(stats::setNames(list(covar), datasets))
   }
 
@@ -29,9 +42,11 @@
 
   missing_ds <- setdiff(datasets, names(covar))
   if(length(missing_ds) > 0L) {
+    .heatmap_log("covar missing datasets: ", paste(missing_ds, collapse=","))
     stop(sprintf("`covar` is missing dataset(s): %s", paste(missing_ds, collapse=", ")))
   }
 
+  .heatmap_log("normalized covar datasets={", paste(datasets, collapse=","), "}.")
   covar[datasets]
 }
 
@@ -48,20 +63,36 @@
 # Excludes the sample ID column used for joining.
 .heatmap_annotation_choices <- function(covar_ds, sample_id_col="SampleID") {
   if(is.null(covar_ds) || !is.data.frame(covar_ds) || ncol(covar_ds) < 1L) {
+    .heatmap_log("annotation choices: covar is NULL/invalid; returning empty choices.")
     return(character(0))
   }
 
-  setdiff(colnames(covar_ds), sample_id_col)
+  choices <- setdiff(colnames(covar_ds), sample_id_col)
+  .heatmap_log(
+    "annotation choices from covar columns={",
+    paste(colnames(covar_ds), collapse=","),
+    "}, sample_id_col='", sample_id_col,
+    "' -> choices={", paste(choices, collapse=","), "}."
+  )
+  choices
 }
 
 # List annotation columns that can be used for heatmap row labels.
 # Excludes the identifier column used to match expression row names.
 .heatmap_row_label_choices <- function(annot_ds, primary_id="PrimaryID") {
   if(is.null(annot_ds) || !is.data.frame(annot_ds) || ncol(annot_ds) < 1L) {
+    .heatmap_log("row-label choices: annot is NULL/invalid; returning empty choices.")
     return(character(0))
   }
 
-  setdiff(colnames(annot_ds), primary_id)
+  choices <- setdiff(colnames(annot_ds), primary_id)
+  .heatmap_log(
+    "row-label choices from annot columns={",
+    paste(colnames(annot_ds), collapse=","),
+    "}, primary_id='", primary_id,
+    "' -> choices={", paste(choices, collapse=","), "}."
+  )
+  choices
 }
 
 #' Heatmap Module UI
@@ -217,9 +248,13 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     stop("`exprs` must be provided.")
   }
 
+  .heatmap_log("heatmapServer init; sample_id_col='", sample_id_col, "', primary_id='",
+               primary_id, "', max_genes=", as.character(max_genes), ".")
   annot_norm <- .gene_group_normalize_annot(annot)
   datasets <- names(annot_norm)
+  .heatmap_log("annotation datasets={", paste(datasets, collapse=","), "}.")
   exprs_norm <- .gene_group_normalize_exprs(exprs, datasets)
+  .heatmap_log("covar is: ", if(is.null(covar)) "NULL" else paste(class(covar), collapse="/"), ".")
   covar_norm <- .heatmap_normalize_covar(covar, datasets)
   primary_id <- as.character(primary_id)[1]
   max_genes <- suppressWarnings(as.integer(max_genes)[1])
@@ -252,6 +287,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
   }
 
   moduleServer(id, function(input, output, session) {
+    .heatmap_log("moduleServer started for id='", id, "'.")
     selected_ids <- reactiveVal(character(0))
     fig_size <- reactiveValues(width=800, height=600)
     palettes <- palettes %||% reactiveVal(NULL)
@@ -262,8 +298,11 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     selected_ids_for_heatmap <- reactive({
       ids <- selected_ids()
       if(length(ids) > max_genes) {
+        .heatmap_log("selected genes=", as.character(length(ids)), " exceeds max_genes=",
+                     as.character(max_genes), "; truncating for display.")
         ids[seq_len(max_genes)]
       } else {
+        .heatmap_log("selected genes within limit: ", as.character(length(ids)), ".")
         ids
       }
     })
@@ -272,6 +311,8 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       size <- sanitize_figsize(input$figure_size, default=c(800, 600))
       fig_size$width <- size$width
       fig_size$height <- size$height
+      .heatmap_log("figure_size input='", input$figure_size, "' parsed as ",
+                   as.character(size$width), "x", as.character(size$height), ".")
     })
 
     selector <- geneGroupSelectorServer(
@@ -290,9 +331,12 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       ds <- selector$dataset()
       req(isTruthy(ds))
       req(ds %in% datasets)
+      .heatmap_log("dataset changed to '", ds, "'; updating covariate and row-label controls.")
 
       covar_choices <- .heatmap_annotation_choices(covar_norm[[ds]], sample_id_col=sample_id_col)
       isolate({ selected_covar <- intersect(input$sel_annot %||% character(0), covar_choices) })
+     #.heatmap_log("sel_annot input={", paste(input$sel_annot %||% character(0), collapse=","),
+     #             "}; valid selected={", paste(selected_covar, collapse=","), "}.")
 
       updateSelectizeInput(
         session=session,
@@ -310,6 +354,8 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       if(!row_selected %in% row_choices) {
         row_selected <- ""
       }
+      .heatmap_log("annot_row_col selected='", row_selected, "'; row choices={",
+                   paste(row_choices, collapse=","), "}.")
 
       updateSelectizeInput(
         session=session,
@@ -337,6 +383,15 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       req(isTruthy(ds))
       req(ds %in% datasets)
       req(length(selected_ids_for_heatmap()) > 0L)
+      .heatmap_log("building heatmap object for dataset='", ds, "' with selected_ids=",
+                   as.character(length(selected_ids())), " (displaying ",
+                   as.character(length(selected_ids_for_heatmap())), ").")
+
+      sel_annot_safe <- intersect(
+        as.character(input$sel_annot %||% character(0)),
+        .heatmap_annotation_choices(covar_norm[[ds]], sample_id_col=sample_id_col)
+      )
+      .heatmap_log("sel_annot_safe={", paste(sel_annot_safe, collapse=","), "}.")
 
       hm_col_all <- heatmap_col()
       hm_col_ds <- hm_col_all[[1]]
@@ -349,6 +404,8 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       if(is.list(annot_pal_all) && ds %in% names(annot_pal_all)) {
         annot_pal <- annot_pal_all[[ds]]
       }
+      .heatmap_log("palette keys for dataset='", ds, "': {",
+                   paste(names(annot_pal %||% list()), collapse=","), "}.")
 
       plot_heatmap(
         exprs=exprs_norm[[ds]],
@@ -358,7 +415,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         annot=annot_norm[[ds]],
         primary_id_col=primary_id,
         annot_row_col=if(isTruthy(input$annot_row_col)) input$annot_row_col else NULL,
-        sel_annot=input$sel_annot,
+        sel_annot=sel_annot_safe,
         legend=isTRUE(input$show_legend),
         col=hm_col_ds$values$pal,
         palettes=annot_pal
@@ -367,6 +424,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
 
     observe({ output$heatmap_plot <- renderPlot({
       hm <- heatmap_obj()
+      .heatmap_log("rendering heatmap plot; legend=", as.character(isTRUE(input$show_legend)), ".")
       .heatmap_draw(hm, show_legend=isTRUE(input$show_legend))
     }, width=fig_size$width, height=fig_size$height) })
 
@@ -374,6 +432,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       filename = function() {
         ds <- selector$dataset()
         md <- selector$modus()
+        .heatmap_log("preparing PDF filename for dataset='", ds, "', modus='", md, "'.")
         sprintf(
           "heatmap_%s_%s.pdf",
           sanitize_filename(ds, "dataset"),
@@ -382,6 +441,9 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       },
       content = function(file) {
         hm <- heatmap_obj()
+        .heatmap_log("saving PDF to '", file, "' with size ",
+                     as.character(fig_size$width / 75), "x",
+                     as.character(fig_size$height / 75), " inches.")
         save_pdf(
           file=file,
           width=fig_size$width / 75,

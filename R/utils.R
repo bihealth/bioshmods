@@ -1,5 +1,26 @@
 `%||%` <- function(x, y) if(is.null(x)) y else x
 
+# Global debug switch for package-internal tracing.
+# Enable with: options(bioshmods.debug = TRUE)
+.bioshmods_debug_enabled <- function() {
+  isTRUE(getOption("bioshmods.debug", FALSE))
+}
+
+# Internal logging helper honoring the package-level debug option.
+.bioshmods_log <- function(..., .prefix=NULL) {
+  if(!.bioshmods_debug_enabled()) {
+    return(invisible(NULL))
+  }
+
+  msg <- paste(..., collapse="")
+  if(!is.null(.prefix) && nzchar(.prefix)) {
+    msg <- paste0("[", .prefix, "] ", msg)
+  }
+
+  message(msg)
+  invisible(NULL)
+}
+
 #' Sanitize Text for Filenames
 #'
 #' Normalize free text into a filesystem-safe filename fragment by replacing

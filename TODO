@@ -35,3 +35,11 @@
 
 * [x] `nearPoints()` issue in disco plot selection logic is resolved.
 * [ ] Gene plot UI height does not adjust when resolution is changed.
+
+### Review findings (2026-03-05)
+
+* [ ] Fix gene browser "Additional info" correlation lookup to use dataset-indexed covariates, not `g_id()` indexing.
+* [ ] Add explicit validation/fallback in tmod panel pie logic for required contrast columns (`PrimaryID`, `log2FoldChange`, `padj`) instead of hard-coded assumptions.
+* [x] Reduce noisy `message()` logging in `geneBrowserPlotServer` (module init and per-plot calls), or gate behind a debug flag.
+* [ ] Add a test that `geneBrowserPlotServer` returns correlation text in `output$addInfo` for numeric X covariates.
+* [ ] Add tests for tmod panel behavior when required contrast columns are missing (clear error messages).

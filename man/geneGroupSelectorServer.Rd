@@ -18,7 +18,8 @@ geneGroupSelectorServer(
   dge_lfc_col = NULL,
   dge_fdr_col = NULL,
   defaults = NULL,
-  selected_ids = NULL
+  selected_ids = NULL,
+  dataset = NULL
 )
 }
 \arguments{
@@ -56,6 +57,9 @@ and \code{dge_require_fdr}.}
 \item{selected_ids}{optional \code{reactiveVal()} that will be updated
 with the currently selected PrimaryIDs (column \code{primary_id}) as a
 character vector}
+
+\item{dataset}{optional \code{reactiveVal()} that stores the currently selected
+dataset name. If \code{NULL}, it is initialized internally with \code{reactiveVal()}.}
 }
 \value{
 A list with reactives: \code{genes}, \code{annotation}, \code{dataset}, and \code{modus}.
