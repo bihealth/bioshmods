@@ -53,6 +53,8 @@ discoUI <- function(id, cntr_titles) {
   }
 }
 
+# Merge selected point IDs with annotation metadata from both datasets.
+# Returns one table with requested columns, suffixed by `_1` and `_2`.
 .get_gene_df <- function(pid, selcols, primary_id="PrimaryID", annot1=NULL, annot2=NULL) {
 
   pid1 <- pid[["__primary_id_1"]]
@@ -81,28 +83,38 @@ discoUI <- function(id, cntr_titles) {
   return(cbind(pid1, pid2))
 }
 
+# Prepare plotted disco points by removing missing values and clipping score range.
+# Returns a selection-ready data frame sorted by absolute disco value.
 .prep_disco_selection_df <- function(df, lower, upper) {
   ret <- df %>%
     filter(!is.na(.data$log2FoldChange.x) & !is.na(.data$log2FoldChange.y) & !is.na(.data$disco)) %>%
     mutate(disco=ifelse(.data$disco > upper, upper, ifelse(.data$disco < lower, lower, .data$disco))) %>%
     arrange(abs(.data$disco))
-  print(ret)
+  # print(ret)
   ret
 }
 
+# Check whether an object is a non-empty list where every element is a data frame.
+# Used to detect single-dataset contrast containers.
 .is_list_of_data_frames <- function(x) {
   is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
 }
 
+# Check whether an object is a non-empty list of dataset-level data-frame lists.
+# Used to detect multi-dataset contrast containers.
 .is_list_of_list_of_data_frames <- function(x) {
   is.list(x) && length(x) > 0L &&
     all(vapply(x, function(ds) .is_list_of_data_frames(ds), logical(1)))
 }
 
+# Collect unique primary identifiers from all contrasts in one dataset.
+# Returns a character vector for annotation construction and validation.
 .cntr_primary_ids <- function(cntr_ds, primary_id) {
   unique(unlist(lapply(cntr_ds, function(df) as.character(df[[primary_id]])), use.names = FALSE))
 }
 
+# Build a minimal annotation table when no annotation is supplied by the caller.
+# Uses unique primary IDs extracted from all contrasts in a dataset.
 .make_annotation_from_cntr <- function(cntr_ds, primary_id) {
   data.frame(
     stats::setNames(list(.cntr_primary_ids(cntr_ds, primary_id)), primary_id),
@@ -110,6 +122,8 @@ discoUI <- function(id, cntr_titles) {
   )
 }
 
+# Normalize and validate `cntr`/`annot` into a consistent dataset-keyed structure.
+# Ensures required ID columns exist and annotations cover all contrast identifiers.
 .normalize_disco_inputs <- function(cntr, annot, primary_id) {
   if (.is_list_of_data_frames(cntr)) {
     cntr <- list(default=cntr)
