@@ -50,6 +50,30 @@ test_that("colorPalettesServer initializes palettes for all variable types", {
   expect_true(is.function(p$expression$pal))
 })
 
+test_that("colorPalettesServer initializes same-type variables with different palettes", {
+  variables <- list(
+    sex=list(type="categorical", levels=c("female", "male")),
+    group=list(type="categorical", levels=c("A", "B"))
+  )
+
+  palettes <- reactiveVal(list())
+
+  testServer(
+    colorPalettesServer,
+    args=list(
+      variables=variables,
+      palettes=palettes
+    ),
+    {
+      session$flushReact()
+    }
+  )
+
+  p <- isolate(palettes())$default
+  expect_named(p, c("sex", "group"))
+  expect_false(identical(unname(p$sex$pal), unname(p$group$pal)))
+})
+
 test_that("colorPalettesServer updates selected palette choices", {
   variables <- list(
     sex=list(type="categorical", levels=c("female", "male"))

@@ -205,6 +205,22 @@
   )
 }
 
+# Pick a deterministic default palette for a variable row.
+# Cycles through available choices so rows initialize with different defaults.
+.color_palettes_default_palette_for_row <- function(type, row_index=1L) {
+  choices <- unname(.color_palettes_palette_choices(type))
+  if(length(choices) < 1L) {
+    return(.color_palettes_default_palette(type))
+  }
+
+  row_index <- suppressWarnings(as.integer(row_index)[1])
+  if(is.na(row_index) || row_index < 1L) {
+    row_index <- 1L
+  }
+  idx <- ((row_index - 1L) %% length(choices)) + 1L
+  choices[[idx]]
+}
+
 # Generate n colors from a Brewer or viridis-like palette selector.
 .color_palettes_make_colors <- function(palette_id, n) {
   n <- suppressWarnings(as.integer(n)[1])
@@ -445,7 +461,8 @@
     reverse_input_id <- paste0("reverse_", row_id)
     cycle_minus_id <- paste0("cycle_minus_", row_id)
     cycle_plus_id <- paste0("cycle_plus_", row_id)
-    selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
+    selected_palette <- input[[palette_input_id]] %||%
+      .color_palettes_default_palette_for_row(spec$type, i)
     shift <- isolate({
       (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
     })
@@ -489,7 +506,8 @@
     cycle_minus_id <- paste0("cycle_minus_", row_id)
     cycle_plus_id <- paste0("cycle_plus_", row_id)
 
-    selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
+    selected_palette <- input[[palette_input_id]] %||%
+      .color_palettes_default_palette_for_row(spec$type, i)
     shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
 
     out[[i]] <- .color_palettes_build_entry(
@@ -647,7 +665,8 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
           preview_output_id <- paste0("preview_", row_id)
 
           output[[preview_output_id]] <- renderUI({
-            selected_palette <- input[[palette_input_id]] %||% .color_palettes_default_palette(spec$type)
+            selected_palette <- input[[palette_input_id]] %||%
+              .color_palettes_default_palette_for_row(spec$type, idx)
             shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
             entry <- .color_palettes_build_entry(
               spec=spec,

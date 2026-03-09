@@ -35,6 +35,8 @@
 
 * [x] `nearPoints()` issue in disco plot selection logic is resolved.
 * [ ] Gene plot UI height does not adjust when resolution is changed.
+* [ ] export to PDFs fails for gene browser plots
+* [ ] palettes do not initialize automatically for all datasets
 
 ### Review findings (2026-03-05)
 
