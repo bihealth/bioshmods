@@ -40,19 +40,18 @@ Default is expression -> DGE -> by name.}
 
 \item{primary_id}{default annotation column used as the primary gene identifier}
 
-\item{dge_pval_col}{optional p-value column name in contrast tables for DGE mode.
-If \code{NULL}, the module auto-detects a suitable numeric column.}
+\item{dge_pval_col}{optional p-value column name in contrast tables for DGE mode.}
 
 \item{dge_lfc_col}{optional log fold-change column name in contrast tables for
-DGE mode. If \code{NULL}, the module auto-detects a suitable numeric column.}
+DGE mode.}
 
 \item{dge_fdr_col}{optional adjusted p-value (FDR) column name in contrast tables
-for DGE mode. If \code{NULL}, the module auto-detects a suitable numeric column.}
+for DGE mode.}
 
 \item{defaults}{optional list of default selector parameters. Supported keys:
 \code{expr_metric}, \code{expr_top_mode}, \code{expr_top_value}, \code{dge_top_mode},
 \code{dge_top_value}, \code{dge_rank_mode}, \code{dge_pval_thr}, \code{dge_lfc_thr},
-and \code{dge_require_fdr}.}
+and \code{dge_require_fdr}. Invalid or unsupported values raise an error.}
 
 \item{selected_ids}{optional \code{reactiveVal()} that will be updated
 with the currently selected PrimaryIDs (column \code{primary_id}) as a

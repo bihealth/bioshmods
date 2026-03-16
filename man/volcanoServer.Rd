@@ -35,7 +35,7 @@ sets, each data set being a named list of data frames.}
 frames which hold the log2 fold changes and p-values, respectively}
 
 \item{primary_id}{name of the primary ID column in contrasts and
-annotation data frame}
+annotation data frame.}
 
 \item{annot}{data frame with gene annotations (containing at least the
 column specified with the \code{primary_id} parameter) or (if there are

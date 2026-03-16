@@ -19,6 +19,11 @@
 }
 
 .normalize_volcano_inputs <- function(cntr, annot, primary_id, lfc_col, pval_col, annot_show) {
+  primary_id <- trimws(as.character(primary_id)[1])
+  if(is.na(primary_id) || !nzchar(primary_id)) {
+    stop("`primary_id` must be a non-empty character column name.")
+  }
+
   if (.volcano_is_list_of_data_frames(cntr)) {
     cntr <- list(default=cntr)
     if (is.null(annot) || is.data.frame(annot)) {
@@ -72,13 +77,10 @@
       df <- cntr_ds[[cntr_name]]
 
       if (!primary_id %in% colnames(df)) {
-        if (!is.null(rownames(df))) {
-          warning(sprintf(".normalize_volcano_inputs: %s not found in dataset '%s' contrast '%s'; using rownames.", primary_id, ds, cntr_name))
-          df[[primary_id]] <- rownames(df)
-          cntr_ds[[cntr_name]] <- df
-        } else {
-          stop(sprintf("Contrast '%s' in dataset '%s' is missing '%s' and has no rownames.", cntr_name, ds, primary_id))
-        }
+        stop(sprintf(
+          "Contrast '%s' in dataset '%s' is missing '%s'.",
+          cntr_name, ds, primary_id
+        ))
       }
 
       if (!all(c(lfc_col, pval_col) %in% colnames(df))) {
@@ -204,7 +206,7 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #' frames which hold the log2 fold changes and p-values, respectively
 #' @param pval_thr default p-value threshold
 #' @param primary_id name of the primary ID column in contrasts and
-#' annotation data frame
+#' annotation data frame.
 #' @param annot data frame with gene annotations (containing at least the
 #' column specified with the `primary_id` parameter) or (if there are
 #' multiple data sets) a named list of such data frames. Names of this list
@@ -252,7 +254,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
                            onclick=sprintf('Shiny.onInputChange(\"%s-genebutton\",  this.id)', id),
                            class = "btn-primary btn-sm")
       .ds <- .df[["Dataset"]][1]
-      .df <- annot[[.ds]][ match(.df[[primary_id]], annot[[.ds]][[primary_id]]), ]
+      .df <- annot[[.ds]][ match(.df[[primary_id]], annot[[.ds]][[primary_id]]), , drop=FALSE ]
       .df[[primary_id]] <- sprintf(as.character(link), .ds, .df[[primary_id]], .df[[primary_id]])
       .df
     }, sanitize.text.function=function(x) x)
@@ -373,16 +375,9 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
 
 ## create one huge data frame for all contrasts
 .volcano_process_data_one_ds <- function(ds_id, cntr, annot, primary_id, lfc_col, pval_col) {
-
   df <- imap_dfr(cntr, ~ {
              stopifnot(!is.null(colnames(.x)))
-
-             if(!primary_id %in% colnames(.x) && !is.null(rownames(.x))) {
-               warning(sprintf(".volcano_process_data: %s not found in contrast data frame", primary_id))
-               .x[[primary_id]] <- rownames(.x)
-             }
-
-             stopifnot(all(c(lfc_col, pval_col) %in% colnames(.x)))
+             stopifnot(all(c(primary_id, lfc_col, pval_col) %in% colnames(.x)))
 
              .x[["Dataset"]] <- ds_id
              .x[["Contrast"]] <- .y
