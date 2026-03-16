@@ -149,14 +149,6 @@ gg_panelplot <- function(res, pie, auc_thr=.5, q_thr=.05,
     
 }
 
-mp <- function(x) {
-  message(paste(x, collapse=", "))
-}
-
-mf <- function(x, ...) {
-  message(sprintf(x, ...))
-}
-
 #' @importFrom shinycssloaders withSpinner
 #' @rdname tmodPanelPlotServer
 #' @export
@@ -409,7 +401,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
         .res <- .res[ sel ]
       }
 
-      mf("Saving to file %s", file)
+      message(sprintf("Saving to file %s", file))
       save_pdf(
         file=file,
         width=fig_size$width / 75,
