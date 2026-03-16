@@ -28,11 +28,35 @@ named list with one element per dataset.}
 \value{
 A UI container for dynamic variable-specific palette controls.
 
-A reactive expression returning the current palette list.
+The reactive expression returning the current palette list (same
+as the \code{palettes} argument if supplied).
 }
 \description{
 Create palette controls for each declared variable and return the selected
 palettes as a reactive expression.
+}
+\details{
+A "variable specification list" is a named list where each element describes
+one variable. Each variable entry must include:
+\itemize{
+\item \code{type}: one of \code{"categorical"}, \code{"ordinal"}, or \code{"continuous"}.
+\item for \code{"categorical"} / \code{"ordinal"}: \code{levels} (non-empty character vector).
+\item for \code{"continuous"}: \code{breaks} (numeric vector with at least 2 unique values).
+}
+
+Single-dataset form:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{list(sex=list(type="categorical", levels=c("female", "male")), 
+     expression=list(type="continuous", breaks=c(-2, 0, 2)))
+}\if{html}{\out{</div>}}
+
+Multi-dataset form:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{list(ds_a=list(sex=list(type="categorical", 
+                         levels=c("female", "male"))), 
+      ds_b=list(expression=list(type="continuous", 
+                                breaks=c(-2, 0, 2))))
+}\if{html}{\out{</div>}}
 }
 \examples{
 if(interactive()) {

@@ -95,20 +95,26 @@
 # - data.frame (converted via infer_palette_variables)
 # - named list of variable specification lists and/or data.frames
 .color_palettes_normalize_datasets <- function(variables) {
+
+  # there are four possible input forms.
+  # 1. A single data frame (single dataset)
   if(is.data.frame(variables)) {
     return(list(default=infer_palette_variables(variables)))
   }
 
-  # Treat "list of variable specs" as single-dataset input even when invalid,
-  # so detailed validation errors point to variable-level issues.
+
+  # 2. A list of variable specification lists (multiple datasets)
   if(is.list(variables) && length(variables) > 0L &&
      all(vapply(variables, function(x) is.list(x) && !is.null(x$type), logical(1)))) {
     return(list(default=.color_palettes_validate_variables(variables)))
   }
 
+  # 3. A single variable specification list (single dataset)
   if(.color_palettes_is_varspec(variables)) {
     return(list(default=.color_palettes_validate_variables(variables)))
   }
+
+  # 4. What remains must be a named list of data frames.
 
   if(!is.list(variables) || length(variables) < 1L) {
     stop("`variables` must be a variable specification list, a data frame, or a list of datasets.")
@@ -398,21 +404,43 @@
   ids
 }
 
+# Build stable input/output field IDs for one palette row.
+.color_palettes_row_input_ids <- function(row_id) {
+  list(
+    palette=paste0("palette_", row_id),
+    preview=paste0("preview_", row_id),
+    reverse=paste0("reverse_", row_id),
+    cycle_minus=paste0("cycle_minus_", row_id),
+    cycle_plus=paste0("cycle_plus_", row_id)
+  )
+}
+
+# Resolve current row state from inputs with deterministic defaults.
+.color_palettes_row_state <- function(input, spec, row_id, row_index=1L, include_shift=TRUE) {
+  ids <- .color_palettes_row_input_ids(row_id)
+  selected_palette <- input[[ids$palette]] %||%
+    .color_palettes_default_palette_for_row(spec$type, row_index)
+  reverse <- isTRUE(input[[ids$reverse]])
+
+  shift <- 0L
+  if(isTRUE(include_shift)) {
+    shift <- (input[[ids$cycle_plus]] %||% 0L) - (input[[ids$cycle_minus]] %||% 0L)
+  }
+
+  list(selected_palette=selected_palette, reverse=reverse, shift=shift)
+}
+
 # Build UI for one variable palette row.
 .color_palettes_row_ui <- function(ns, var_name, spec, row_id, compact=FALSE,
-                                   selected_palette=NULL, reverse=FALSE, shift=0L) {
-  palette_input_id <- paste0("palette_", row_id)
-  preview_output_id <- paste0("preview_", row_id)
-  reverse_input_id <- paste0("reverse_", row_id)
-  cycle_minus_id <- paste0("cycle_minus_", row_id)
-  cycle_plus_id <- paste0("cycle_plus_", row_id)
+                                   selected_palette=NULL, reverse=FALSE) {
+  ids <- .color_palettes_row_input_ids(row_id)
   selected_palette <- selected_palette %||% .color_palettes_default_palette(spec$type)
 
   extra_controls <- NULL
 
   if(spec$type == "continuous") {
     extra_controls <- checkboxInput(
-      ns(reverse_input_id),
+      ns(ids$reverse),
       "Reverse palette",
       value=isTRUE(reverse)
     )
@@ -420,8 +448,8 @@
     extra_controls <- tags$div(
       style="display:flex;align-items:center;gap:6px;margin-top:8px;",
       tags$span(style="font-size:12px;color:#666;", "Cycle colors:"),
-      actionButton(ns(cycle_minus_id), "-", width="36px"),
-      actionButton(ns(cycle_plus_id), "+", width="36px")
+      actionButton(ns(ids$cycle_minus), "-", width="36px"),
+      actionButton(ns(ids$cycle_plus), "+", width="36px")
     )
   }
 
@@ -433,14 +461,14 @@
         ))
 
   pal_input <- selectInput(
-          ns(palette_input_id),
+          ns(ids$palette),
           "",
           choices=.color_palettes_palette_choices(spec$type),
           selected=selected_palette,
           width="100%"
         )
 
-  preview <- uiOutput(ns(preview_output_id))
+  preview <- uiOutput(ns(ids$preview))
 
   if(compact) {
     return(list(pal_input, extra_controls))
@@ -457,15 +485,13 @@
   rows <- lapply(seq_along(var_names), function(i) {
     spec <- variables[[i]]
     row_id <- row_ids[i]
-    palette_input_id <- paste0("palette_", row_id)
-    reverse_input_id <- paste0("reverse_", row_id)
-    cycle_minus_id <- paste0("cycle_minus_", row_id)
-    cycle_plus_id <- paste0("cycle_plus_", row_id)
-    selected_palette <- input[[palette_input_id]] %||%
-      .color_palettes_default_palette_for_row(spec$type, i)
-    shift <- isolate({
-      (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
-    })
+    state <- .color_palettes_row_state(
+      input=input,
+      spec=spec,
+      row_id=row_id,
+      row_index=i,
+      include_shift=FALSE
+    )
 
     .color_palettes_row_ui(
       ns=ns,
@@ -473,9 +499,8 @@
       spec=spec,
       row_id=row_id,
       compact=compact,
-      selected_palette=selected_palette,
-      reverse=isTRUE(input[[reverse_input_id]]),
-      shift=shift
+      selected_palette=state$selected_palette,
+      reverse=state$reverse
     )
   })
 
@@ -501,20 +526,18 @@
   for(i in seq_along(var_names)) {
     spec <- variables[[i]]
     row_id <- row_ids[i]
-    palette_input_id <- paste0("palette_", row_id)
-    reverse_input_id <- paste0("reverse_", row_id)
-    cycle_minus_id <- paste0("cycle_minus_", row_id)
-    cycle_plus_id <- paste0("cycle_plus_", row_id)
-
-    selected_palette <- input[[palette_input_id]] %||%
-      .color_palettes_default_palette_for_row(spec$type, i)
-    shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
+    state <- .color_palettes_row_state(
+      input=input,
+      spec=spec,
+      row_id=row_id,
+      row_index=i
+    )
 
     out[[i]] <- .color_palettes_build_entry(
       spec=spec,
-      palette_id=selected_palette,
-      reverse=isTRUE(input[[reverse_input_id]]),
-      shift=shift
+      palette_id=state$selected_palette,
+      reverse=state$reverse,
+      shift=state$shift
     )
   }
 
@@ -554,7 +577,29 @@ colorPalettesUI <- function(id) {
 #'   named list with one element per dataset.
 #' @param compact Logical; whether to use a more compact layout for palette rows.
 #'
-#' @return A reactive expression returning the current palette list.
+#' @details
+#' A "variable specification list" is a named list where each element describes
+#' one variable. Each variable entry must include:
+#' - `type`: one of `"categorical"`, `"ordinal"`, or `"continuous"`.
+#' - for `"categorical"` / `"ordinal"`: `levels` (non-empty character vector).
+#' - for `"continuous"`: `breaks` (numeric vector with at least 2 unique values).
+#'
+#' Single-dataset form:
+#' ```
+#' list(sex=list(type="categorical", levels=c("female", "male")), 
+#'      expression=list(type="continuous", breaks=c(-2, 0, 2)))
+#' ```
+#'
+#' Multi-dataset form:
+#' ```
+#' list(ds_a=list(sex=list(type="categorical", 
+#'                          levels=c("female", "male"))), 
+#'       ds_b=list(expression=list(type="continuous", 
+#'                                 breaks=c(-2, 0, 2))))
+#' ```
+#'
+#' @return The reactive expression returning the current palette list (same
+#' as the `palettes` argument if supplied). 
 #'
 #' @examples
 #' if(interactive()) {
@@ -658,21 +703,20 @@ colorPalettesServer <- function(id, variables, palettes = NULL, compact = FALSE)
           idx <- i
           spec <- vars[[idx]]
           row_id <- row_ids[idx]
-          palette_input_id <- paste0("palette_", row_id)
-          reverse_input_id <- paste0("reverse_", row_id)
-          cycle_minus_id <- paste0("cycle_minus_", row_id)
-          cycle_plus_id <- paste0("cycle_plus_", row_id)
-          preview_output_id <- paste0("preview_", row_id)
+          ids <- .color_palettes_row_input_ids(row_id)
 
-          output[[preview_output_id]] <- renderUI({
-            selected_palette <- input[[palette_input_id]] %||%
-              .color_palettes_default_palette_for_row(spec$type, idx)
-            shift <- (input[[cycle_plus_id]] %||% 0L) - (input[[cycle_minus_id]] %||% 0L)
+          output[[ids$preview]] <- renderUI({
+            state <- .color_palettes_row_state(
+              input=input,
+              spec=spec,
+              row_id=row_id,
+              row_index=idx
+            )
             entry <- .color_palettes_build_entry(
               spec=spec,
-              palette_id=selected_palette,
-              reverse=isTRUE(input[[reverse_input_id]]),
-              shift=shift
+              palette_id=state$selected_palette,
+              reverse=state$reverse,
+              shift=state$shift
             )
             .color_palettes_preview_ui(entry)
           })
