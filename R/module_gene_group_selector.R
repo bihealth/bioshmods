@@ -172,20 +172,6 @@
   cntr[datasets]
 }
 
-# Pick the first available preferred numeric column name.
-# Falls back to the first candidate column when no preferred names match.
-.gene_group_guess_numeric_col <- function(cols, preferred) {
-  hit <- preferred[preferred %in% cols]
-  if(length(hit) > 0L) {
-    return(hit[1])
-  }
-  if(length(cols) > 0L) {
-    cols[1]
-  } else {
-    NA_character_
-  }
-}
-
 # Compute numeric columns shared across selected contrast tables.
 # Used to build robust DGE UI choices that exist in every selected contrast.
 .gene_group_dge_numeric_cols <- function(cntr_ds, selected_contrasts) {
@@ -251,7 +237,7 @@
 }
 
 # Normalize optional selector defaults supplied by users.
-# Invalid values are replaced by sane defaults.
+# Invalid values raise explicit errors.
 .gene_group_normalize_defaults <- function(defaults) {
   base <- .gene_group_default_settings()
   if(is.null(defaults)) {
@@ -262,58 +248,106 @@
     stop("`defaults` must be NULL or a list.")
   }
 
-  x <- utils::modifyList(base, defaults)
-
-  if(!is.character(x$expr_metric) || !x$expr_metric %in% c("variance", "mean")) {
-    x$expr_metric <- base$expr_metric
+  extra_keys <- setdiff(names(defaults), names(base))
+  if(length(extra_keys) > 0L) {
+    stop(sprintf(
+      "`defaults` contains unsupported key(s): %s",
+      paste(extra_keys, collapse=", ")
+    ))
   }
 
-  if(!is.character(x$expr_top_mode) || !x$expr_top_mode %in% c("n", "pct")) {
-    x$expr_top_mode <- base$expr_top_mode
+  x <- utils::modifyList(base, defaults)
+
+  x$expr_metric <- as.character(x$expr_metric)[1]
+  if(is.na(x$expr_metric) || !x$expr_metric %in% c("variance", "mean")) {
+    stop("`defaults$expr_metric` must be one of: 'variance', 'mean'.")
+  }
+
+  x$expr_top_mode <- as.character(x$expr_top_mode)[1]
+  if(is.na(x$expr_top_mode) || !x$expr_top_mode %in% c("n", "pct")) {
+    stop("`defaults$expr_top_mode` must be one of: 'n', 'pct'.")
   }
 
   x$expr_top_value <- suppressWarnings(as.numeric(x$expr_top_value)[1])
   if(!is.finite(x$expr_top_value)) {
-    x$expr_top_value <- base$expr_top_value
+    stop("`defaults$expr_top_value` must be a finite number.")
   }
   if(x$expr_top_mode == "pct") {
-    x$expr_top_value <- max(0, min(100, x$expr_top_value))
+    if(x$expr_top_value < 0 || x$expr_top_value > 100) {
+      stop("`defaults$expr_top_value` must be in [0, 100] when `expr_top_mode='pct'`.")
+    }
   } else {
-    x$expr_top_value <- max(1, floor(x$expr_top_value))
+    if(x$expr_top_value < 1 || abs(x$expr_top_value - round(x$expr_top_value)) > .Machine$double.eps^0.5) {
+      stop("`defaults$expr_top_value` must be an integer >= 1 when `expr_top_mode='n'`.")
+    }
+    x$expr_top_value <- as.integer(round(x$expr_top_value))
   }
 
-  if(!is.character(x$dge_top_mode) || !x$dge_top_mode %in% c("all", "n", "pct")) {
-    x$dge_top_mode <- base$dge_top_mode
+  x$dge_top_mode <- as.character(x$dge_top_mode)[1]
+  if(is.na(x$dge_top_mode) || !x$dge_top_mode %in% c("all", "n", "pct")) {
+    stop("`defaults$dge_top_mode` must be one of: 'all', 'n', 'pct'.")
   }
 
   x$dge_top_value <- suppressWarnings(as.numeric(x$dge_top_value)[1])
   if(!is.finite(x$dge_top_value)) {
-    x$dge_top_value <- base$dge_top_value
+    stop("`defaults$dge_top_value` must be a finite number.")
   }
   if(x$dge_top_mode == "pct") {
-    x$dge_top_value <- max(0, min(100, x$dge_top_value))
-  } else {
-    x$dge_top_value <- max(1, floor(x$dge_top_value))
+    if(x$dge_top_value < 0 || x$dge_top_value > 100) {
+      stop("`defaults$dge_top_value` must be in [0, 100] when `dge_top_mode='pct'`.")
+    }
+  } else if(x$dge_top_mode == "n") {
+    if(x$dge_top_value < 1 || abs(x$dge_top_value - round(x$dge_top_value)) > .Machine$double.eps^0.5) {
+      stop("`defaults$dge_top_value` must be an integer >= 1 when `dge_top_mode='n'`.")
+    }
+    x$dge_top_value <- as.integer(round(x$dge_top_value))
   }
 
-  if(!is.character(x$dge_rank_mode) || !x$dge_rank_mode %in% c("p_first", "lfc_first")) {
-    x$dge_rank_mode <- base$dge_rank_mode
+  x$dge_rank_mode <- as.character(x$dge_rank_mode)[1]
+  if(is.na(x$dge_rank_mode) || !x$dge_rank_mode %in% c("p_first", "lfc_first")) {
+    stop("`defaults$dge_rank_mode` must be one of: 'p_first', 'lfc_first'.")
   }
 
   x$dge_pval_thr <- suppressWarnings(as.numeric(x$dge_pval_thr)[1])
-  if(!is.finite(x$dge_pval_thr)) {
-    x$dge_pval_thr <- base$dge_pval_thr
+  if(!is.finite(x$dge_pval_thr) || x$dge_pval_thr < 0 || x$dge_pval_thr > 1) {
+    stop("`defaults$dge_pval_thr` must be a number in [0, 1].")
   }
-  x$dge_pval_thr <- max(0, min(1, x$dge_pval_thr))
 
   x$dge_lfc_thr <- suppressWarnings(as.numeric(x$dge_lfc_thr)[1])
-  if(!is.finite(x$dge_lfc_thr)) {
-    x$dge_lfc_thr <- base$dge_lfc_thr
+  if(!is.finite(x$dge_lfc_thr) || x$dge_lfc_thr < 0) {
+    stop("`defaults$dge_lfc_thr` must be a finite number >= 0.")
   }
-  x$dge_lfc_thr <- max(0, x$dge_lfc_thr)
 
-  x$dge_require_fdr <- isTRUE(x$dge_require_fdr)
+  if(!is.logical(x$dge_require_fdr) || length(x$dge_require_fdr) != 1L || is.na(x$dge_require_fdr)) {
+    stop("`defaults$dge_require_fdr` must be TRUE or FALSE.")
+  }
+
+  x$dge_require_fdr <- as.logical(x$dge_require_fdr)
   x
+}
+
+# Resolve mode-specific values by preferring live input over server defaults.
+.gene_group_resolve_mode_inputs <- function(mode, input_values=list(), defaults=.gene_group_default_settings()) {
+  if(mode == "by_expression") {
+    return(list(
+      metric=input_values$expr_metric %||% defaults$expr_metric,
+      top_mode=input_values$expr_top_mode %||% defaults$expr_top_mode,
+      top_value=input_values$expr_top_value %||% defaults$expr_top_value
+    ))
+  }
+
+  if(mode == "by_dge") {
+    return(list(
+      top_mode=input_values$dge_top_mode %||% defaults$dge_top_mode,
+      top_value=input_values$dge_top_value %||% defaults$dge_top_value,
+      rank_mode=input_values$dge_rank_mode %||% defaults$dge_rank_mode,
+      p_thr=input_values$dge_pval_thr %||% defaults$dge_pval_thr,
+      lfc_thr=input_values$dge_lfc_thr %||% defaults$dge_lfc_thr,
+      require_fdr=input_values$dge_require_fdr %||% defaults$dge_require_fdr
+    ))
+  }
+
+  list()
 }
 
 # Build available selector modes based on provided inputs.
@@ -430,7 +464,7 @@
   )
 }
 
-# Resolve DGE mode columns from server-level params or data-driven defaults.
+# Resolve DGE mode columns from explicit server-level params only.
 .gene_group_dge_defaults <- function(cntr_ds, selected_contrasts, p_col=NULL, lfc_col=NULL, fdr_col=NULL) {
   cntr_names <- names(cntr_ds)
   sel_cntr <- intersect(selected_contrasts, cntr_names)
@@ -439,9 +473,9 @@
   }
 
   num_cols <- .gene_group_dge_numeric_cols(cntr_ds, sel_cntr)
-  resolved_p_col <- .gene_group_guess_numeric_col(num_cols, c("padj", "pvalue", "P.Value", "PValue"))
-  resolved_lfc_col <- .gene_group_guess_numeric_col(num_cols, c("log2FoldChange", "logFC", "lfc", "LFC"))
-  resolved_fdr_col <- .gene_group_guess_numeric_col(num_cols, c("padj", "adj.P.Val", "FDR", "qvalue", "q_value"))
+  resolved_p_col <- NULL
+  resolved_lfc_col <- NULL
+  resolved_fdr_col <- NULL
 
   if(isTruthy(p_col) && p_col %in% num_cols) {
     resolved_p_col <- p_col
@@ -535,10 +569,8 @@
     if(is.null(expr_ds)) {
       return(p("Expression data not available."))
     }
-    metric <- input_values$expr_metric %||% defaults$expr_metric
-    top_mode <- input_values$expr_top_mode %||% defaults$expr_top_mode
-    top_value <- input_values$expr_top_value %||% defaults$expr_top_value
-    return(.gene_group_expression_controls_ui(ns, metric, top_mode, top_value))
+    resolved <- .gene_group_resolve_mode_inputs("by_expression", input_values=input_values, defaults=defaults)
+    return(.gene_group_expression_controls_ui(ns, resolved$metric, resolved$top_mode, resolved$top_value))
   }
 
   if(mode == "by_dge") {
@@ -557,21 +589,16 @@
       lfc_col=dge_lfc_col,
       fdr_col=dge_fdr_col
     )
-    top_mode <- input_values$dge_top_mode %||% defaults$dge_top_mode
-    top_value <- input_values$dge_top_value %||% defaults$dge_top_value
-    rank_mode <- input_values$dge_rank_mode %||% defaults$dge_rank_mode
-    p_thr <- input_values$dge_pval_thr %||% defaults$dge_pval_thr
-    lfc_thr <- input_values$dge_lfc_thr %||% defaults$dge_lfc_thr
-    require_fdr <- input_values$dge_require_fdr %||% defaults$dge_require_fdr
+    resolved <- .gene_group_resolve_mode_inputs("by_dge", input_values=input_values, defaults=defaults)
     return(.gene_group_dge_controls_ui(
       ns=ns,
       dge_defaults=dge_defaults,
-      top_mode=top_mode,
-      top_value=top_value,
-      rank_mode=rank_mode,
-      p_thr=p_thr,
-      lfc_thr=lfc_thr,
-      require_fdr=require_fdr
+      top_mode=resolved$top_mode,
+      top_value=resolved$top_value,
+      rank_mode=resolved$rank_mode,
+      p_thr=resolved$p_thr,
+      lfc_thr=resolved$lfc_thr,
+      require_fdr=resolved$require_fdr
     ))
   }
 
@@ -785,16 +812,12 @@
   }
 
   if(mode == "by_expression") {
-    metric <- input_values$expr_metric %||% defaults$expr_metric
-    top_mode <- input_values$expr_top_mode %||% defaults$expr_top_mode
-    top_value <- input_values$expr_top_value %||% defaults$expr_top_value
-    return(.gene_group_select_by_expression(ann_df, expr_ds, primary_id, metric, top_mode, top_value))
+    resolved <- .gene_group_resolve_mode_inputs("by_expression", input_values=input_values, defaults=defaults)
+    return(.gene_group_select_by_expression(ann_df, expr_ds, primary_id, resolved$metric, resolved$top_mode, resolved$top_value))
   }
 
   if(mode == "by_dge") {
-    rank_mode <- input_values$dge_rank_mode %||% defaults$dge_rank_mode
-    top_mode <- input_values$dge_top_mode %||% defaults$dge_top_mode
-    top_value <- input_values$dge_top_value %||% defaults$dge_top_value
+    resolved <- .gene_group_resolve_mode_inputs("by_dge", input_values=input_values, defaults=defaults)
     dge_defaults <- .gene_group_dge_defaults(
       cntr_ds=cntr_ds,
       selected_contrasts=input_values$dge_contrasts,
@@ -810,12 +833,12 @@
       p_col=dge_defaults$p_col,
       lfc_col=dge_defaults$lfc_col,
       fdr_col=dge_defaults$fdr_col,
-      require_fdr=input_values$dge_require_fdr %||% defaults$dge_require_fdr,
-      p_thr=input_values$dge_pval_thr %||% defaults$dge_pval_thr,
-      lfc_thr=input_values$dge_lfc_thr %||% defaults$dge_lfc_thr,
-      rank_mode=rank_mode,
-      top_mode=top_mode,
-      top_value=top_value
+      require_fdr=resolved$require_fdr,
+      p_thr=resolved$p_thr,
+      lfc_thr=resolved$lfc_thr,
+      rank_mode=resolved$rank_mode,
+      top_mode=resolved$top_mode,
+      top_value=resolved$top_value
     ))
   }
 
@@ -862,18 +885,17 @@ geneGroupSelectorUI <- function(id) {
 #'   such lists for multiple datasets
 #' @param primary_id default annotation column used as the primary gene identifier
 #' @param dge_pval_col optional p-value column name in contrast tables for DGE mode.
-#'   If `NULL`, the module auto-detects a suitable numeric column.
 #' @param dge_lfc_col optional log fold-change column name in contrast tables for
-#'   DGE mode. If `NULL`, the module auto-detects a suitable numeric column.
+#'   DGE mode.
 #' @param dge_fdr_col optional adjusted p-value (FDR) column name in contrast tables
-#'   for DGE mode. If `NULL`, the module auto-detects a suitable numeric column.
+#'   for DGE mode.
 #' @param mode_order order of available selection modes. Values must come from
 #'   `c("by_expression", "by_dge", "by_name")`. Unavailable modes are skipped.
 #'   Default is expression -> DGE -> by name.
 #' @param defaults optional list of default selector parameters. Supported keys:
 #'   `expr_metric`, `expr_top_mode`, `expr_top_value`, `dge_top_mode`,
 #'   `dge_top_value`, `dge_rank_mode`, `dge_pval_thr`, `dge_lfc_thr`,
-#'   and `dge_require_fdr`.
+#'   and `dge_require_fdr`. Invalid or unsupported values raise an error.
 #' @param selected_ids optional `reactiveVal()` that will be updated
 #'   with the currently selected PrimaryIDs (column `primary_id`) as a
 #'   character vector

@@ -164,6 +164,42 @@ test_that("geneGroupSelectorServer uses server-level DGE column params", {
   expect_equal(isolate(selected_ids()), c("g1", "g2", "g4"))
 })
 
+test_that("geneGroupSelectorServer does not auto-detect DGE columns", {
+  annot <- data.frame(
+    PrimaryID = paste0("g", 1:4),
+    stringsAsFactors = FALSE
+  )
+  cntr <- list(
+    contrast_a = data.frame(
+      PrimaryID = annot$PrimaryID,
+      pvalue = c(0.001, 0.02, 0.2, 0.03),
+      log2FoldChange = c(2, 1, 0.5, 1.5),
+      padj = c(0.005, 0.02, 0.9, 0.04),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    geneGroupSelectorServer,
+    args = list(
+      annot = annot,
+      cntr = cntr,
+      selected_ids = selected_ids
+    ),
+    {
+      session$setInputs(modus = "by_dge")
+      session$setInputs(dge_contrasts = "contrast_a")
+      session$setInputs(dge_pval_thr = 0.05)
+      session$setInputs(dge_lfc_thr = 0)
+      session$flushReact()
+    }
+  )
+
+  expect_equal(isolate(selected_ids()), character(0))
+})
+
 test_that("geneGroupSelectorServer synchronizes dataset reactiveVal with UI", {
   annot <- list(
     ds_a = data.frame(
@@ -197,4 +233,67 @@ test_that("geneGroupSelectorServer synchronizes dataset reactiveVal with UI", {
   )
 
   expect_equal(isolate(dataset()), "ds_a")
+})
+
+test_that("geneGroupSelectorServer validates defaults strictly", {
+  annot <- data.frame(
+    PrimaryID = c("g1", "g2"),
+    stringsAsFactors = FALSE
+  )
+
+  expect_error(
+    testServer(
+      geneGroupSelectorServer,
+      args = list(
+        annot = annot,
+        defaults = list(unknown_default = 1)
+      ),
+      {
+        session$flushReact()
+      }
+    ),
+    "unsupported key"
+  )
+
+  expect_error(
+    testServer(
+      geneGroupSelectorServer,
+      args = list(
+        annot = annot,
+        defaults = list(expr_top_mode = "invalid_mode")
+      ),
+      {
+        session$flushReact()
+      }
+    ),
+    "expr_top_mode"
+  )
+
+  expect_error(
+    testServer(
+      geneGroupSelectorServer,
+      args = list(
+        annot = annot,
+        defaults = list(dge_pval_thr = 2)
+      ),
+      {
+        session$flushReact()
+      }
+    ),
+    "dge_pval_thr"
+  )
+
+  expect_error(
+    testServer(
+      geneGroupSelectorServer,
+      args = list(
+        annot = annot,
+        defaults = list(dge_require_fdr = "yes")
+      ),
+      {
+        session$flushReact()
+      }
+    ),
+    "TRUE or FALSE"
+  )
 })
