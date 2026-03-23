@@ -339,7 +339,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
 
       ## store the data frame for click, hover or brush events
       dfvar(df)
-      print(head(df, 100))
+      # print(head(df, 100))
 
       g <- ggplot(df, aes(x=.data[[lfc_col]], y=.data[["y"]],
                      color   =.data[["Significant"]])) +
