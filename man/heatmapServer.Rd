@@ -14,6 +14,7 @@ heatmapServer(
   cntr = NULL,
   covar = NULL,
   palettes = NULL,
+  selected_ids = NULL,
   sample_id_col = "SampleID",
   primary_id = "PrimaryID",
   dge_pval_col = NULL,
@@ -40,6 +41,10 @@ data frames (multi-dataset mode).}
 \item{palettes}{Optional reactive expression or \code{reactiveVal} returning a
 palette list forwarded to \code{\link[=plot_heatmap]{plot_heatmap()}}. Useful when heatmap colors are
 coordinated across modules.}
+
+\item{selected_ids}{Optional \code{reactiveVal()} used to store the currently
+selected gene IDs. If \code{NULL}, the module initializes its own internal
+\code{reactiveVal(character(0))}.}
 
 \item{sample_id_col}{Name of the sample ID column in \code{covar}.}
 

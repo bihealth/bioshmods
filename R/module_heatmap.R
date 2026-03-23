@@ -168,6 +168,9 @@ heatmapUI <- function(id) {
 #' @param palettes Optional reactive expression or `reactiveVal` returning a
 #'   palette list forwarded to [plot_heatmap()]. Useful when heatmap colors are
 #'   coordinated across modules.
+#' @param selected_ids Optional `reactiveVal()` used to store the currently
+#'   selected gene IDs. If `NULL`, the module initializes its own internal
+#'   `reactiveVal(character(0))`.
 #' @param sample_id_col Name of the sample ID column in `covar`.
 #' @param dge_pval_col Optional p-value column name for DGE mode in
 #'   [geneGroupSelectorServer()].
@@ -237,6 +240,7 @@ heatmapUI <- function(id) {
 #' @export
 heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
                           palettes=NULL,
+                          selected_ids=NULL,
                           sample_id_col="SampleID",
                           primary_id="PrimaryID",
                           dge_pval_col=NULL,
@@ -246,6 +250,9 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
                           annot_row_col=NULL) {
   if(is.null(exprs)) {
     stop("`exprs` must be provided.")
+  }
+  if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
+    stop("`selected_ids` must be NULL or a `reactiveVal()`.")
   }
 
   .heatmap_log("heatmapServer init; sample_id_col='", sample_id_col, "', primary_id='",
@@ -286,9 +293,10 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     }
   }
 
+  selected_ids <- selected_ids %||% reactiveVal(character(0))
+
   moduleServer(id, function(input, output, session) {
     .heatmap_log("moduleServer started for id='", id, "'.")
-    selected_ids <- reactiveVal(character(0))
     fig_size <- reactiveValues(width=800, height=600)
     palettes <- palettes %||% reactiveVal(NULL)
 
