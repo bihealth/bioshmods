@@ -1,16 +1,20 @@
+## Check whether an object is a non-empty list of data frames.
 .volcano_is_list_of_data_frames <- function(x) {
   is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
 }
 
+## Check whether an object is a non-empty list of contrast lists.
 .volcano_is_list_of_list_of_data_frames <- function(x) {
   is.list(x) && length(x) > 0L &&
     all(vapply(x, function(ds) .volcano_is_list_of_data_frames(ds), logical(1)))
 }
 
+## Collect unique primary IDs across all contrasts in one dataset.
 .volcano_cntr_primary_ids <- function(cntr_ds, primary_id) {
   unique(unlist(lapply(cntr_ds, function(df) as.character(df[[primary_id]])), use.names = FALSE))
 }
 
+## Build a minimal annotation table from the contrast primary IDs.
 .volcano_make_annotation_from_cntr <- function(cntr_ds, primary_id) {
   data.frame(
     stats::setNames(list(.volcano_cntr_primary_ids(cntr_ds, primary_id)), primary_id),
@@ -18,6 +22,7 @@
   )
 }
 
+## Normalize and validate contrast and annotation inputs for the module.
 .normalize_volcano_inputs <- function(cntr, annot, primary_id, lfc_col, pval_col, annot_show) {
   primary_id <- trimws(as.character(primary_id)[1])
   if(is.na(primary_id) || !nzchar(primary_id)) {
