@@ -249,3 +249,37 @@ test_that("volcanoServer updates external gene_id on gene button click", {
   expect_equal(isolate(gene_id$ds), "default")
   expect_equal(isolate(gene_id$id), "g2")
 })
+
+test_that("volcanoServer shows annot_show columns on hover", {
+  cntr <- list(
+    contrast_a=.volcano_test_contrast(c("g1", "g2"), c(1, -1), c(0.01, 0.02))
+  )
+  annot <- data.frame(
+    PrimaryID=c("g1", "g2"),
+    SYMBOL=c("A", "B"),
+    ENTREZID=c("11", "22"),
+    stringsAsFactors=FALSE
+  )
+
+  testServer(
+    volcanoServer,
+    args=list(
+      cntr=cntr,
+      annot=annot
+    ),
+    {
+      hover_genes(data.frame(Dataset="default", PrimaryID="g2", stringsAsFactors=FALSE))
+      session$flushReact()
+
+      html <- output$point_id
+      expect_match(html, "Dataset")
+      expect_match(html, "PrimaryID")
+      expect_match(html, "SYMBOL")
+      expect_match(html, "ENTREZID")
+      expect_match(html, "default")
+      expect_match(html, "g2")
+      expect_match(html, "B")
+      expect_match(html, "22")
+    }
+  )
+})

@@ -249,7 +249,16 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     plot_obj       <- reactiveVal()
 
     output$point_id <- renderTable({
-      hover_genes()
+      .df <- hover_genes()
+      if(is.null(.df) || nrow(.df) == 0L) {
+        return(NULL)
+      }
+
+      purrr::map_dfr(unique(.df[["Dataset"]]), function(.ds) {
+        .sel <- .df[.df[["Dataset"]] == .ds, c("Dataset", primary_id), drop=FALSE]
+        .ann <- annot[[.ds]][ match(.sel[[primary_id]], annot[[.ds]][[primary_id]]), , drop=FALSE ]
+        dplyr::bind_cols(.sel["Dataset"], .ann)
+      })
     })
 
     output$sel_genes <- renderTable({
@@ -295,7 +304,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     observeEvent(input$plot_hover, {
       .df <- dfvar()
       np <- nearPoints(.df, input$plot_hover, xvar = lfc_col, yvar = "y")
-      hover_genes(np[ , primary_id, drop=FALSE ])
+      hover_genes(np[ , c("Dataset", primary_id), drop=FALSE ])
     })
 
     observeEvent(input$plot_brush, {
