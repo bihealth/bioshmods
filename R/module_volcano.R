@@ -334,20 +334,17 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
 
       ## store the data frame for click, hover or brush events
       dfvar(df)
+      print(head(df, 100))
 
-      ## loads of trickery to get around the dumb decision of using
-      ## unquoted vars in ggplot (because typing quotes is SO hard 
-      ## so we will make living hell out of an otherwise nice framework)
       g <- ggplot(df, aes(x=.data[[lfc_col]], y=.data[["y"]],
-                     color   ="Significant",
-                     dscon   ="Dataset_Contrast",
-                     dataset ="Dataset",
-                     contrast="Contrast")) +
+                     color   =.data[["Significant"]])) +
         geom_point(alpha=.5) +
         facet_wrap(as.formula(paste('~', "Dataset_Contrast")), scales=scales) +
         scale_color_manual(values=c("TRUE"="red", "FALSE"="black")) +
                                    theme(text=element_text(size=input$font_size)) +
                                    theme(legend.position="bottom")
+      # ggsave("debug_volcano_plot.pdf", g, width=fig_size$width/100, height=fig_size$height/100)
+      # saveRDS(g, "debug_volcano_plot.rds")
       plot_obj(g)
       g
 
