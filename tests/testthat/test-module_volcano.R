@@ -250,6 +250,66 @@ test_that("volcanoServer updates external gene_id on gene button click", {
   expect_equal(isolate(gene_id$id), "g2")
 })
 
+test_that("volcanoServer updates external selected_ids on Show button click", {
+  cntr <- list(
+    contrast_a=.volcano_test_contrast(c("g1", "g2", "g2"), c(1, -1, -1), c(0.01, 0.02, 0.02))
+  )
+  annot <- data.frame(
+    PrimaryID=c("g1", "g2"),
+    SYMBOL=c("A", "B"),
+    stringsAsFactors=FALSE
+  )
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    volcanoServer,
+    args=list(
+      cntr=cntr,
+      annot=annot,
+      selected_ids=selected_ids
+    ),
+    {
+      selected_genes(data.frame(
+        Dataset=c("default", "default", "default"),
+        PrimaryID=c("g2", "g1", "g2"),
+        stringsAsFactors=FALSE
+      ))
+      session$flushReact()
+
+      expect_true(any(grepl("Show", as.character(output$show_selected_ui), fixed=TRUE)))
+
+      session$setInputs(show_selected=1)
+      session$flushReact()
+    }
+  )
+
+  expect_equal(isolate(selected_ids()), c("g2", "g1"))
+})
+
+test_that("volcanoServer validates selected_ids", {
+  cntr <- list(
+    contrast_a=.volcano_test_contrast(c("g1"), 1, 0.01)
+  )
+  annot <- data.frame(
+    PrimaryID="g1",
+    stringsAsFactors=FALSE
+  )
+
+  expect_error(
+    testServer(
+      volcanoServer,
+      args=list(
+        cntr=cntr,
+        annot=annot,
+        selected_ids=character(0)
+      ),
+      {
+      }
+    ),
+    "selected_ids"
+  )
+})
+
 test_that("volcanoServer shows annot_show columns on hover", {
   cntr <- list(
     contrast_a=.volcano_test_contrast(c("g1", "g2"), c(1, -1), c(0.01, 0.02))

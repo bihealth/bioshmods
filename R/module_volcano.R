@@ -189,7 +189,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
       ),
       column(width=4,
         HTML("Click on the button to view an expression profile"),
-        tableOutput(NS(id, "sel_genes"))
+        tableOutput(NS(id, "sel_genes")),
+        uiOutput(NS(id, "show_selected_ui"))
       ), width=10
     )
   )
@@ -219,18 +220,86 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #' @param gene_id must be a `reactiveValues` object. If not NULL, then
 #' clicking on a gene identifier will modify this object (possibly
 #' triggering an event in another module).
+#' @param selected_ids Optional `reactiveVal()` populated with the primary IDs
+#'   from the current plot selection when the user clicks the `Show` button.
+#'   If `NULL`, the button is not shown and no external state is updated.
 #' @param annot_show which columns from the annotation data frame should be
 #' shown when mouse hovers over a gene
+#'
+#' @examples
+#' annot <- data.frame(
+#'   PrimaryID=paste0("g", 1:6),
+#'   SYMBOL=LETTERS[1:6],
+#'   stringsAsFactors=FALSE
+#' )
+#'
+#' cntr <- list(
+#'   contrast_a=data.frame(
+#'     PrimaryID=annot$PrimaryID,
+#'     log2FoldChange=rnorm(6),
+#'     padj=runif(6),
+#'     stringsAsFactors=FALSE
+#'   )
+#' )
+#'
+#' if(interactive()) {
+#'   ui <- fluidPage(volcanoUI("volcano"))
+#'
+#'   server <- function(input, output, session) {
+#'     volcanoServer(
+#'       "volcano",
+#'       cntr = cntr,
+#'       annot = annot
+#'     )
+#'   }
+#'
+#'   shinyApp(ui, server)
+#' }
+#'
+#' # Example showing how to use shared selected_ids to 
+#' link volcano and heatmap modules
+#'
+#' data(C19)
+#'
+#' if(interactive()) {
+#'   ui <- fluidPage(
+#'     tabsetPanel(
+#'       tabPanel("Volcano plot", volcanoUI("vol")),
+#'       tabPanel("Heatmap", heatmapUI("hm"))
+#'       )
+#'   )
+#'   server <- function(input, output, session) {
+#'     selected_ids <- reactiveVal(character(0))
+#'     volcanoServer("vol", 
+#'                   cntr=C19$contrasts, 
+#'                   annot=C19$annotation, 
+#'                   selected_ids=selected_ids)
+#'     heatmapServer(
+#'       "hm",
+#'       annot=C19$annotation,
+#'       exprs=C19$expression,
+#'       cntr=C19$contrasts,
+#'       covar=C19$covariates,
+#'       sample_id_col="label",
+#'       selected_ids=selected_ids
+#'     )
+#'   }
+#'   shinyApp(ui, server)
+#' }
 #' @export
-
 volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj", 
                           primary_id="PrimaryID",
-                          annot=NULL, gene_id=NULL, 
+                          annot=NULL, gene_id=NULL,
+                          selected_ids=NULL,
                           annot_show=c("SYMBOL", "ENTREZID")) {
 
   normalized <- .normalize_volcano_inputs(cntr, annot, primary_id, lfc_col, pval_col, annot_show)
   cntr <- normalized$cntr
   annot <- normalized$annot
+
+  if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
+    stop("`selected_ids` must be NULL or a `reactiveVal()`.")
+  }
 
   if(!"default" %in% names(cntr)) {
     message("volcanoServer: running in multi data set mode")
@@ -273,12 +342,27 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       .df
     }, sanitize.text.function=function(x) x)
 
+    output$show_selected_ui <- renderUI({
+      req(!is.null(selected_ids))
+      .df <- selected_genes()
+      req(!is.null(.df), nrow(.df) > 0L)
+      actionButton(NS(id, "show_selected"), "Show", class="btn-default")
+    })
+
     observeEvent(input$genebutton, {
       if(!is.null(gene_id)) {
         ids <- strsplit(input$genebutton, '~')[[1]]
         gene_id$ds <- ids[2]
         gene_id$id <- ids[3]
       }
+    })
+
+    observeEvent(input$show_selected, {
+      req(!is.null(selected_ids))
+      .df <- selected_genes()
+      req(!is.null(.df), nrow(.df) > 0L, primary_id %in% colnames(.df))
+      ids <- unique(stats::na.omit(as.character(.df[[primary_id]])))
+      selected_ids(ids[nzchar(ids)])
     })
 
     observeEvent(input$figure_size, {

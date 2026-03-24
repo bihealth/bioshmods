@@ -15,6 +15,7 @@ volcanoServer(
   primary_id = "PrimaryID",
   annot = NULL,
   gene_id = NULL,
+  selected_ids = NULL,
   annot_show = c("SYMBOL", "ENTREZID")
 )
 }
@@ -46,9 +47,61 @@ must match the names of the \code{cntr} list.}
 clicking on a gene identifier will modify this object (possibly
 triggering an event in another module).}
 
+\item{selected_ids}{Optional \code{reactiveVal()} populated with the primary IDs
+from the current plot selection when the user clicks the \code{Show} button.
+If \code{NULL}, the button is not shown and no external state is updated.}
+
 \item{annot_show}{which columns from the annotation data frame should be
 shown when mouse hovers over a gene}
 }
 \description{
 Shiny module for displaying volcano plots
+}
+\examples{
+annot <- data.frame(
+  PrimaryID=paste0("g", 1:6),
+  SYMBOL=LETTERS[1:6],
+  stringsAsFactors=FALSE
+)
+exprs <- matrix(
+  rnorm(24),
+  nrow=6,
+  dimnames=list(annot$PrimaryID, paste0("s", 1:4))
+)
+cntr <- list(
+  contrast_a=data.frame(
+    PrimaryID=annot$PrimaryID,
+    log2FoldChange=rnorm(6),
+    padj=runif(6),
+    stringsAsFactors=FALSE
+  )
+)
+covar <- data.frame(
+  SampleID=colnames(exprs),
+  group=c("A", "A", "B", "B"),
+  stringsAsFactors=FALSE
+)
+
+if(interactive()) {
+  ui <- fluidPage(
+    fluidRow(
+      column(width=6, volcanoUI("vol")),
+      column(width=6, heatmapUI("hm"))
+    )
+  )
+  server <- function(input, output, session) {
+    selected_ids <- reactiveVal(character(0))
+    volcanoServer("vol", cntr=cntr, annot=annot, selected_ids=selected_ids)
+    heatmapServer(
+      "hm",
+      annot=annot,
+      exprs=exprs,
+      cntr=cntr,
+      covar=covar,
+      selected_ids=selected_ids
+    )
+  }
+  shinyApp(ui, server)
+}
+
 }
