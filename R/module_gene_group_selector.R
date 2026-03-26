@@ -1243,9 +1243,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       server=TRUE
     )
 
-    # protection against invalid dataset reactive value (e.g. 
-    # from external manipulation or invalid initial value)
-    # XXX is this necessary? we do the same thing below
+    # Keep the shared dataset reactiveVal on a valid dataset name.
+    # Repairs invalid external or initial values before the rest of the module uses them.
     observe({
       .ds <- isolate({ dataset() })
       if(!isTruthy(.ds) || !.ds %in% datasets) {
@@ -1255,6 +1254,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }
     })
 
+    # Mirror changes from the dataset input widget into the shared dataset reactiveVal.
+    # Normalizes invalid UI values to the first available dataset before publishing them.
     observeEvent(input$dataset, {
       .ds <- input$dataset
       if(!isTruthy(.ds) || !.ds %in% datasets) {
@@ -1262,8 +1263,6 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }
       .gene_group_log("dataset input changed to '", as.character(input$dataset),
                       "'; effective dataset='", .ds, "'.")
-      # isolate so we don't trigger this observer again from the dataset() update inside it; 
-      # only update dataset() if it differs from the input value to avoid unnecessary downstream updates
       isolate({ 
         if(!identical(dataset(), .ds)) {
           dataset(.ds)
@@ -1271,14 +1270,21 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       })
     }, ignoreInit=FALSE)
 
-    # current mode: by DGE, by name or by expression
+    # Derive the effective selector mode from UI state and external overrides.
+    # External selected IDs force the selector into by-name mode until that override is cleared.
     current_mode <- reactive({
+      mode_input <- trimws(as.character(input$modus %||% "")[1])
       if(!is.null(external_name_state())) {
         return("by_name")
       }
-      input$modus %||% default_mode
+      if(!nzchar(mode_input) || !mode_input %in% unname(modes)) {
+        return(default_mode)
+      }
+      mode_input
     })
 
+    # Build the current dynamic parameter state used by UI rendering and selection logic.
+    # Combines dataset, effective mode, and the effective control input values in one object.
     param_state <- reactive({
       .gene_group_param_state(
         dataset=dataset(),
@@ -1292,9 +1298,18 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
 
     # prepare the UI controls for the active mode
     output$modus_controls <- renderUI({
-      state <- param_state()
-      ds <- state$dataset
-      .gene_group_log("rendering modus controls for dataset='", ds, "', mode='", state$mode, "'.")
+      ds <- dataset()
+      mode <- current_mode()
+      input_values <- isolate(.gene_group_apply_external_name_state(
+        .gene_group_input_values(input),
+        external_name_state()
+      ))
+      state <- .gene_group_param_state(
+        dataset=ds,
+        mode=mode,
+        input_values=input_values
+      )
+      .gene_group_log("rendering modus controls for dataset='", ds, "', mode='", mode, "'.")
 
       .gene_group_modus_controls_ui(
         ns=session$ns,
@@ -1306,8 +1321,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       )
     })
 
-    # this does the actual selection of genes and returns a data frame - 
-    # primary_ids and annotation for the selected genes
+    # Compute the selected annotation rows for the current dataset and mode.
+    # Dispatches to the appropriate by-name, expression, or DGE selection helper.
     selected_annotation <- reactive({
       state <- param_state()
       ds <- state$dataset
@@ -1323,6 +1338,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       out
     })
 
+    # Extract the unique primary IDs from the selected annotation rows.
+    # This is the canonical gene list shared with downstream outputs and modules.
     selected_primary_ids <- reactive({
       sel <- selected_annotation()
       if(nrow(sel) == 0L) {
@@ -1337,12 +1354,16 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       ids
     })
 
+    # Drop the external by-name override when the user intentionally changes mode.
     observeEvent(input$modus, {
-      if(!identical(input$modus, "by_name")) {
+      mode_input <- trimws(as.character(input$modus %||% "")[1])
+      if(nzchar(mode_input) && !identical(mode_input, "by_name")) {
         external_name_state(NULL)
       }
     }, ignoreInit=TRUE)
 
+    # Drop the external by-name override when the ID-column selector is changed manually.
+    # This returns control of by-name settings to the live UI once the user edits them.
     observeEvent(input$name_id_col, {
       state <- external_name_state()
       if(!is.null(state) &&
@@ -1351,6 +1372,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }
     }, ignoreInit=TRUE)
 
+    # Drop the external by-name override when the gene text area is edited manually.
+    # This lets free-text editing take precedence over an imported external selection.
     observeEvent(input$name_list, {
       state <- external_name_state()
       if(!is.null(state) &&
@@ -1359,7 +1382,10 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }
     }, ignoreInit=TRUE)
 
+    # if selected_ids is provided, sync it with the selector's current selection
     if(!is.null(selected_ids)) {
+      # Import externally supplied selected IDs into the selector as a by-name override.
+      # Ignores the module's own last publication so bidirectional syncing does not loop.
       observeEvent(selected_ids(), {
         ids <- as.character(selected_ids() %||% character(0))
 
@@ -1383,6 +1409,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }, ignoreInit=TRUE)
     }
 
+    # Publish the current selected primary IDs to the external selected_ids reactiveVal.
+    # Skips unchanged values and marks self-originated updates to prevent feedback loops.
     observe({
       if(!is.null(selected_ids)) {
         ids <- selected_primary_ids()
