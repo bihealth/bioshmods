@@ -125,6 +125,42 @@ test_that("geneGroupSelectorServer supports custom mode order and defaults", {
   expect_equal(isolate(selected_ids()), c("g8", "g7", "g6"))
 })
 
+test_that("geneGroupSelectorServer switches to by_name when selected_ids changes externally", {
+  annot <- data.frame(
+    PrimaryID = paste0("g", 1:6),
+    SYMBOL = LETTERS[1:6],
+    stringsAsFactors = FALSE
+  )
+  exprs <- matrix(
+    seq_len(12),
+    nrow = 6,
+    dimnames = list(annot$PrimaryID, c("s1", "s2"))
+  )
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    geneGroupSelectorServer,
+    args = list(
+      annot = annot,
+      exprs = exprs,
+      selected_ids = selected_ids
+    ),
+    {
+      session$flushReact()
+      expect_equal(isolate(session$returned$modus()), "by_expression")
+
+      selected_ids(c("g4", "g2"))
+      session$flushReact()
+
+      expect_equal(isolate(session$returned$modus()), "by_name")
+      expect_equal(isolate(session$returned$genes()), c("g4", "g2"))
+      expect_true(any(grepl("g4", as.character(output$modus_controls), fixed = TRUE)))
+      expect_true(any(grepl("g2", as.character(output$modus_controls), fixed = TRUE)))
+      expect_true(any(grepl("name_id_col", as.character(output$modus_controls), fixed = TRUE)))
+    }
+  )
+})
+
 test_that("geneGroupSelectorServer uses server-level DGE column params", {
   annot <- data.frame(
     PrimaryID = paste0("g", 1:4),

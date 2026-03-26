@@ -1,9 +1,15 @@
-# Parse comma/space separated gene identifiers from text input.
-# Returns unique non-empty tokens in their original order.
+## ---------------------------------------------
+## General Utilities
+## ---------------------------------------------
+
+# Write module-scoped log messages through the shared package logger.
+# Keeps the selector log prefix consistent across helper functions.
 .gene_group_log <- function(...) {
   .bioshmods_log(..., .prefix="gene_group_selector")
 }
 
+# Parse comma- or space-separated gene identifiers from text input.
+# Returns unique non-empty tokens while preserving their input order.
 .gene_group_parse_gene_input <- function(x) {
   x <- x %||% ""
   x <- paste(x, collapse=" ")
@@ -83,6 +89,43 @@
   names(x)[is.na(names(x)) | trimws(names(x)) == ""] <- paste0(default_prefix, seq_along(x))[is.na(names(x)) | trimws(names(x)) == ""]
   x
 }
+
+
+## ---------------------------------------------
+## Sanity checks
+## ---------------------------------------------
+
+# Check that the specified primary ID column exists in all annotation data frames.
+.gene_group_check_primary_id <- function(annot, primary_id) {
+  for(ds in names(annot)) {
+    if(!primary_id %in% colnames(annot[[ds]])) {
+      stop(sprintf("`primary_id` ('%s') not found in annotation for dataset '%s'.", primary_id, ds))
+    }
+  }
+}
+
+
+# Check that "selected_ids" is either NULL or a reactiveVal object.
+.gene_group_check_selected_ids <- function(selected_ids) {
+  if(!is.null(selected_ids)) {
+    if(!inherits(selected_ids, "reactiveVal")) {
+      stop("`selected_ids` must be NULL or a `reactiveVal()`.")
+    }
+  }
+}
+
+# Check that "dataset" is either NULL or a reactiveVal object.
+.gene_group_check_dataset <- function(dataset) {
+  if(!is.null(dataset) && !inherits(dataset, "reactiveVal")) {
+    stop("`dataset` must be NULL or a `reactiveVal()`.")
+  }
+}
+
+
+
+## ---------------------------------------------
+## Input Normalization
+## ---------------------------------------------
 
 # Normalize annotation input to a named list keyed by dataset.
 # Accepts a single data frame or a list of data frames.
@@ -326,8 +369,13 @@
   x
 }
 
-# Resolve mode-specific values by preferring live input over server defaults.
-.gene_group_resolve_mode_inputs <- function(mode, input_values=list(), defaults=.gene_group_default_settings()) {
+# Resolve mode-specific values from the current parameter state.
+# Uses live inputs first and falls back to defaults from the selector config.
+.gene_group_resolve_mode_inputs <- function(param_state, selector_config) {
+  mode <- param_state$mode
+  input_values <- param_state$input_values
+  defaults <- selector_config$defaults
+
   if(mode == "by_expression") {
     return(list(
       metric=input_values$expr_metric %||% defaults$expr_metric,
@@ -374,11 +422,15 @@
   stats::setNames(ordered, mode_labels[ordered])
 }
 
-# Create an empty annotation data frame with preserved columns.
-# Used as a consistent "no selection" return object.
-.gene_group_empty_annot <- function(annot_df) {
-  annot_df[0, , drop=FALSE]
-}
+
+
+
+
+
+
+## ---------------------------------------------
+## UI Builders
+## ---------------------------------------------
 
 # Build dataset selector UI.
 # Hidden when only one dataset is available.
@@ -387,20 +439,23 @@
     selected <- datasets[1]
   }
 
+  # hide the datasdet selector if we only have one dataset
   if(length(datasets) < 2L) {
     .gene_group_log("dataset UI hidden (single dataset='", selected, "').")
     return(hidden(selectizeInput(ns("dataset"), "Dataset", choices=datasets, selected=selected)))
   }
+
   .gene_group_log("dataset UI shown; datasets={", paste(datasets, collapse=","),
                   "}, selected='", selected, "'.")
   selectizeInput(ns("dataset"), "Dataset", choices=datasets, selected=selected)
 }
 
 # Controls for name-based selection mode.
-.gene_group_name_controls_ui <- function(ns, ann_cols, selected_col) {
+.gene_group_name_controls_ui <- function(ns, ann_cols, selected_col, name_list=NULL) {
   if(!isTruthy(selected_col) || !selected_col %in% ann_cols) {
     selected_col <- ann_cols[1]
   }
+  name_list <- name_list %||% ""
 
   fluidRow(
     column(
@@ -415,12 +470,18 @@
     ),
     column(
       12,
-      shiny::textAreaInput(ns("name_list"), "Gene names / IDs (space or comma separated)", rows=8)
+      shiny::textAreaInput(
+        ns("name_list"),
+        "Gene names / IDs (space or comma separated)",
+        rows=8,
+        value=name_list
+      )
     )
   )
 }
 
-# Controls for expression-based selection mode.
+# Build the controls for expression-based gene selection.
+# Renders metric and top-k inputs for the expression mode UI.
 .gene_group_expression_controls_ui <- function(ns, metric, top_mode, top_value) {
   top_value <- suppressWarnings(as.numeric(top_value)[1])
   if(!is.finite(top_value)) {
@@ -464,8 +525,13 @@
   )
 }
 
-# Resolve DGE mode columns from explicit server-level params only.
-.gene_group_dge_defaults <- function(cntr_ds, selected_contrasts, p_col=NULL, lfc_col=NULL, fdr_col=NULL) {
+# Resolve the DGE columns used by the selector UI and logic.
+# Restricts choices to columns stored in the selector config.
+.gene_group_dge_defaults <- function(cntr_ds, param_state, selector_config) {
+  selected_contrasts <- param_state$input_values$dge_contrasts
+  p_col <- selector_config$dge$pval_col
+  lfc_col <- selector_config$dge$lfc_col
+  fdr_col <- selector_config$dge$fdr_col
   cntr_names <- names(cntr_ds)
   sel_cntr <- intersect(selected_contrasts, cntr_names)
   if(length(sel_cntr) == 0L) {
@@ -496,7 +562,8 @@
   )
 }
 
-# Controls for DGE-based selection mode.
+# Build the controls for DGE-based gene selection.
+# Renders thresholds, ranking, and top-k inputs for DGE mode.
 .gene_group_dge_controls_ui <- function(ns, dge_defaults, top_mode, top_value,
                                         rank_mode, p_thr, lfc_thr, require_fdr) {
   top_value <- suppressWarnings(as.numeric(top_value)[1])
@@ -552,24 +619,32 @@
   )
 }
 
-# Build mode-specific controls for the selector UI.
-.gene_group_modus_controls_ui <- function(ns, mode, defaults,
-                                          dge_pval_col=NULL, dge_lfc_col=NULL, dge_fdr_col=NULL,
-                                          ann_df=NULL, expr_ds=NULL, cntr_ds=NULL, input_values=list()) {
+# Build the mode-specific control panel for the selector.
+# Dispatches the UI rendering based on the current parameter state.
+.gene_group_modus_controls_ui <- function(ns, ann_df=NULL, expr_ds=NULL, cntr_ds=NULL,
+                                          param_state, selector_config) {
+  mode <- param_state$mode
+  input_values <- param_state$input_values
+
   if(mode == "by_name") {
     ann_cols <- colnames(ann_df)
     selected_col <- input_values$name_id_col %||% "PrimaryID"
     if(!selected_col %in% ann_cols && "PrimaryID" %in% ann_cols) {
       selected_col <- "PrimaryID"
     }
-    return(.gene_group_name_controls_ui(ns, ann_cols, selected_col))
+    return(.gene_group_name_controls_ui(
+      ns,
+      ann_cols,
+      selected_col,
+      name_list=input_values$name_list
+    ))
   }
 
   if(mode == "by_expression") {
     if(is.null(expr_ds)) {
       return(p("Expression data not available."))
     }
-    resolved <- .gene_group_resolve_mode_inputs("by_expression", input_values=input_values, defaults=defaults)
+    resolved <- .gene_group_resolve_mode_inputs(param_state, selector_config)
     return(.gene_group_expression_controls_ui(ns, resolved$metric, resolved$top_mode, resolved$top_value))
   }
 
@@ -582,14 +657,8 @@
       return(p("No contrasts available for this dataset."))
     }
 
-    dge_defaults <- .gene_group_dge_defaults(
-      cntr_ds=cntr_ds,
-      selected_contrasts=input_values$dge_contrasts,
-      p_col=dge_pval_col,
-      lfc_col=dge_lfc_col,
-      fdr_col=dge_fdr_col
-    )
-    resolved <- .gene_group_resolve_mode_inputs("by_dge", input_values=input_values, defaults=defaults)
+    dge_defaults <- .gene_group_dge_defaults(cntr_ds, param_state, selector_config)
+    resolved <- .gene_group_resolve_mode_inputs(param_state, selector_config)
     return(.gene_group_dge_controls_ui(
       ns=ns,
       dge_defaults=dge_defaults,
@@ -605,7 +674,24 @@
   p("No selection mode available.")
 }
 
-# Match query IDs to annotation rows using one annotation column.
+
+
+
+
+
+
+## ---------------------------------------------
+## Selection Logic
+## ---------------------------------------------
+
+# Create an empty annotation data frame with preserved columns.
+# Keeps "no selection" results compatible with downstream code.
+.gene_group_empty_annot <- function(annot_df) {
+  annot_df[0, , drop=FALSE]
+}
+
+# Match query IDs against one annotation column.
+# Preserves query order and drops IDs that are not present.
 .gene_group_match_annot_rows <- function(ann_df, id_col, query_ids) {
   empty_df <- .gene_group_empty_annot(ann_df)
   if(length(query_ids) == 0L) {
@@ -622,7 +708,8 @@
   ann_df[m, , drop=FALSE]
 }
 
-# Select annotation rows from free text and uploaded gene list file.
+# Select annotation rows from typed and uploaded gene IDs.
+# Combines both sources into one ordered list before matching.
 .gene_group_select_by_name <- function(ann_df, id_col, name_list, name_file) {
   name_ids <- .gene_group_parse_gene_input(name_list)
   file_ids <- .gene_group_read_gene_file(name_file)
@@ -632,7 +719,8 @@
   .gene_group_match_annot_rows(ann_df, id_col, query_ids)
 }
 
-# Select annotation rows based on expression ranking.
+# Select annotation rows by expression-derived ranking.
+# Uses the chosen metric and top-k rule to keep the highest-ranked genes.
 .gene_group_select_by_expression <- function(ann_df, expr_ds, primary_id, metric="variance", top_mode="n", top_value=100) {
   empty_df <- .gene_group_empty_annot(ann_df)
   if(is.null(expr_ds)) {
@@ -670,7 +758,8 @@
   .gene_group_match_annot_rows(ann_df, primary_id, ids)
 }
 
-# Build a compact per-gene DGE summary from selected contrasts.
+# Build a compact per-gene DGE summary across selected contrasts.
+# Keeps the values needed for later ranking and threshold filtering.
 .gene_group_collect_dge_rows <- function(cntr_ds, contrasts, primary_id, p_col, lfc_col, fdr_col, require_fdr, p_thr, lfc_thr) {
   dge_rows <- lapply(contrasts, function(nm) {
     df <- cntr_ds[[nm]]
@@ -712,7 +801,8 @@
   do.call(rbind, dge_rows)
 }
 
-# Rank genes by strongest DGE evidence across contrasts.
+# Rank genes by their strongest DGE evidence across contrasts.
+# Supports ranking by p-value first or by absolute log fold change first.
 .gene_group_rank_dge_rows <- function(dge_rows, rank_mode="p_first") {
   split_ids <- split(dge_rows, dge_rows$id)
   rank_df <- data.frame(
@@ -729,7 +819,8 @@
   }
 }
 
-# Select annotation rows based on DGE filters/ranking.
+# Select annotation rows from DGE results after filtering and ranking.
+# Applies thresholding first and then an optional top-k restriction.
 .gene_group_select_by_dge <- function(ann_df, cntr_ds, primary_id,
                                       contrasts, p_col, lfc_col, fdr_col,
                                       require_fdr=FALSE, p_thr=.05, lfc_thr=0,
@@ -796,11 +887,14 @@
   .gene_group_match_annot_rows(ann_df, primary_id, rank_df$id)
 }
 
-# Dispatch selection mode to the corresponding pure selection helper.
-.gene_group_selected_annotation <- function(mode, ann_df, primary_id,
-                                            dge_pval_col=NULL, dge_lfc_col=NULL, dge_fdr_col=NULL,
-                                            expr_ds=NULL, cntr_ds=NULL, input_values=list(),
-                                            defaults=.gene_group_default_settings()) {
+# Dispatch the active mode to the matching selection helper.
+# Returns one annotation subset from the current state and selector config.
+.gene_group_selected_annotation <- function(ann_df, expr_ds=NULL, cntr_ds=NULL,
+                                            param_state, selector_config) {
+  mode <- param_state$mode
+  input_values <- param_state$input_values
+  primary_id <- selector_config$primary_id
+
   .gene_group_log("selected_annotation dispatch mode='", mode, "'.")
   if(mode == "by_name") {
     name_id_col <- input_values$name_id_col %||% primary_id
@@ -812,19 +906,13 @@
   }
 
   if(mode == "by_expression") {
-    resolved <- .gene_group_resolve_mode_inputs("by_expression", input_values=input_values, defaults=defaults)
+    resolved <- .gene_group_resolve_mode_inputs(param_state, selector_config)
     return(.gene_group_select_by_expression(ann_df, expr_ds, primary_id, resolved$metric, resolved$top_mode, resolved$top_value))
   }
 
   if(mode == "by_dge") {
-    resolved <- .gene_group_resolve_mode_inputs("by_dge", input_values=input_values, defaults=defaults)
-    dge_defaults <- .gene_group_dge_defaults(
-      cntr_ds=cntr_ds,
-      selected_contrasts=input_values$dge_contrasts,
-      p_col=dge_pval_col,
-      lfc_col=dge_lfc_col,
-      fdr_col=dge_fdr_col
-    )
+    resolved <- .gene_group_resolve_mode_inputs(param_state, selector_config)
+    dge_defaults <- .gene_group_dge_defaults(cntr_ds, param_state, selector_config)
     return(.gene_group_select_by_dge(
       ann_df=ann_df,
       cntr_ds=cntr_ds,
@@ -845,6 +933,92 @@
   .gene_group_empty_annot(ann_df)
 }
 
+
+
+
+
+
+
+## ---------------------------------------------
+## Server State Helpers
+## ---------------------------------------------
+
+# Capture the current selector inputs as a plain list.
+# Keeps server code from rebuilding the same input bundle inline.
+.gene_group_input_values <- function(input) {
+  list(
+    name_id_col=input$name_id_col,
+    name_list=input$name_list,
+    name_file=input$name_file,
+    expr_metric=input$expr_metric,
+    expr_top_mode=input$expr_top_mode,
+    expr_top_value=input$expr_top_value,
+    dge_contrasts=input$dge_contrasts,
+    dge_require_fdr=input$dge_require_fdr,
+    dge_pval_thr=input$dge_pval_thr,
+    dge_lfc_thr=input$dge_lfc_thr,
+    dge_top_mode=input$dge_top_mode,
+    dge_top_value=input$dge_top_value,
+    dge_rank_mode=input$dge_rank_mode
+  )
+}
+
+# Build the static selector configuration shared across helper calls.
+# Groups defaults, ID settings, and DGE column mappings in one object.
+.gene_group_selector_config <- function(primary_id, defaults, dge_pval_col, dge_lfc_col, dge_fdr_col) {
+  list(
+    primary_id=primary_id,
+    defaults=defaults,
+    dge=list(
+      pval_col=dge_pval_col,
+      lfc_col=dge_lfc_col,
+      fdr_col=dge_fdr_col
+    )
+  )
+}
+
+# Override name-based inputs with an externally supplied ID selection.
+# Clears the uploaded file so the external IDs fully define the query.
+.gene_group_apply_external_name_state <- function(input_values, external_name_state) {
+  if(is.null(external_name_state)) {
+    return(input_values)
+  }
+
+  input_values$name_id_col <- external_name_state$name_id_col
+  input_values$name_list <- external_name_state$name_list
+  input_values$name_file <- NULL
+  input_values
+}
+
+# Convert selected IDs into the stored external by-name override state.
+# Uses the primary ID column and newline-separated IDs for the text area.
+.gene_group_external_name_state <- function(primary_id, ids) {
+  list(
+    name_id_col=primary_id,
+    name_list=paste(as.character(ids), collapse="\n")
+  )
+}
+
+# Build the dynamic selector parameter state from reactive inputs.
+# Combines dataset, active mode, and the effective control values.
+.gene_group_param_state <- function(dataset, mode, input_values) {
+  list(
+    dataset=dataset,
+    mode=mode,
+    input_values=input_values
+  )
+}
+
+
+
+
+
+
+
+## ---------------------------------------------
+## Public UI
+## ---------------------------------------------
+
 #' @rdname geneGroupSelectorServer
 #' @export
 # Build controls-only UI for selecting gene groups.
@@ -864,6 +1038,16 @@ geneGroupSelectorUI <- function(id) {
     downloadButton(ns("save_genes"), "Export selected PrimaryIDs")
   )
 }
+
+
+
+
+
+
+
+## ---------------------------------------------
+## Public Server
+## ---------------------------------------------
 
 #' Shiny module for selecting groups of genes
 #'
@@ -898,7 +1082,8 @@ geneGroupSelectorUI <- function(id) {
 #'   and `dge_require_fdr`. Invalid or unsupported values raise an error.
 #' @param selected_ids optional `reactiveVal()` that will be updated
 #'   with the currently selected PrimaryIDs (column `primary_id`) as a
-#'   character vector
+#'   character vector. When it changes externally, the selector switches to
+#'   `by_name` mode and mirrors those IDs in the text field.
 #' @param dataset optional `reactiveVal()` that stores the currently selected
 #'   dataset name. If `NULL`, it is initialized internally with `reactiveVal()`.
 #' @return A list with reactives: `genes`, `annotation`, `dataset`, and `modus`.
@@ -985,68 +1170,88 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
                                     selected_ids=NULL,
                                     dataset=NULL) {
   .gene_group_log("geneGroupSelectorServer init id='", id, "'.")
-  annot <- .gene_group_normalize_annot(annot)
-  for(ds in names(annot)) {
-    if(!primary_id %in% colnames(annot[[ds]])) {
-      stop(sprintf("`primary_id` ('%s') not found in annotation for dataset '%s'.", primary_id, ds))
-    }
-  }
 
-  if(!is.null(selected_ids)) {
-    if(!inherits(selected_ids, "reactiveVal")) {
-      stop("`selected_ids` must be NULL or a `reactiveVal()`.")
-    }
-  }
-  if(!is.null(dataset) && !inherits(dataset, "reactiveVal")) {
-    stop("`dataset` must be NULL or a `reactiveVal()`.")
-  }
+  # after this, annot is a list with data frames (different datasets)
+  # or a single one called "default"
+  annot <- .gene_group_normalize_annot(annot)
+
+  # sanity checks; stop with informative errors if the input is not as expected
+  .gene_group_check_primary_id(annot, primary_id)
+  .gene_group_check_selected_ids(selected_ids)
+  .gene_group_check_dataset(dataset)
 
   defaults <- .gene_group_normalize_defaults(defaults)
   mode_order <- .gene_group_normalize_mode_order(mode_order)
   dge_pval_col <- trimws(as.character(dge_pval_col %||% "")[1])
   dge_lfc_col <- trimws(as.character(dge_lfc_col %||% "")[1])
   dge_fdr_col <- trimws(as.character(dge_fdr_col %||% "")[1])
+
   if(!nzchar(dge_pval_col)) {
     dge_pval_col <- NULL
   }
+
   if(!nzchar(dge_lfc_col)) {
     dge_lfc_col <- NULL
   }
+
   if(!nzchar(dge_fdr_col)) {
     dge_fdr_col <- NULL
   }
+
   datasets <- names(annot)
   dataset <- dataset %||% reactiveVal()
   exprs <- .gene_group_normalize_exprs(exprs, datasets)
   cntr <- .gene_group_normalize_cntr(cntr, datasets)
+  selector_config <- .gene_group_selector_config(
+    primary_id=primary_id,
+    defaults=defaults,
+    dge_pval_col=dge_pval_col,
+    dge_lfc_col=dge_lfc_col,
+    dge_fdr_col=dge_fdr_col
+  )
   modes <- .gene_group_modes(!is.null(exprs), !is.null(cntr), mode_order=mode_order)
+
   .gene_group_log("server datasets={", paste(datasets, collapse=","), "}; modes={",
                   paste(unname(modes), collapse=","), "}.")
 
+  ## -----------------------------------------------------
+  ## Reactive and observer definitions
+  ## -----------------------------------------------------
   moduleServer(id, function(input, output, session) {
     .gene_group_log("moduleServer started for id='", id, "'.")
+    default_mode <- unname(modes[1])
+
+    # state vars.
+    # external_name_state reacts to external changes to selected_ids
+    external_name_state <- reactiveVal(NULL)
+    pushing_selected_ids <- reactiveVal(FALSE)
+    last_published_ids <- reactiveVal(character(0))
+
+    # dynamically render the dataset selection input based on the provided annotation datasets
+    # b/c dataset() is a reactiveVal.
     output$dataset_ui <- renderUI({
       .gene_group_log("rendering dataset UI with dataset()='", as.character(dataset()), "'.")
       .gene_group_dataset_input_ui(session$ns, datasets, selected=dataset())
     })
 
-    observeEvent(TRUE, {
-      .gene_group_log("initializing modus choices={", paste(unname(modes), collapse=","), "}.")
-      shiny::updateSelectizeInput(
-        session=session,
-        inputId="modus",
-        choices=modes,
-        selected=unname(modes[1]),
-        server=TRUE
-      )
-    }, once=TRUE)
+    .gene_group_log("initializing modus choices={", paste(unname(modes), collapse=","), "}.")
+    updateSelectizeInput(
+      session=session,
+      inputId="modus",
+      choices=modes,
+      selected=default_mode,
+      server=TRUE
+    )
 
+    # protection against invalid dataset reactive value (e.g. 
+    # from external manipulation or invalid initial value)
+    # XXX is this necessary? we do the same thing below
     observe({
-      .ds <- dataset()
+      .ds <- isolate({ dataset() })
       if(!isTruthy(.ds) || !.ds %in% datasets) {
         .gene_group_log("dataset reactive invalid ('", as.character(.ds),
                         "'); resetting to '", datasets[1], "'.")
-        isolate({ dataset(datasets[1]) })
+        dataset(datasets[1])
       }
     })
 
@@ -1057,6 +1262,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }
       .gene_group_log("dataset input changed to '", as.character(input$dataset),
                       "'; effective dataset='", .ds, "'.")
+      # isolate so we don't trigger this observer again from the dataset() update inside it; 
+      # only update dataset() if it differs from the input value to avoid unnecessary downstream updates
       isolate({ 
         if(!identical(dataset(), .ds)) {
           dataset(.ds)
@@ -1064,68 +1271,54 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       })
     }, ignoreInit=FALSE)
 
-    output$modus_controls <- renderUI({
-      ds <- dataset()
-      mode <- input$modus %||% unname(modes[1])
-      .gene_group_log("rendering modus controls for dataset='", ds, "', mode='", mode, "'.")
-      isolate({
-      .gene_group_modus_controls_ui(
-        ns=session$ns,
-        mode=mode,
-        defaults=defaults,
-        dge_pval_col=dge_pval_col,
-        dge_lfc_col=dge_lfc_col,
-        dge_fdr_col=dge_fdr_col,
-        ann_df=annot[[ds]],
-        expr_ds=if(is.null(exprs)) NULL else exprs[[ds]],
-        cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
-        input_values=list(
-          name_id_col=input$name_id_col,
-          expr_metric=input$expr_metric,
-          expr_top_mode=input$expr_top_mode,
-          expr_top_value=input$expr_top_value,
-          dge_contrasts=input$dge_contrasts,
-          dge_require_fdr=input$dge_require_fdr,
-          dge_pval_thr=input$dge_pval_thr,
-          dge_lfc_thr=input$dge_lfc_thr,
-          dge_top_mode=input$dge_top_mode,
-          dge_top_value=input$dge_top_value,
-          dge_rank_mode=input$dge_rank_mode
-        )
-      )
-      })
+    # current mode: by DGE, by name or by expression
+    current_mode <- reactive({
+      if(!is.null(external_name_state())) {
+        return("by_name")
+      }
+      input$modus %||% default_mode
     })
 
-    selected_annotation <- reactive({
-      ds <- dataset()
-      mode <- input$modus %||% unname(modes[1])
-      out <- .gene_group_selected_annotation(
-        mode=mode,
-        ann_df=annot[[ds]],
-        primary_id=primary_id,
-        dge_pval_col=dge_pval_col,
-        dge_lfc_col=dge_lfc_col,
-        dge_fdr_col=dge_fdr_col,
-        expr_ds=if(is.null(exprs)) NULL else exprs[[ds]],
-        cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
-        defaults=defaults,
-        input_values=list(
-          name_id_col=input$name_id_col,
-          name_list=input$name_list,
-          name_file=input$name_file,
-          expr_metric=input$expr_metric,
-          expr_top_mode=input$expr_top_mode,
-          expr_top_value=input$expr_top_value,
-          dge_contrasts=input$dge_contrasts,
-          dge_require_fdr=input$dge_require_fdr,
-          dge_pval_thr=input$dge_pval_thr,
-          dge_lfc_thr=input$dge_lfc_thr,
-          dge_rank_mode=input$dge_rank_mode,
-          dge_top_mode=input$dge_top_mode,
-          dge_top_value=input$dge_top_value
+    param_state <- reactive({
+      .gene_group_param_state(
+        dataset=dataset(),
+        mode=current_mode(),
+        input_values=.gene_group_apply_external_name_state(
+          .gene_group_input_values(input),
+          external_name_state()
         )
       )
-      .gene_group_log("selected_annotation dataset='", ds, "', mode='", mode,
+    })
+
+    # prepare the UI controls for the active mode
+    output$modus_controls <- renderUI({
+      state <- param_state()
+      ds <- state$dataset
+      .gene_group_log("rendering modus controls for dataset='", ds, "', mode='", state$mode, "'.")
+
+      .gene_group_modus_controls_ui(
+        ns=session$ns,
+        ann_df=annot[[ds]],
+        expr_ds=if(is.null(exprs)) NULL else exprs[[ds]],
+        cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
+        param_state=state,
+        selector_config=selector_config
+      )
+    })
+
+    # this does the actual selection of genes and returns a data frame - 
+    # primary_ids and annotation for the selected genes
+    selected_annotation <- reactive({
+      state <- param_state()
+      ds <- state$dataset
+      out <- .gene_group_selected_annotation(
+        ann_df=annot[[ds]],
+        expr_ds=if(is.null(exprs)) NULL else exprs[[ds]],
+        cntr_ds=if(is.null(cntr)) NULL else cntr[[ds]],
+        param_state=state,
+        selector_config=selector_config
+      )
+      .gene_group_log("selected_annotation dataset='", ds, "', mode='", state$mode,
                       "' -> nrows=", as.character(nrow(out)), ".")
       out
     })
@@ -1144,11 +1337,62 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       ids
     })
 
+    observeEvent(input$modus, {
+      if(!identical(input$modus, "by_name")) {
+        external_name_state(NULL)
+      }
+    }, ignoreInit=TRUE)
+
+    observeEvent(input$name_id_col, {
+      state <- external_name_state()
+      if(!is.null(state) &&
+         !identical(input$name_id_col %||% "", state$name_id_col %||% "")) {
+        external_name_state(NULL)
+      }
+    }, ignoreInit=TRUE)
+
+    observeEvent(input$name_list, {
+      state <- external_name_state()
+      if(!is.null(state) &&
+         !identical(input$name_list %||% "", state$name_list %||% "")) {
+        external_name_state(NULL)
+      }
+    }, ignoreInit=TRUE)
+
+    if(!is.null(selected_ids)) {
+      observeEvent(selected_ids(), {
+        ids <- as.character(selected_ids() %||% character(0))
+
+        if(isTRUE(pushing_selected_ids()) &&
+           identical(ids, last_published_ids())) {
+          pushing_selected_ids(FALSE)
+          return()
+        }
+
+        pushing_selected_ids(FALSE)
+        external_name_state(.gene_group_external_name_state(selector_config$primary_id, ids))
+
+        if(!identical(isolate(input$modus %||% default_mode), "by_name")) {
+          shiny::updateSelectizeInput(
+            session=session,
+            inputId="modus",
+            selected="by_name",
+            server=TRUE
+          )
+        }
+      }, ignoreInit=TRUE)
+    }
+
     observe({
       if(!is.null(selected_ids)) {
+        ids <- selected_primary_ids()
         .gene_group_log("updating external selected_ids reactiveVal with n=",
-                        as.character(length(selected_primary_ids())), ".")
-        selected_ids(selected_primary_ids())
+                        as.character(length(ids)), ".")
+        if(!identical(isolate(selected_ids()), ids)) {
+          pushing_selected_ids(TRUE)
+          last_published_ids(ids)
+          selected_ids(ids)
+        }
       }
     })
 
@@ -1159,7 +1403,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
     output$save_genes <- downloadHandler(
       filename = function() {
         ds <- dataset()
-        md <- input$modus %||% unname(modes[1])
+        md <- current_mode()
         .gene_group_log("preparing gene export filename for dataset='", ds, "', mode='", md, "'.")
         sprintf(
           "selected_genes_%s_%s.txt",
@@ -1178,7 +1422,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       genes=selected_primary_ids,
       annotation=selected_annotation,
       dataset=dataset,
-      modus=reactive(input$modus %||% unname(modes[1]))
+      modus=current_mode
     ))
   })
 }

@@ -243,9 +243,9 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
                           selected_ids=NULL,
                           sample_id_col="SampleID",
                           primary_id="PrimaryID",
-                          dge_pval_col=NULL,
-                          dge_lfc_col=NULL,
-                          dge_fdr_col=NULL,
+                          dge_pval_col="pvalue",
+                          dge_lfc_col="log2FoldChange",
+                          dge_fdr_col="padj",
                           max_genes=150,
                           annot_row_col=NULL) {
   if(is.null(exprs)) {

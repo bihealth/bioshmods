@@ -55,7 +55,8 @@ and \code{dge_require_fdr}. Invalid or unsupported values raise an error.}
 
 \item{selected_ids}{optional \code{reactiveVal()} that will be updated
 with the currently selected PrimaryIDs (column \code{primary_id}) as a
-character vector}
+character vector. When it changes externally, the selector switches to
+\code{by_name} mode and mirrors those IDs in the text field.}
 
 \item{dataset}{optional \code{reactiveVal()} that stores the currently selected
 dataset name. If \code{NULL}, it is initialized internally with \code{reactiveVal()}.}
