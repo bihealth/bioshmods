@@ -168,9 +168,9 @@ heatmapUI <- function(id) {
 #' @param palettes Optional reactive expression or `reactiveVal` returning a
 #'   palette list forwarded to [plot_heatmap()]. Useful when heatmap colors are
 #'   coordinated across modules.
-#' @param selected_ids Optional `reactiveVal()` used to store the currently
-#'   selected gene IDs. If `NULL`, the module initializes its own internal
-#'   `reactiveVal(character(0))`.
+#' @param selected_ids Optional incoming `reactiveVal()` with gene IDs to import
+#'   into the embedded gene-group selector. Heatmap selections are not written
+#'   back there.
 #' @param sample_id_col Name of the sample ID column in `covar`.
 #' @param dge_pval_col Optional p-value column name for DGE mode in
 #'   [geneGroupSelectorServer()].
@@ -298,8 +298,6 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     fig_size <- reactiveValues(width=800, height=600)
     palettes <- palettes %||% reactiveVal(NULL)
     selected_ids_ggs <- reactiveVal(character(0))
-    syncing_external_selected_ids <- reactiveVal(FALSE)
-    last_published_selected_ids <- reactiveVal(character(0))
 
     heatmap_col_var <- list(values = list(type="continuous", breaks = c(-2, -1, 0, 1, 2)))
     heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
@@ -319,27 +317,10 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     if(!is.null(selected_ids)) {
       observeEvent(selected_ids(), {
         ids <- as.character(selected_ids() %||% character(0))
-
-        if(isTRUE(syncing_external_selected_ids()) &&
-           identical(ids, last_published_selected_ids())) {
-          syncing_external_selected_ids(FALSE)
-          return()
-        }
-
-        syncing_external_selected_ids(FALSE)
         if(!identical(isolate(selected_ids_ggs()), ids)) {
           selected_ids_ggs(ids)
         }
       }, ignoreInit=TRUE)
-
-      observe({
-        ids <- selected_ids_ggs()
-        if(!identical(isolate(selected_ids()), ids)) {
-          syncing_external_selected_ids(TRUE)
-          last_published_selected_ids(ids)
-          selected_ids(ids)
-        }
-      })
     }
 
     selected_ids_for_heatmap <- reactive({

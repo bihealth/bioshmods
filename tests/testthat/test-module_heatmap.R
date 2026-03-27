@@ -82,7 +82,7 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
   )
 })
 
-test_that("heatmapServer uses external selected_ids reactiveVal when provided", {
+test_that("heatmapServer does not write local selections back to external selected_ids", {
   x <- .heatmap_test_inputs()
   selected_ids <- reactiveVal(character(0))
 
@@ -101,7 +101,7 @@ test_that("heatmapServer uses external selected_ids reactiveVal when provided", 
       session$setInputs(`gene_selector-name_list` = "g1,g2")
       session$flushReact()
 
-      expect_equal(isolate(selected_ids()), c("g1", "g2"))
+      expect_equal(isolate(selected_ids()), character(0))
       expect_equal(isolate(session$returned$genes()), c("g1", "g2"))
       expect_true(methods::is(isolate(session$returned$heatmap()), "Heatmap"))
     }
