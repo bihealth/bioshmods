@@ -17,8 +17,8 @@
 
 
 ## create a datatable with the genes from a gene set
-.tmod_browser_gene_table <- function(but, ds, id, db_name, cntr_name, 
-                                     sort_name, tmod_dbs, cntr, tmod_map, primary_id, annot) {
+.tmod_browser_gene_table_data <- function(ds, id, db_name, cntr_name,
+                                          sort_name, tmod_dbs, cntr, tmod_map, primary_id, annot) {
 
   db        <- tmod_dbs[[db_name]]
 
@@ -33,8 +33,19 @@
   if(!is.null(annot)) {
     ret <- merge(annot, ret, by=primary_id, all.y=TRUE)
   }
-  ret <- ret %>% mutate('>' = sprintf(but, ds, .data[[primary_id]])) %>% relocate(all_of(">"), .before=1) %>%
-    arrange(.data[["pvalue"]])
+  ret %>% arrange(.data[["pvalue"]])
+}
+
+
+## create a datatable with the genes from a gene set
+.tmod_browser_gene_table <- function(but, ds, id, db_name, cntr_name,
+                                     sort_name, tmod_dbs, cntr, tmod_map, primary_id, annot) {
+
+  ret <- .tmod_browser_gene_table_data(
+    ds=ds, id=id, db_name=db_name, cntr_name=cntr_name, sort_name=sort_name,
+    tmod_dbs=tmod_dbs, cntr=cntr, tmod_map=tmod_map, primary_id=primary_id, annot=annot
+  )
+  ret <- ret %>% mutate('>' = sprintf(but, ds, .data[[primary_id]])) %>% relocate(all_of(">"), .before=1)
 
   num_cols <- colnames(ret)[ map_lgl(ret, is.numeric) ]
 
@@ -160,7 +171,10 @@
 tmodBrowserPlotUI <- function(id) {
     sidebarLayout(
       sidebarPanel(
-        fluidRow(downloadButton(NS(id, "save"), "Save plot", class="bg-success")),
+        fluidRow(
+          column(width=4, uiOutput(NS(id, "show_selected_ui"))),
+          column(width=8, downloadButton(NS(id, "save"), "Save plot", class="bg-success"))
+        ),
         fluidRow(tableOutput(NS(id, "modinfo"))),
         width=5
       ),
@@ -230,6 +244,11 @@ tmodBrowserPlotUI <- function(id) {
 #' @param gene_id must be a `reactiveValues` object. If not NULL, then
 #' clicking on a gene identifier will modify this object (possibly
 #' triggering an event in another module).
+#' @param selected_ids Optional `reactiveVal()` populated with the primary IDs
+#'   from the genes shown in the `Genes` tab when the user clicks the `Show`
+#'   button. If `NULL`, the button is not shown and no external state is updated.
+#' @param ui_config Optional list configuring UI text. Supported keys:
+#'   `show_button_label` for the label shown on the `Show` button.
 #' @param gs_id a "reactive values" object (returned by `reactiveValues()`), including 
 #' dataset (`ds`), gene set ID (`id`), contrast id (`cntr`), database ID
 #' (`db`) and sorting mode (`sort`). If `mod_id` is not `NULL`, these
@@ -243,9 +262,14 @@ tmodBrowserPlotUI <- function(id) {
 #' @export
 tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod_gl=NULL, annot=NULL, 
                                   tmod_res=NULL,
-                                  primary_id="PrimaryID", gene_id=NULL) {
+                                  primary_id="PrimaryID", gene_id=NULL,
+                                  selected_ids=NULL, ui_config=NULL) {
 
   stopifnot(!is.null(tmod_gl) || !is.null(tmod_map))
+  if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
+    stop("`selected_ids` must be NULL or a `reactiveVal()`.")
+  }
+  ui_config <- .normalize_show_button_ui_config(ui_config)
 
   # XXX not a good check
   if(!is.data.frame(annot)) {
@@ -276,6 +300,39 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
 
     disable("save")
 
+    module_genes_data <- reactive({
+      req(gs_id$id)
+      if(!isTruthy(gs_id$id)) { return(NULL) }
+      ds <- gs_id$ds
+      .tmod_browser_gene_table_data(
+        ds=ds,
+        id=gs_id$id,
+        db_name=gs_id$db,
+        cntr_name=gs_id$cntr,
+        sort_name=gs_id$sort,
+        tmod_dbs=tmod_dbs[[ds]],
+        cntr=cntr[[ds]],
+        tmod_map=tmod_map[[ds]],
+        primary_id=primary_id,
+        annot=annot[[ds]]
+      )
+    })
+
+    output$show_selected_ui <- renderUI({
+      req(!is.null(selected_ids))
+      .df <- module_genes_data()
+      req(!is.null(.df), nrow(.df) > 0L, primary_id %in% colnames(.df))
+      actionButton(NS(id, "show_selected"), ui_config$show_button_label, class="btn-default")
+    })
+
+    observeEvent(input$show_selected, {
+      req(!is.null(selected_ids))
+      .df <- module_genes_data()
+      req(!is.null(.df), nrow(.df) > 0L, primary_id %in% colnames(.df))
+      ids <- unique(stats::na.omit(as.character(.df[[primary_id]])))
+      selected_ids(ids[nzchar(ids)])
+    })
+
     ## create the evidence plot and display the command line to replicate it
     output$evidencePlot <- renderPlot({
       #message("Rendering plot")
@@ -302,8 +359,8 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
     })
 
     output$moduleGenes <- renderDT({
-      req(gs_id$id)
-      if(!isTruthy(gs_id$id)) { return(NULL) }
+      .df <- module_genes_data()
+      if(is.null(.df)) { return(NULL) }
       ds <- gs_id$ds
       .tmod_browser_gene_table(as.character(gene.but), ds,
                                     gs_id$id, gs_id$db, gs_id$cntr, gs_id$sort, 

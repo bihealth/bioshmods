@@ -21,6 +21,37 @@
   invisible(NULL)
 }
 
+# Normalize and validate shared show-button UI configuration.
+# Supports a custom label while rejecting unknown or empty values.
+.normalize_show_button_ui_config <- function(ui_config) {
+  defaults <- list(show_button_label="Show")
+
+  if(is.null(ui_config)) {
+    return(defaults)
+  }
+
+  if(!is.list(ui_config)) {
+    stop("`ui_config` must be NULL or a list.")
+  }
+
+  unknown_keys <- setdiff(names(ui_config), names(defaults))
+  if(length(unknown_keys) > 0L) {
+    stop(sprintf(
+      "`ui_config` contains unsupported key(s): %s",
+      paste(unknown_keys, collapse=", ")
+    ))
+  }
+
+  out <- utils::modifyList(defaults, ui_config)
+  out$show_button_label <- trimws(as.character(out$show_button_label)[1])
+
+  if(is.na(out$show_button_label) || !nzchar(out$show_button_label)) {
+    stop("`ui_config$show_button_label` must be a non-empty string.")
+  }
+
+  out
+}
+
 #' Sanitize Text for Filenames
 #'
 #' Normalize free text into a filesystem-safe filename fragment by replacing

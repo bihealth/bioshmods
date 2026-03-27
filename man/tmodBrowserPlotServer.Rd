@@ -17,7 +17,9 @@ tmodBrowserPlotServer(
   annot = NULL,
   tmod_res = NULL,
   primary_id = "PrimaryID",
-  gene_id = NULL
+  gene_id = NULL,
+  selected_ids = NULL,
+  ui_config = NULL
 )
 }
 \arguments{
@@ -46,6 +48,13 @@ another shiny module.}
 \item{gene_id}{must be a \code{reactiveValues} object. If not NULL, then
 clicking on a gene identifier will modify this object (possibly
 triggering an event in another module).}
+
+\item{selected_ids}{Optional \code{reactiveVal()} populated with the primary IDs
+from the genes shown in the \code{Genes} tab when the user clicks the \code{Show}
+button. If \code{NULL}, the button is not shown and no external state is updated.}
+
+\item{ui_config}{Optional list configuring UI text. Supported keys:
+\code{show_button_label} for the label shown on the \code{Show} button.}
 }
 \value{
 returns a reactive value with a selected gene identifier

@@ -130,36 +130,6 @@
   list(cntr = cntr, annot = annot, annot_full = annot_full)
 }
 
-## Normalize and validate optional UI configuration for the module.
-.normalize_volcano_ui_config <- function(ui_config) {
-  defaults <- list(show_button_label="Show")
-
-  if(is.null(ui_config)) {
-    return(defaults)
-  }
-
-  if(!is.list(ui_config)) {
-    stop("`ui_config` must be NULL or a list.")
-  }
-
-  unknown_keys <- setdiff(names(ui_config), names(defaults))
-  if(length(unknown_keys) > 0L) {
-    stop(sprintf(
-      "`ui_config` contains unsupported key(s): %s",
-      paste(unknown_keys, collapse=", ")
-    ))
-  }
-
-  out <- utils::modifyList(defaults, ui_config)
-  out$show_button_label <- trimws(as.character(out$show_button_label)[1])
-
-  if(is.na(out$show_button_label) || !nzchar(out$show_button_label)) {
-    stop("`ui_config$show_button_label` must be a non-empty string.")
-  }
-
-  out
-}
-
 #' @rdname volcanoServer
 #' @export
 volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
@@ -337,7 +307,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
   cntr <- normalized$cntr
   annot <- normalized$annot
   annot_full <- normalized$annot_full
-  ui_config <- .normalize_volcano_ui_config(ui_config)
+  ui_config <- .normalize_show_button_ui_config(ui_config)
 
   if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
     stop("`selected_ids` must be NULL or a `reactiveVal()`.")
