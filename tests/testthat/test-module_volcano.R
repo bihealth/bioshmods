@@ -56,6 +56,11 @@ test_that("volcanoUI contains expected controls and plot outputs", {
   expect_true(grepl("vol-volcanoPlot", html, fixed=TRUE))
   expect_true(grepl("vol-point_id", html, fixed=TRUE))
   expect_true(grepl("vol-sel_genes", html, fixed=TRUE))
+  expect_true(grepl("vol-show_selected_ui", html, fixed=TRUE))
+  expect_lt(
+    regexpr("vol-show_selected_ui", html, fixed=TRUE)[1],
+    regexpr("vol-sel_genes", html, fixed=TRUE)[1]
+  )
 })
 
 test_that(".normalize_volcano_inputs errors when primary_id is NULL", {
@@ -277,6 +282,8 @@ test_that("volcanoServer updates external selected_ids on Show button click", {
       session$flushReact()
 
       expect_true(any(grepl("Show", as.character(output$show_selected_ui), fixed=TRUE)))
+      expect_true(any(grepl("Export to file", as.character(output$show_selected_ui), fixed=TRUE)))
+      expect_true(any(grepl("export_selected", as.character(output$show_selected_ui), fixed=TRUE)))
 
       session$setInputs(show_selected=1)
       session$flushReact()
@@ -284,6 +291,39 @@ test_that("volcanoServer updates external selected_ids on Show button click", {
   )
 
   expect_equal(isolate(selected_ids()), c("g2", "g1"))
+})
+
+test_that("volcanoServer uses configurable show button label", {
+  cntr <- list(
+    contrast_a=.volcano_test_contrast(c("g1", "g2"), c(1, -1), c(0.01, 0.02))
+  )
+  annot <- data.frame(
+    PrimaryID=c("g1", "g2"),
+    SYMBOL=c("A", "B"),
+    stringsAsFactors=FALSE
+  )
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    volcanoServer,
+    args=list(
+      cntr=cntr,
+      annot=annot,
+      selected_ids=selected_ids,
+      ui_config=list(show_button_label="Send to heatmap")
+    ),
+    {
+      selected_genes(data.frame(
+        Dataset=c("default", "default"),
+        PrimaryID=c("g2", "g1"),
+        stringsAsFactors=FALSE
+      ))
+      session$flushReact()
+
+      expect_true(any(grepl("Send to heatmap", as.character(output$show_selected_ui), fixed=TRUE)))
+      expect_true(any(grepl("Export to file", as.character(output$show_selected_ui), fixed=TRUE)))
+    }
+  )
 })
 
 test_that("volcanoServer validates selected_ids", {
@@ -307,6 +347,20 @@ test_that("volcanoServer validates selected_ids", {
       }
     ),
     "selected_ids"
+  )
+
+  expect_error(
+    testServer(
+      volcanoServer,
+      args=list(
+        cntr=cntr,
+        annot=annot,
+        ui_config=list(show_button_label="")
+      ),
+      {
+      }
+    ),
+    "show_button_label"
   )
 })
 

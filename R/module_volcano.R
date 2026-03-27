@@ -128,6 +128,36 @@
   list(cntr = cntr, annot = annot)
 }
 
+## Normalize and validate optional UI configuration for the module.
+.normalize_volcano_ui_config <- function(ui_config) {
+  defaults <- list(show_button_label="Show")
+
+  if(is.null(ui_config)) {
+    return(defaults)
+  }
+
+  if(!is.list(ui_config)) {
+    stop("`ui_config` must be NULL or a list.")
+  }
+
+  unknown_keys <- setdiff(names(ui_config), names(defaults))
+  if(length(unknown_keys) > 0L) {
+    stop(sprintf(
+      "`ui_config` contains unsupported key(s): %s",
+      paste(unknown_keys, collapse=", ")
+    ))
+  }
+
+  out <- utils::modifyList(defaults, ui_config)
+  out$show_button_label <- trimws(as.character(out$show_button_label)[1])
+
+  if(is.na(out$show_button_label) || !nzchar(out$show_button_label)) {
+    stop("`ui_config$show_button_label` must be a non-empty string.")
+  }
+
+  out
+}
+
 #' @rdname volcanoServer
 #' @export
 volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
@@ -188,9 +218,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
                   )
       ),
       column(width=4,
-        HTML("Click on the button to view an expression profile"),
-        tableOutput(NS(id, "sel_genes")),
-        uiOutput(NS(id, "show_selected_ui"))
+        uiOutput(NS(id, "show_selected_ui")),
+        tableOutput(NS(id, "sel_genes"))
       ), width=10
     )
   )
@@ -223,6 +252,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #' @param selected_ids Optional `reactiveVal()` populated with the primary IDs
 #'   from the current plot selection when the user clicks the `Show` button.
 #'   If `NULL`, the button is not shown and no external state is updated.
+#' @param ui_config Optional list configuring UI text. Supported keys:
+#'   `show_button_label` for the label shown on the `Show` button.
 #' @param annot_show which columns from the annotation data frame should be
 #' shown when mouse hovers over a gene
 #'
@@ -291,11 +322,13 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
                           primary_id="PrimaryID",
                           annot=NULL, gene_id=NULL,
                           selected_ids=NULL,
+                          ui_config=NULL,
                           annot_show=c("SYMBOL", "ENTREZID")) {
 
   normalized <- .normalize_volcano_inputs(cntr, annot, primary_id, lfc_col, pval_col, annot_show)
   cntr <- normalized$cntr
   annot <- normalized$annot
+  ui_config <- .normalize_volcano_ui_config(ui_config)
 
   if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
     stop("`selected_ids` must be NULL or a `reactiveVal()`.")
@@ -330,23 +363,47 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       })
     })
 
-    output$sel_genes <- renderTable({
+    selected_genes_table <- reactive({
       .df <- selected_genes()
+      if(is.null(.df) || nrow(.df) == 0L) {
+        return(NULL)
+      }
+      .ds <- .df[["Dataset"]][1]
+      .ann <- annot[[.ds]][ match(.df[[primary_id]], annot[[.ds]][[primary_id]]), , drop=FALSE ]
+      dplyr::bind_cols(.df["Dataset"], .ann)
+    })
+
+    output$sel_genes <- renderTable({
+      .df <- selected_genes_table()
       if(is.null(.df)) { return(NULL) }
       link <- actionButton(NS(id, "gene_id~%s~%s"), label="%s \U25B6 ",
                            onclick=sprintf('Shiny.onInputChange(\"%s-genebutton\",  this.id)', id),
                            class = "btn-primary btn-sm")
-      .ds <- .df[["Dataset"]][1]
-      .df <- annot[[.ds]][ match(.df[[primary_id]], annot[[.ds]][[primary_id]]), , drop=FALSE ]
-      .df[[primary_id]] <- sprintf(as.character(link), .ds, .df[[primary_id]], .df[[primary_id]])
+      .df[[primary_id]] <- sprintf(as.character(link), .df[["Dataset"]], .df[[primary_id]], .df[[primary_id]])
       .df
     }, sanitize.text.function=function(x) x)
 
     output$show_selected_ui <- renderUI({
-      req(!is.null(selected_ids))
-      .df <- selected_genes()
+      .df <- selected_genes_table()
       req(!is.null(.df), nrow(.df) > 0L)
-      actionButton(NS(id, "show_selected"), "Show", class="btn-default")
+      buttons <- list(
+        downloadButton(NS(id, "export_selected"), "Export to file", class="btn-default")
+      )
+
+      if(!is.null(selected_ids)) {
+        buttons <- c(
+          list(actionButton(NS(id, "show_selected"), ui_config$show_button_label, class="btn-default")),
+          buttons
+        )
+      }
+
+      do.call(
+        shiny::tags$div,
+        c(
+          list(style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"),
+          buttons
+        )
+      )
     })
 
     observeEvent(input$genebutton, {
@@ -364,6 +421,19 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       ids <- unique(stats::na.omit(as.character(.df[[primary_id]])))
       selected_ids(ids[nzchar(ids)])
     })
+
+    output$export_selected <- downloadHandler(
+      filename = function() {
+        .ds <- input$dataset
+        if(!isTruthy(.ds)) { .ds <- "_all" }
+        sprintf("volcano_selected_genes_%s.xlsx", sanitize_filename(.ds, "all"))
+      },
+      content = function(file) {
+        .df <- selected_genes_table()
+        req(!is.null(.df), nrow(.df) > 0L)
+        writexl::write_xlsx(list(selected_genes=.df), path=file)
+      }
+    )
 
     observeEvent(input$figure_size, {
       size <- sanitize_figsize(input$figure_size, default=c(800, 800))
