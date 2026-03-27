@@ -39,9 +39,10 @@ test_that(".normalize_volcano_inputs keeps explicit default primary_id", {
     annot_show="SYMBOL"
   )
 
-  expect_named(normalized, c("cntr", "annot"))
+  expect_named(normalized, c("cntr", "annot", "annot_full"))
   expect_equal(normalized$cntr$default$contrast_a$PrimaryID, c("g1", "g2"))
   expect_equal(normalized$annot$default$PrimaryID, c("g1", "g2"))
+  expect_equal(normalized$annot_full$default$SYMBOL, c("A", "B"))
 })
 
 test_that("volcanoUI contains expected controls and plot outputs", {
@@ -53,6 +54,9 @@ test_that("volcanoUI contains expected controls and plot outputs", {
   expect_true(grepl("vol-pval_thr", html, fixed=TRUE))
   expect_true(grepl("vol-lfc_thr", html, fixed=TRUE))
   expect_true(grepl("vol-save", html, fixed=TRUE))
+  expect_true(grepl("vol-show_top_labels", html, fixed=TRUE))
+  expect_true(grepl("vol-top_label_n", html, fixed=TRUE))
+  expect_true(grepl("vol-label_col_ui", html, fixed=TRUE))
   expect_true(grepl("vol-volcanoPlot", html, fixed=TRUE))
   expect_true(grepl("vol-point_id", html, fixed=TRUE))
   expect_true(grepl("vol-sel_genes", html, fixed=TRUE))
@@ -125,8 +129,11 @@ test_that(".normalize_volcano_inputs supports multi-dataset input and trims anno
 
   expect_named(normalized$cntr, c("ds_a", "ds_b"))
   expect_named(normalized$annot, c("ds_a", "ds_b"))
+  expect_named(normalized$annot_full, c("ds_a", "ds_b"))
   expect_named(normalized$annot$ds_a, c("PrimaryID", "SYMBOL"))
   expect_named(normalized$annot$ds_b, c("PrimaryID", "SYMBOL"))
+  expect_named(normalized$annot_full$ds_a, c("PrimaryID", "SYMBOL", "EXTRA"))
+  expect_named(normalized$annot_full$ds_b, c("PrimaryID", "SYMBOL", "EXTRA"))
 })
 
 test_that(".normalize_volcano_inputs errors when explicit primary_id is missing in contrasts", {
@@ -394,6 +401,132 @@ test_that("volcanoServer shows annot_show columns on hover", {
       expect_match(html, "g2")
       expect_match(html, "B")
       expect_match(html, "22")
+    }
+  )
+})
+
+test_that("volcanoServer adds text labels when top labels are enabled", {
+  cntr <- list(
+    contrast_a=.volcano_test_contrast(
+      c("g1", "g2", "g3"),
+      c(2, -1.5, 0.2),
+      c(0.001, 0.01, 0.5)
+    )
+  )
+  annot <- data.frame(
+    PrimaryID=c("g1", "g2", "g3"),
+    stringsAsFactors=FALSE
+  )
+
+  testServer(
+    volcanoServer,
+    args=list(
+      cntr=cntr,
+      annot=annot
+    ),
+    {
+      session$setInputs(
+        .clientdata_output_volcanoPlot_width=800,
+        .clientdata_output_volcanoPlot_height=600
+      )
+      session$setInputs(
+        dataset="default",
+        lfc_thr=0,
+        pval_thr=1,
+        samescaleX=TRUE,
+        samescaleY=TRUE,
+        figure_size="800x600",
+        font_size=12,
+        show_top_labels=TRUE,
+        top_label_n=2
+      )
+      session$flushReact()
+      output$volcanoPlot
+      session$flushReact()
+
+      g <- isolate(plot_obj())
+      expect_s3_class(g, "ggplot")
+      expect_true(any(vapply(g$layers, function(x) inherits(x$geom, "GeomText"), logical(1))))
+    }
+  )
+})
+
+test_that("volcanoServer chooses top labels per contrast", {
+  cntr <- list(
+    contrast_a=.volcano_test_contrast(
+      c("g1", "g2"),
+      c(2, 0.5),
+      c(0.001, 0.2)
+    ),
+    contrast_b=.volcano_test_contrast(
+      c("g3", "g4"),
+      c(-1.8, 0.2),
+      c(0.002, 0.4)
+    )
+  )
+  annot <- data.frame(
+    PrimaryID=c("g1", "g2", "g3", "g4"),
+    stringsAsFactors=FALSE
+  )
+
+  testServer(
+    volcanoServer,
+    args=list(
+      cntr=cntr,
+      annot=annot
+    ),
+    {
+      session$setInputs(
+        .clientdata_output_volcanoPlot_width=800,
+        .clientdata_output_volcanoPlot_height=600
+      )
+      session$setInputs(
+        dataset="default",
+        lfc_thr=0,
+        pval_thr=1,
+        samescaleX=TRUE,
+        samescaleY=TRUE,
+        figure_size="800x600",
+        font_size=12,
+        show_top_labels=TRUE,
+        top_label_n=1
+      )
+      session$flushReact()
+      output$volcanoPlot
+      session$flushReact()
+
+      g <- isolate(plot_obj())
+      text_layer <- g$layers[[which(vapply(g$layers, function(x) inherits(x$geom, "GeomText"), logical(1)))[1]]]
+      expect_equal(nrow(text_layer$data), 2)
+      expect_setequal(text_layer$data$PrimaryID, c("g1", "g3"))
+    }
+  )
+})
+
+test_that("volcanoServer shows label column selector when annotation columns are available", {
+  cntr <- list(
+    contrast_a=.volcano_test_contrast(c("g1", "g2"), c(1, -1), c(0.01, 0.02))
+  )
+  annot <- data.frame(
+    PrimaryID=c("g1", "g2"),
+    SYMBOL=c("A", "B"),
+    ENTREZID=c("11", "22"),
+    stringsAsFactors=FALSE
+  )
+
+  testServer(
+    volcanoServer,
+    args=list(
+      cntr=cntr,
+      annot=annot
+    ),
+    {
+      session$flushReact()
+      html <- paste(as.character(output$label_col_ui), collapse="\n")
+      expect_match(html, "Label column")
+      expect_match(html, "Primary ID")
+      expect_match(html, "SYMBOL")
+      expect_match(html, "ENTREZID")
     }
   )
 })

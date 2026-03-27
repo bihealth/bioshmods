@@ -70,6 +70,7 @@
   }
 
   annot <- annot[names(cntr)]
+  annot_full <- annot
 
   for (ds in names(cntr)) {
     cntr_ds <- cntr[[ds]]
@@ -97,6 +98,7 @@
 
     if (is.null(annot[[ds]])) {
       annot[[ds]] <- .volcano_make_annotation_from_cntr(cntr_ds, primary_id)
+      annot_full[[ds]] <- annot[[ds]]
     }
 
     if (!is.data.frame(annot[[ds]])) {
@@ -125,7 +127,7 @@
     annot[[ds]] <- annot[[ds]] %>% select(any_of(keep_cols))
   }
 
-  list(cntr = cntr, annot = annot)
+  list(cntr = cntr, annot = annot, annot_full = annot_full)
 }
 
 ## Normalize and validate optional UI configuration for the module.
@@ -204,6 +206,12 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
         column(width=6, numericInput(NS(id, "font_size"), label="Font size", value = 12, 
                                  min=3, step=1, width="100%"),
                     bsTooltip(NS(id, "font_size"), "Change the font size of plot labels"))),
+      fluidRow(column(width=12,
+                      checkboxInput(NS(id, "show_top_labels"), "Show top labels", value=FALSE))),
+      fluidRow(column(width=12,
+                      numericInput(NS(id, "top_label_n"), "Top labels (N)", value=10,
+                                   min=1, step=1, width="80%"))),
+      fluidRow(column(width=12, uiOutput(NS(id, "label_col_ui")))),
       fluidRow(column(width=12,
                       downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success"))),
       fluidRow(tableOutput(NS(id, "point_id"))),
@@ -328,6 +336,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
   normalized <- .normalize_volcano_inputs(cntr, annot, primary_id, lfc_col, pval_col, annot_show)
   cntr <- normalized$cntr
   annot <- normalized$annot
+  annot_full <- normalized$annot_full
   ui_config <- .normalize_volcano_ui_config(ui_config)
 
   if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
@@ -361,6 +370,29 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
         .ann <- annot[[.ds]][ match(.sel[[primary_id]], annot[[.ds]][[primary_id]]), , drop=FALSE ]
         dplyr::bind_cols(.sel["Dataset"], .ann)
       })
+    })
+
+    output$label_col_ui <- renderUI({
+      common_cols <- Reduce(intersect, lapply(annot_full, colnames))
+      label_cols <- setdiff(common_cols, primary_id)
+      if(length(label_cols) == 0L) {
+        return(NULL)
+      }
+
+      selected_label_col <- isolate(input$label_col %||% primary_id)
+      choices <- stats::setNames(c(primary_id, label_cols), c("Primary ID", label_cols))
+
+      if(!selected_label_col %in% unname(choices)) {
+        selected_label_col <- primary_id
+      }
+
+      selectInput(
+        NS(id, "label_col"),
+        "Label column",
+        choices=choices,
+        selected=selected_label_col,
+        width="100%"
+      )
     })
 
     selected_genes_table <- reactive({
@@ -441,6 +473,14 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       fig_size$height <- size$height
     })
 
+    observeEvent(input$show_top_labels, {
+      if(isTRUE(input$show_top_labels)) {
+        shinyjs::enable("top_label_n")
+      } else {
+        shinyjs::disable("top_label_n")
+      }
+    }, ignoreInit=FALSE)
+
     output$save <- downloadHandler(
       filename = function() {
         .ds <- input$dataset
@@ -504,6 +544,44 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
       dfvar(df)
       # print(head(df, 100))
 
+      label_df <- NULL
+      if(isTRUE(input$show_top_labels)) {
+        top_n <- suppressWarnings(as.integer(input$top_label_n)[1])
+        if(!is.na(top_n) && top_n > 0L) {
+          label_df <- df %>%
+            filter(!is.na(.data[[primary_id]]) & .data[[primary_id]] != "") %>%
+            arrange(desc(.data[["Significant"]]), desc(.data[["y"]]),
+                    desc(abs(.data[[lfc_col]]))) %>%
+            distinct(.data[["Dataset_Contrast"]], .data[[primary_id]], .keep_all=TRUE) %>%
+            group_by(.data[["Dataset_Contrast"]]) %>%
+            slice_head(n=top_n) %>%
+            ungroup()
+
+          label_col <- trimws(as.character(input$label_col %||% primary_id)[1])
+          if(!nzchar(label_col) || is.na(label_col)) {
+            label_col <- primary_id
+          }
+
+          label_df[["label"]] <- vapply(seq_len(nrow(label_df)), function(i) {
+            .ds <- label_df[["Dataset"]][i]
+            .id <- label_df[[primary_id]][i]
+            .ann <- annot_full[[.ds]]
+
+            if(is.null(.ann) || !label_col %in% colnames(.ann)) {
+              return(as.character(.id))
+            }
+
+            .val <- .ann[[label_col]][ match(.id, .ann[[primary_id]]) ]
+            .val <- as.character(.val)[1]
+            if(is.na(.val) || !nzchar(.val)) {
+              as.character(.id)
+            } else {
+              .val
+            }
+          }, character(1))
+        }
+      }
+
       g <- ggplot(df, aes(x=.data[[lfc_col]], y=.data[["y"]],
                      color   =.data[["Significant"]])) +
         geom_point(alpha=.5) +
@@ -511,6 +589,18 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
         scale_color_manual(values=c("TRUE"="red", "FALSE"="black")) +
                                    theme(text=element_text(size=input$font_size)) +
                                    theme(legend.position="bottom")
+
+      if(!is.null(label_df) && nrow(label_df) > 0L) {
+        g <- g + geom_text(
+          data=label_df,
+          aes(label=.data[["label"]]),
+          check_overlap=TRUE,
+          vjust=-0.4,
+          size=max(2.5, input$font_size / 4),
+          show.legend=FALSE
+        )
+      }
+
       # ggsave("debug_volcano_plot.pdf", g, width=fig_size$width/100, height=fig_size$height/100)
       # saveRDS(g, "debug_volcano_plot.rds")
       plot_obj(g)
