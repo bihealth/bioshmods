@@ -108,6 +108,29 @@ test_that("heatmapServer uses external selected_ids reactiveVal when provided", 
   )
 })
 
+test_that("heatmapServer mirrors external selected_ids into the embedded selector", {
+  x <- .heatmap_test_inputs()
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    heatmapServer,
+    args = list(
+      annot = x$annot,
+      exprs = x$exprs,
+      covar = x$covar,
+      selected_ids = selected_ids
+    ),
+    {
+      session$flushReact()
+      selected_ids(c("g4", "g2"))
+      session$flushReact()
+
+      expect_equal(isolate(session$returned$genes()), c("g4", "g2"))
+      expect_true(methods::is(isolate(session$returned$heatmap()), "Heatmap"))
+    }
+  )
+})
+
 test_that("heatmapServer supports custom sample_id_col and validates missing columns", {
   x <- .heatmap_test_inputs(use_label = TRUE)
 

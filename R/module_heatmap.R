@@ -293,18 +293,57 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     }
   }
 
-  selected_ids <- selected_ids %||% reactiveVal(character(0))
-
   moduleServer(id, function(input, output, session) {
     .heatmap_log("moduleServer started for id='", id, "'.")
     fig_size <- reactiveValues(width=800, height=600)
     palettes <- palettes %||% reactiveVal(NULL)
+    selected_ids_ggs <- reactiveVal(character(0))
+    syncing_external_selected_ids <- reactiveVal(FALSE)
+    last_published_selected_ids <- reactiveVal(character(0))
 
     heatmap_col_var <- list(values = list(type="continuous", breaks = c(-2, -1, 0, 1, 2)))
     heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
 
+    selector <- geneGroupSelectorServer(
+      "gene_selector",
+      annot=annot,
+      exprs=exprs,
+      cntr=cntr,
+      primary_id=primary_id,
+      dge_pval_col=dge_pval_col,
+      dge_lfc_col=dge_lfc_col,
+      dge_fdr_col=dge_fdr_col,
+      selected_ids=selected_ids_ggs
+    )
+
+    if(!is.null(selected_ids)) {
+      observeEvent(selected_ids(), {
+        ids <- as.character(selected_ids() %||% character(0))
+
+        if(isTRUE(syncing_external_selected_ids()) &&
+           identical(ids, last_published_selected_ids())) {
+          syncing_external_selected_ids(FALSE)
+          return()
+        }
+
+        syncing_external_selected_ids(FALSE)
+        if(!identical(isolate(selected_ids_ggs()), ids)) {
+          selected_ids_ggs(ids)
+        }
+      }, ignoreInit=TRUE)
+
+      observe({
+        ids <- selected_ids_ggs()
+        if(!identical(isolate(selected_ids()), ids)) {
+          syncing_external_selected_ids(TRUE)
+          last_published_selected_ids(ids)
+          selected_ids(ids)
+        }
+      })
+    }
+
     selected_ids_for_heatmap <- reactive({
-      ids <- selected_ids()
+      ids <- selector$genes()
       if(length(ids) > max_genes) {
         .heatmap_log("selected genes=", as.character(length(ids)), " exceeds max_genes=",
                      as.character(max_genes), "; truncating for display.")
@@ -322,18 +361,6 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       .heatmap_log("figure_size input='", input$figure_size, "' parsed as ",
                    as.character(size$width), "x", as.character(size$height), ".")
     })
-
-    selector <- geneGroupSelectorServer(
-      "gene_selector",
-      annot=annot,
-      exprs=exprs,
-      cntr=cntr,
-      primary_id=primary_id,
-      dge_pval_col=dge_pval_col,
-      dge_lfc_col=dge_lfc_col,
-      dge_fdr_col=dge_fdr_col,
-      selected_ids=selected_ids
-    )
 
     observe({
       ds <- selector$dataset()
@@ -375,11 +402,11 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     })
 
     output$selected_genes_n <- renderText({
-      sprintf("Selected genes: %d", length(selected_ids()))
+      sprintf("Selected genes: %d", length(selector$genes()))
     })
 
     output$selected_genes_warning <- renderText({
-      n <- length(selected_ids())
+      n <- length(selector$genes())
       if(n <= max_genes) {
         return("")
       }
@@ -392,7 +419,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       req(ds %in% datasets)
       req(length(selected_ids_for_heatmap()) > 0L)
       .heatmap_log("building heatmap object for dataset='", ds, "' with selected_ids=",
-                   as.character(length(selected_ids())), " (displaying ",
+                   as.character(length(selector$genes())), " (displaying ",
                    as.character(length(selected_ids_for_heatmap())), ").")
 
       sel_annot_safe <- intersect(
@@ -464,7 +491,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     )
 
     return(list(
-      genes=reactive(selected_ids()),
+      genes=selector$genes,
       dataset=selector$dataset,
       heatmap=heatmap_obj
     ))

@@ -161,6 +161,41 @@ test_that("geneGroupSelectorServer switches to by_name when selected_ids changes
   )
 })
 
+test_that("geneGroupSelectorServer can switch away from by_name after external IDs", {
+  annot <- data.frame(
+    PrimaryID = paste0("g", 1:6),
+    stringsAsFactors = FALSE
+  )
+  exprs <- matrix(
+    seq_len(12),
+    nrow = 6,
+    dimnames = list(annot$PrimaryID, c("s1", "s2"))
+  )
+  selected_ids <- reactiveVal(character(0))
+
+  testServer(
+    geneGroupSelectorServer,
+    args = list(
+      annot = annot,
+      exprs = exprs,
+      selected_ids = selected_ids
+    ),
+    {
+      session$flushReact()
+      selected_ids(c("g4", "g2"))
+      session$flushReact()
+
+      expect_equal(isolate(session$returned$modus()), "by_name")
+
+      session$setInputs(modus = "by_expression")
+      session$flushReact()
+
+      expect_equal(isolate(session$returned$modus()), "by_expression")
+      expect_true(any(grepl("expr_metric", as.character(output$modus_controls), fixed = TRUE)))
+    }
+  )
+})
+
 test_that("geneGroupSelectorServer keeps external by_name state when modus is transiently blank", {
   annot <- data.frame(
     PrimaryID = paste0("g", 1:6),

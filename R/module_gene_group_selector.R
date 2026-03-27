@@ -1270,14 +1270,17 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       })
     }, ignoreInit=FALSE)
 
-    # Derive the effective selector mode from UI state and external overrides.
-    # External selected IDs force the selector into by-name mode until that override is cleared.
+    # Derive the effective selector mode from the mode widget, with a by-name fallback.
+    # External selected IDs only influence mode while the widget is transiently blank.
     current_mode <- reactive({
       mode_input <- trimws(as.character(input$modus %||% "")[1])
-      if(!is.null(external_name_state())) {
-        return("by_name")
+      if(!nzchar(mode_input)) {
+        if(!is.null(external_name_state())) {
+          return("by_name")
+        }
+        return(default_mode)
       }
-      if(!nzchar(mode_input) || !mode_input %in% unname(modes)) {
+      if(!mode_input %in% unname(modes)) {
         return(default_mode)
       }
       mode_input
@@ -1398,10 +1401,11 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
         pushing_selected_ids(FALSE)
         external_name_state(.gene_group_external_name_state(selector_config$primary_id, ids))
 
-        if(!identical(isolate(input$modus %||% default_mode), "by_name")) {
+        if(!identical(trimws(as.character(isolate(input$modus %||% default_mode))[1]), "by_name")) {
           shiny::updateSelectizeInput(
             session=session,
             inputId="modus",
+            choices=modes,
             selected="by_name",
             server=TRUE
           )
