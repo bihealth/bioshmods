@@ -52,6 +52,24 @@
   out
 }
 
+# Validate an optional shared selection object with an `ids` reactive element.
+# Used by modules that import/export gene IDs through reactiveValues.
+.check_selection_reactivevalues <- function(selection, arg_name="selection") {
+  if(is.null(selection)) {
+    return(invisible(NULL))
+  }
+
+  if(!(inherits(selection, "reactivevalues") || isTRUE(shiny::is.reactivevalues(selection)))) {
+    stop(sprintf("`%s` must be NULL or a `reactiveValues()` object.", arg_name))
+  }
+
+# if(!"ids" %in% names(selection)) {
+#   stop(sprintf("`%s` must contain an `ids` element.", arg_name))
+# }
+
+  invisible(NULL)
+}
+
 #' Sanitize Text for Filenames
 #'
 #' Normalize free text into a filesystem-safe filename fragment by replacing

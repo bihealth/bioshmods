@@ -18,7 +18,7 @@ geneGroupSelectorServer(
   dge_lfc_col = NULL,
   dge_fdr_col = NULL,
   defaults = NULL,
-  selected_ids = NULL,
+  selection = NULL,
   dataset = NULL
 )
 }
@@ -53,10 +53,11 @@ for DGE mode.}
 \code{dge_top_value}, \code{dge_rank_mode}, \code{dge_pval_thr}, \code{dge_lfc_thr},
 and \code{dge_require_fdr}. Invalid or unsupported values raise an error.}
 
-\item{selected_ids}{optional \code{reactiveVal()} that will be updated
-with the currently selected PrimaryIDs (column \code{primary_id}) as a
-character vector. When it changes externally, the selector switches to
-\code{by_name} mode and mirrors those IDs in the text field.}
+\item{selection}{optional \code{reactiveValues()} object with an \code{ids}
+element that will be updated with the currently selected PrimaryIDs
+(column \code{primary_id}) as a character vector. When \code{selection$ids}
+changes externally, the selector switches to \code{by_name} mode and mirrors
+those IDs in the text field.}
 
 \item{dataset}{optional \code{reactiveVal()} that stores the currently selected
 dataset name. If \code{NULL}, it is initialized internally with \code{reactiveVal()}.}
@@ -104,18 +105,18 @@ if(interactive()) {
     )
   )
   server <- function(input, output, session) {
-    selected_ids <- reactiveVal(character())
+    selection <- reactiveValues(ids=character())
 
     geneGroupSelectorServer(
       "gsel",
       annot=annot,
       exprs=exprs,
       cntr=cntr,
-      selected_ids=selected_ids
+      selection=selection
     )
 
     output$selected_ids <- renderTable({
-      data.frame(PrimaryID=selected_ids(), stringsAsFactors=FALSE)
+      data.frame(PrimaryID=selection$ids, stringsAsFactors=FALSE)
     })
   }
   shinyApp(ui, server)
@@ -131,18 +132,18 @@ if(interactive()) {
     )
   )
   server <- function(input, output, session) {
-    selected_ids <- reactiveVal(character())
+    selection <- reactiveValues(ids=character())
 
     geneGroupSelectorServer(
       "gsel",
       annot=C19$annotation,
       exprs=C19$expression,
       cntr=C19$contrasts,
-      selected_ids=selected_ids
+      selection=selection
     )
 
     output$selected_ids <- renderTable({
-      data.frame(PrimaryID=selected_ids(), stringsAsFactors=FALSE)
+      data.frame(PrimaryID=selection$ids, stringsAsFactors=FALSE)
     })
   }
   shinyApp(ui, server)

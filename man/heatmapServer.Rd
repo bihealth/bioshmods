@@ -14,7 +14,7 @@ heatmapServer(
   cntr = NULL,
   covar = NULL,
   palettes = NULL,
-  selected_ids = NULL,
+  selection = NULL,
   sample_id_col = "SampleID",
   primary_id = "PrimaryID",
   dge_pval_col = NULL,
@@ -42,9 +42,9 @@ data frames (multi-dataset mode).}
 palette list forwarded to \code{\link[=plot_heatmap]{plot_heatmap()}}. Useful when heatmap colors are
 coordinated across modules.}
 
-\item{selected_ids}{Optional incoming \code{reactiveVal()} with gene IDs to import
-into the embedded gene-group selector. Heatmap selections are not written back
-there.}
+\item{selection}{Optional incoming \code{reactiveValues()} object with an \code{ids}
+element containing gene IDs to import into the embedded gene-group selector.
+Heatmap selections are not written back there.}
 
 \item{sample_id_col}{Name of the sample ID column in \code{covar}.}
 

@@ -16,13 +16,13 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
     stringsAsFactors = FALSE
   )
 
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
     args = list(
       annot = annot,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$setInputs(modus = "by_name")
@@ -32,13 +32,13 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
     }
   )
 
-  expect_equal(isolate(selected_ids()), c("g2", "g1"))
+  expect_equal(isolate(selection$ids), c("g2", "g1"))
 
   testServer(
     geneGroupSelectorServer,
     args = list(
       annot = annot,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$setInputs(modus = "by_name")
@@ -47,7 +47,7 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
     }
   )
 
-  expect_equal(isolate(selected_ids()), character(0))
+  expect_equal(isolate(selection$ids), character(0))
 })
 
 test_that("geneGroupSelectorServer defaults to expression mode and top 50 by mean", {
@@ -63,14 +63,14 @@ test_that("geneGroupSelectorServer defaults to expression mode and top 50 by mea
   rownames(exprs) <- annot$PrimaryID
   colnames(exprs) <- c("s1", "s2")
 
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
     args = list(
       annot = annot,
       exprs = exprs,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$flushReact()
@@ -78,8 +78,8 @@ test_that("geneGroupSelectorServer defaults to expression mode and top 50 by mea
     }
   )
 
-  expect_equal(length(isolate(selected_ids())), 50)
-  expect_equal(isolate(selected_ids()), paste0("g", 60:11))
+  expect_equal(length(isolate(selection$ids)), 50)
+  expect_equal(isolate(selection$ids), paste0("g", 60:11))
 })
 
 test_that("geneGroupSelectorServer supports custom mode order and defaults", {
@@ -102,7 +102,7 @@ test_that("geneGroupSelectorServer supports custom mode order and defaults", {
     )
   )
 
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
@@ -112,7 +112,7 @@ test_that("geneGroupSelectorServer supports custom mode order and defaults", {
       cntr = cntr,
       mode_order = c("by_name", "by_expression", "by_dge"),
       defaults = list(expr_top_value = 3),
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$flushReact()
@@ -122,10 +122,10 @@ test_that("geneGroupSelectorServer supports custom mode order and defaults", {
     }
   )
 
-  expect_equal(isolate(selected_ids()), c("g8", "g7", "g6"))
+  expect_equal(isolate(selection$ids), c("g8", "g7", "g6"))
 })
 
-test_that("geneGroupSelectorServer switches to by_name when selected_ids changes externally", {
+test_that("geneGroupSelectorServer switches to by_name when selection ids changes externally", {
   annot <- data.frame(
     PrimaryID = paste0("g", 1:6),
     SYMBOL = LETTERS[1:6],
@@ -136,20 +136,20 @@ test_that("geneGroupSelectorServer switches to by_name when selected_ids changes
     nrow = 6,
     dimnames = list(annot$PrimaryID, c("s1", "s2"))
   )
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
     args = list(
       annot = annot,
       exprs = exprs,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$flushReact()
       expect_equal(isolate(session$returned$modus()), "by_expression")
 
-      selected_ids(c("g4", "g2"))
+      selection$ids <- c("g4", "g2")
       session$flushReact()
 
       expect_equal(isolate(session$returned$modus()), "by_name")
@@ -171,18 +171,18 @@ test_that("geneGroupSelectorServer can switch away from by_name after external I
     nrow = 6,
     dimnames = list(annot$PrimaryID, c("s1", "s2"))
   )
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
     args = list(
       annot = annot,
       exprs = exprs,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$flushReact()
-      selected_ids(c("g4", "g2"))
+      selection$ids <- c("g4", "g2")
       session$flushReact()
 
       expect_equal(isolate(session$returned$modus()), "by_name")
@@ -206,18 +206,18 @@ test_that("geneGroupSelectorServer keeps external by_name state when modus is tr
     nrow = 6,
     dimnames = list(annot$PrimaryID, c("s1", "s2"))
   )
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
     args = list(
       annot = annot,
       exprs = exprs,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$flushReact()
-      selected_ids(c("g4", "g2"))
+      selection$ids <- c("g4", "g2")
       session$flushReact()
 
       session$setInputs(modus = "")
@@ -244,7 +244,7 @@ test_that("geneGroupSelectorServer uses server-level DGE column params", {
     )
   )
 
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
@@ -254,7 +254,7 @@ test_that("geneGroupSelectorServer uses server-level DGE column params", {
       dge_pval_col = "PVAL",
       dge_lfc_col = "L2FC",
       dge_fdr_col = "QVAL",
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$setInputs(modus = "by_dge")
@@ -265,7 +265,7 @@ test_that("geneGroupSelectorServer uses server-level DGE column params", {
     }
   )
 
-  expect_equal(isolate(selected_ids()), c("g1", "g2", "g4"))
+  expect_equal(isolate(selection$ids), c("g1", "g2", "g4"))
 })
 
 test_that("geneGroupSelectorServer does not auto-detect DGE columns", {
@@ -283,14 +283,14 @@ test_that("geneGroupSelectorServer does not auto-detect DGE columns", {
     )
   )
 
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     geneGroupSelectorServer,
     args = list(
       annot = annot,
       cntr = cntr,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$setInputs(modus = "by_dge")
@@ -301,7 +301,7 @@ test_that("geneGroupSelectorServer does not auto-detect DGE columns", {
     }
   )
 
-  expect_equal(isolate(selected_ids()), character(0))
+  expect_equal(isolate(selection$ids), character(0))
 })
 
 test_that("geneGroupSelectorServer synchronizes dataset reactiveVal with UI", {

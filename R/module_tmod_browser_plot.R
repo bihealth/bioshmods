@@ -244,9 +244,10 @@ tmodBrowserPlotUI <- function(id) {
 #' @param gene_id must be a `reactiveValues` object. If not NULL, then
 #' clicking on a gene identifier will modify this object (possibly
 #' triggering an event in another module).
-#' @param selected_ids Optional `reactiveVal()` populated with the primary IDs
-#'   from the genes shown in the `Genes` tab when the user clicks the `Show`
-#'   button. If `NULL`, the button is not shown and no external state is updated.
+#' @param selection Optional `reactiveValues()` object with an `ids` element
+#'   populated with the primary IDs from the genes shown in the `Genes` tab
+#'   when the user clicks the `Show` button. If `NULL`, the button is not
+#'   shown and no external state is updated.
 #' @param ui_config Optional list configuring UI text. Supported keys:
 #'   `show_button_label` for the label shown on the `Show` button.
 #' @param gs_id a "reactive values" object (returned by `reactiveValues()`), including 
@@ -263,12 +264,10 @@ tmodBrowserPlotUI <- function(id) {
 tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod_gl=NULL, annot=NULL, 
                                   tmod_res=NULL,
                                   primary_id="PrimaryID", gene_id=NULL,
-                                  selected_ids=NULL, ui_config=NULL) {
+                                  selection=NULL, ui_config=NULL) {
 
   stopifnot(!is.null(tmod_gl) || !is.null(tmod_map))
-  if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
-    stop("`selected_ids` must be NULL or a `reactiveVal()`.")
-  }
+  .check_selection_reactivevalues(selection, arg_name="selection")
   ui_config <- .normalize_show_button_ui_config(ui_config)
 
   # XXX not a good check
@@ -319,18 +318,18 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
     })
 
     output$show_selected_ui <- renderUI({
-      req(!is.null(selected_ids))
+      req(!is.null(selection))
       .df <- module_genes_data()
       req(!is.null(.df), nrow(.df) > 0L, primary_id %in% colnames(.df))
       actionButton(NS(id, "show_selected"), ui_config$show_button_label, class="btn-default")
     })
 
     observeEvent(input$show_selected, {
-      req(!is.null(selected_ids))
+      req(!is.null(selection))
       .df <- module_genes_data()
       req(!is.null(.df), nrow(.df) > 0L, primary_id %in% colnames(.df))
       ids <- unique(stats::na.omit(as.character(.df[[primary_id]])))
-      selected_ids(ids[nzchar(ids)])
+      selection$ids <- ids[nzchar(ids)]
     })
 
     ## create the evidence plot and display the command line to replicate it

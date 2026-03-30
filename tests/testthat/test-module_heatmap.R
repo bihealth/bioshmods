@@ -82,9 +82,9 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
   )
 })
 
-test_that("heatmapServer does not write local selections back to external selected_ids", {
+test_that("heatmapServer does not write local selections back to external selection ids", {
   x <- .heatmap_test_inputs()
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     heatmapServer,
@@ -92,7 +92,7 @@ test_that("heatmapServer does not write local selections back to external select
       annot = x$annot,
       exprs = x$exprs,
       covar = x$covar,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$setInputs(`gene_selector-modus` = "by_name")
@@ -101,16 +101,16 @@ test_that("heatmapServer does not write local selections back to external select
       session$setInputs(`gene_selector-name_list` = "g1,g2")
       session$flushReact()
 
-      expect_equal(isolate(selected_ids()), character(0))
+      expect_equal(isolate(selection$ids), character(0))
       expect_equal(isolate(session$returned$genes()), c("g1", "g2"))
       expect_true(methods::is(isolate(session$returned$heatmap()), "Heatmap"))
     }
   )
 })
 
-test_that("heatmapServer mirrors external selected_ids into the embedded selector", {
+test_that("heatmapServer mirrors external selection ids into the embedded selector", {
   x <- .heatmap_test_inputs()
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     heatmapServer,
@@ -118,11 +118,11 @@ test_that("heatmapServer mirrors external selected_ids into the embedded selecto
       annot = x$annot,
       exprs = x$exprs,
       covar = x$covar,
-      selected_ids = selected_ids
+      selection = selection
     ),
     {
       session$flushReact()
-      selected_ids(c("g4", "g2"))
+      selection$ids <- c("g4", "g2")
       session$flushReact()
 
       expect_equal(isolate(session$returned$genes()), c("g4", "g2"))
@@ -192,11 +192,11 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
         annot = x$annot,
         exprs = x$exprs,
         covar = x$covar,
-        selected_ids = character(0)
+        selection = character(0)
       ),
       {}
     ),
-    "selected_ids"
+    "selection"
   )
 })
 

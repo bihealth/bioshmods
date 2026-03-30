@@ -15,7 +15,7 @@ volcanoServer(
   primary_id = "PrimaryID",
   annot = NULL,
   gene_id = NULL,
-  selected_ids = NULL,
+  selection = NULL,
   ui_config = NULL,
   annot_show = c("SYMBOL", "ENTREZID")
 )
@@ -48,9 +48,10 @@ must match the names of the \code{cntr} list.}
 clicking on a gene identifier will modify this object (possibly
 triggering an event in another module).}
 
-\item{selected_ids}{Optional \code{reactiveVal()} populated with the primary IDs
-from the current plot selection when the user clicks the \code{Show} button.
-If \code{NULL}, the button is not shown and no external state is updated.}
+\item{selection}{Optional \code{reactiveValues()} object with an \code{ids}
+element populated with the primary IDs from the current plot selection when
+the user clicks the \code{Show} button. If \code{NULL}, the button is not
+shown and no external state is updated.}
 
 \item{ui_config}{Optional list configuring UI text. Supported keys:
 \code{show_button_label} for the label shown on the \code{Show} button.}
@@ -94,15 +95,15 @@ if(interactive()) {
     )
   )
   server <- function(input, output, session) {
-    selected_ids <- reactiveVal(character(0))
-    volcanoServer("vol", cntr=cntr, annot=annot, selected_ids=selected_ids)
+    selection <- reactiveValues(ids=character(0))
+    volcanoServer("vol", cntr=cntr, annot=annot, selection=selection)
     heatmapServer(
       "hm",
       annot=annot,
       exprs=exprs,
       cntr=cntr,
       covar=covar,
-      selected_ids=selected_ids
+      selection=selection
     )
   }
   shinyApp(ui, server)

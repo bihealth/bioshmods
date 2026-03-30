@@ -105,13 +105,9 @@
 }
 
 
-# Check that "selected_ids" is either NULL or a reactiveVal object.
-.gene_group_check_selected_ids <- function(selected_ids) {
-  if(!is.null(selected_ids)) {
-    if(!inherits(selected_ids, "reactiveVal")) {
-      stop("`selected_ids` must be NULL or a `reactiveVal()`.")
-    }
-  }
+# Check that "selection" is either NULL or a reactiveValues object with ids.
+.gene_group_check_selection <- function(selection) {
+  .check_selection_reactivevalues(selection, arg_name="selection")
 }
 
 # Check that "dataset" is either NULL or a reactiveVal object.
@@ -1080,10 +1076,11 @@ geneGroupSelectorUI <- function(id) {
 #'   `expr_metric`, `expr_top_mode`, `expr_top_value`, `dge_top_mode`,
 #'   `dge_top_value`, `dge_rank_mode`, `dge_pval_thr`, `dge_lfc_thr`,
 #'   and `dge_require_fdr`. Invalid or unsupported values raise an error.
-#' @param selected_ids optional `reactiveVal()` that will be updated
-#'   with the currently selected PrimaryIDs (column `primary_id`) as a
-#'   character vector. When it changes externally, the selector switches to
-#'   `by_name` mode and mirrors those IDs in the text field.
+#' @param selection optional `reactiveValues()` object with an `ids` element
+#'   that will be updated with the currently selected PrimaryIDs (column
+#'   `primary_id`) as a character vector. When `selection$ids` changes
+#'   externally, the selector switches to `by_name` mode and mirrors those
+#'   IDs in the text field.
 #' @param dataset optional `reactiveVal()` that stores the currently selected
 #'   dataset name. If `NULL`, it is initialized internally with `reactiveVal()`.
 #' @return A list with reactives: `genes`, `annotation`, `dataset`, and `modus`.
@@ -1114,18 +1111,18 @@ geneGroupSelectorUI <- function(id) {
 #'     )
 #'   )
 #'   server <- function(input, output, session) {
-#'     selected_ids <- reactiveVal(character())
+#'     selection <- reactiveValues(ids=character())
 #'
 #'     geneGroupSelectorServer(
 #'       "gsel",
 #'       annot=annot,
 #'       exprs=exprs,
 #'       cntr=cntr,
-#'       selected_ids=selected_ids
+#'       selection=selection
 #'     )
 #'
 #'     output$selected_ids <- renderTable({
-#'       data.frame(PrimaryID=selected_ids(), stringsAsFactors=FALSE)
+#'       data.frame(PrimaryID=selection$ids, stringsAsFactors=FALSE)
 #'     })
 #'   }
 #'   shinyApp(ui, server)
@@ -1141,18 +1138,18 @@ geneGroupSelectorUI <- function(id) {
 #'     )
 #'   )
 #'   server <- function(input, output, session) {
-#'     selected_ids <- reactiveVal(character())
+#'     selection <- reactiveValues(ids=character())
 #'
 #'     geneGroupSelectorServer(
 #'       "gsel",
 #'       annot=C19$annotation,
 #'       exprs=C19$expression,
 #'       cntr=C19$contrasts,
-#'       selected_ids=selected_ids
+#'       selection=selection
 #'     )
 #'
 #'     output$selected_ids <- renderTable({
-#'       data.frame(PrimaryID=selected_ids(), stringsAsFactors=FALSE)
+#'       data.frame(PrimaryID=selection$ids, stringsAsFactors=FALSE)
 #'     })
 #'   }
 #'   shinyApp(ui, server)
@@ -1167,7 +1164,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
                                     dge_lfc_col=NULL,
                                     dge_fdr_col=NULL,
                                     defaults=NULL,
-                                    selected_ids=NULL,
+                                    selection=NULL,
                                     dataset=NULL) {
   .gene_group_log("geneGroupSelectorServer init id='", id, "'.")
 
@@ -1177,7 +1174,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
 
   # sanity checks; stop with informative errors if the input is not as expected
   .gene_group_check_primary_id(annot, primary_id)
-  .gene_group_check_selected_ids(selected_ids)
+  .gene_group_check_selection(selection)
   .gene_group_check_dataset(dataset)
 
   defaults <- .gene_group_normalize_defaults(defaults)
@@ -1222,9 +1219,9 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
     default_mode <- unname(modes[1])
 
     # state vars.
-    # external_name_state reacts to external changes to selected_ids
+    # external_name_state reacts to external changes to selection$ids
     external_name_state <- reactiveVal(NULL)
-    pushing_selected_ids <- reactiveVal(FALSE)
+    pushing_selection_ids <- reactiveVal(FALSE)
     last_published_ids <- reactiveVal(character(0))
 
     # dynamically render the dataset selection input based on the provided annotation datasets
@@ -1385,20 +1382,20 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }
     }, ignoreInit=TRUE)
 
-    # if selected_ids is provided, sync it with the selector's current selection
-    if(!is.null(selected_ids)) {
+    # if selection is provided, sync it with the selector's current selection
+    if(!is.null(selection)) {
       # Import externally supplied selected IDs into the selector as a by-name override.
       # Ignores the module's own last publication so bidirectional syncing does not loop.
-      observeEvent(selected_ids(), {
-        ids <- as.character(selected_ids() %||% character(0))
+      observeEvent(selection$ids, {
+        ids <- as.character(selection$ids %||% character(0))
 
-        if(isTRUE(pushing_selected_ids()) &&
+        if(isTRUE(pushing_selection_ids()) &&
            identical(ids, last_published_ids())) {
-          pushing_selected_ids(FALSE)
+          pushing_selection_ids(FALSE)
           return()
         }
 
-        pushing_selected_ids(FALSE)
+        pushing_selection_ids(FALSE)
         external_name_state(.gene_group_external_name_state(selector_config$primary_id, ids))
 
         if(!identical(trimws(as.character(isolate(input$modus %||% default_mode))[1]), "by_name")) {
@@ -1413,17 +1410,17 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
       }, ignoreInit=TRUE)
     }
 
-    # Publish the current selected primary IDs to the external selected_ids reactiveVal.
+    # Publish the current selected primary IDs to the external selection$ids element.
     # Skips unchanged values and marks self-originated updates to prevent feedback loops.
     observe({
-      if(!is.null(selected_ids)) {
+      if(!is.null(selection)) {
         ids <- selected_primary_ids()
-        .gene_group_log("updating external selected_ids reactiveVal with n=",
+        .gene_group_log("updating external selection$ids with n=",
                         as.character(length(ids)), ".")
-        if(!identical(isolate(selected_ids()), ids)) {
-          pushing_selected_ids(TRUE)
+        if(!identical(isolate(selection$ids), ids)) {
+          pushing_selection_ids(TRUE)
           last_published_ids(ids)
-          selected_ids(ids)
+          selection$ids <- ids
         }
       }
     })

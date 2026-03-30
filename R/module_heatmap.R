@@ -168,9 +168,9 @@ heatmapUI <- function(id) {
 #' @param palettes Optional reactive expression or `reactiveVal` returning a
 #'   palette list forwarded to [plot_heatmap()]. Useful when heatmap colors are
 #'   coordinated across modules.
-#' @param selected_ids Optional incoming `reactiveVal()` with gene IDs to import
-#'   into the embedded gene-group selector. Heatmap selections are not written
-#'   back there.
+#' @param selection Optional incoming `reactiveValues()` object with an `ids`
+#'   element containing gene IDs to import into the embedded gene-group
+#'   selector. Heatmap selections are not written back there.
 #' @param sample_id_col Name of the sample ID column in `covar`.
 #' @param dge_pval_col Optional p-value column name for DGE mode in
 #'   [geneGroupSelectorServer()].
@@ -240,7 +240,7 @@ heatmapUI <- function(id) {
 #' @export
 heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
                           palettes=NULL,
-                          selected_ids=NULL,
+                          selection=NULL,
                           sample_id_col="SampleID",
                           primary_id="PrimaryID",
                           dge_pval_col="pvalue",
@@ -251,9 +251,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
   if(is.null(exprs)) {
     stop("`exprs` must be provided.")
   }
-  if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
-    stop("`selected_ids` must be NULL or a `reactiveVal()`.")
-  }
+  .check_selection_reactivevalues(selection, arg_name="selection")
 
   .heatmap_log("heatmapServer init; sample_id_col='", sample_id_col, "', primary_id='",
                primary_id, "', max_genes=", as.character(max_genes), ".")
@@ -297,7 +295,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     .heatmap_log("moduleServer started for id='", id, "'.")
     fig_size <- reactiveValues(width=800, height=600)
     palettes <- palettes %||% reactiveVal(NULL)
-    selected_ids_ggs <- reactiveVal(character(0))
+    selection_ggs <- reactiveValues(ids=character(0))
 
     heatmap_col_var <- list(values = list(type="continuous", breaks = c(-2, -1, 0, 1, 2)))
     heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
@@ -311,14 +309,14 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       dge_pval_col=dge_pval_col,
       dge_lfc_col=dge_lfc_col,
       dge_fdr_col=dge_fdr_col,
-      selected_ids=selected_ids_ggs
+      selection=selection_ggs
     )
 
-    if(!is.null(selected_ids)) {
-      observeEvent(selected_ids(), {
-        ids <- as.character(selected_ids() %||% character(0))
-        if(!identical(isolate(selected_ids_ggs()), ids)) {
-          selected_ids_ggs(ids)
+    if(!is.null(selection)) {
+      observeEvent(selection$ids, {
+        ids <- as.character(selection$ids %||% character(0))
+        if(!identical(isolate(selection_ggs$ids), ids)) {
+          selection_ggs$ids <- ids
         }
       }, ignoreInit=TRUE)
     }
@@ -399,7 +397,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
       req(isTruthy(ds))
       req(ds %in% datasets)
       req(length(selected_ids_for_heatmap()) > 0L)
-      .heatmap_log("building heatmap object for dataset='", ds, "' with selected_ids=",
+      .heatmap_log("building heatmap object for dataset='", ds, "' with selection ids=",
                    as.character(length(selector$genes())), " (displaying ",
                    as.character(length(selected_ids_for_heatmap())), ").")
 

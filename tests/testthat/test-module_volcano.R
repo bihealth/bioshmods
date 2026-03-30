@@ -262,7 +262,7 @@ test_that("volcanoServer updates external gene_id on gene button click", {
   expect_equal(isolate(gene_id$id), "g2")
 })
 
-test_that("volcanoServer updates external selected_ids on Show button click", {
+test_that("volcanoServer updates external selection ids on Show button click", {
   cntr <- list(
     contrast_a=.volcano_test_contrast(c("g1", "g2", "g2"), c(1, -1, -1), c(0.01, 0.02, 0.02))
   )
@@ -271,14 +271,14 @@ test_that("volcanoServer updates external selected_ids on Show button click", {
     SYMBOL=c("A", "B"),
     stringsAsFactors=FALSE
   )
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     volcanoServer,
     args=list(
       cntr=cntr,
       annot=annot,
-      selected_ids=selected_ids
+      selection=selection
     ),
     {
       selected_genes(data.frame(
@@ -297,7 +297,7 @@ test_that("volcanoServer updates external selected_ids on Show button click", {
     }
   )
 
-  expect_equal(isolate(selected_ids()), c("g2", "g1"))
+  expect_equal(isolate(selection$ids), c("g2", "g1"))
 })
 
 test_that("volcanoServer uses configurable show button label", {
@@ -309,14 +309,14 @@ test_that("volcanoServer uses configurable show button label", {
     SYMBOL=c("A", "B"),
     stringsAsFactors=FALSE
   )
-  selected_ids <- reactiveVal(character(0))
+  selection <- reactiveValues(ids = character(0))
 
   testServer(
     volcanoServer,
     args=list(
       cntr=cntr,
       annot=annot,
-      selected_ids=selected_ids,
+      selection=selection,
       ui_config=list(show_button_label="Send to heatmap")
     ),
     {
@@ -333,7 +333,7 @@ test_that("volcanoServer uses configurable show button label", {
   )
 })
 
-test_that("volcanoServer validates selected_ids", {
+test_that("volcanoServer validates selection", {
   cntr <- list(
     contrast_a=.volcano_test_contrast(c("g1"), 1, 0.01)
   )
@@ -348,12 +348,12 @@ test_that("volcanoServer validates selected_ids", {
       args=list(
         cntr=cntr,
         annot=annot,
-        selected_ids=character(0)
+        selection=character(0)
       ),
       {
       }
     ),
-    "selected_ids"
+    "selection"
   )
 
   expect_error(

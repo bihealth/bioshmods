@@ -227,9 +227,10 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #' @param gene_id must be a `reactiveValues` object. If not NULL, then
 #' clicking on a gene identifier will modify this object (possibly
 #' triggering an event in another module).
-#' @param selected_ids Optional `reactiveVal()` populated with the primary IDs
-#'   from the current plot selection when the user clicks the `Show` button.
-#'   If `NULL`, the button is not shown and no external state is updated.
+#' @param selection Optional `reactiveValues()` object with an `ids` element
+#'   populated with the primary IDs from the current plot selection when the
+#'   user clicks the `Show` button. If `NULL`, the button is not shown and no
+#'   external state is updated.
 #' @param ui_config Optional list configuring UI text. Supported keys:
 #'   `show_button_label` for the label shown on the `Show` button.
 #' @param annot_show which columns from the annotation data frame should be
@@ -265,7 +266,7 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #'   shinyApp(ui, server)
 #' }
 #'
-#' # Example showing how to use shared selected_ids to 
+#' # Example showing how to use shared selection to 
 #' link volcano and heatmap modules
 #'
 #' data(C19)
@@ -278,11 +279,11 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #'       )
 #'   )
 #'   server <- function(input, output, session) {
-#'     selected_ids <- reactiveVal(character(0))
+#'     selection <- reactiveValues(ids=character(0))
 #'     volcanoServer("vol", 
 #'                   cntr=C19$contrasts, 
 #'                   annot=C19$annotation, 
-#'                   selected_ids=selected_ids)
+#'                   selection=selection)
 #'     heatmapServer(
 #'       "hm",
 #'       annot=C19$annotation,
@@ -290,7 +291,7 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #'       cntr=C19$contrasts,
 #'       covar=C19$covariates,
 #'       sample_id_col="label",
-#'       selected_ids=selected_ids
+#'       selection=selection
 #'     )
 #'   }
 #'   shinyApp(ui, server)
@@ -299,7 +300,7 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj", 
                           primary_id="PrimaryID",
                           annot=NULL, gene_id=NULL,
-                          selected_ids=NULL,
+                          selection=NULL,
                           ui_config=NULL,
                           annot_show=c("SYMBOL", "ENTREZID")) {
 
@@ -309,9 +310,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
   annot_full <- normalized$annot_full
   ui_config <- .normalize_show_button_ui_config(ui_config)
 
-  if(!is.null(selected_ids) && !inherits(selected_ids, "reactiveVal")) {
-    stop("`selected_ids` must be NULL or a `reactiveVal()`.")
-  }
+  .check_selection_reactivevalues(selection, arg_name="selection")
 
   if(!"default" %in% names(cntr)) {
     message("volcanoServer: running in multi data set mode")
@@ -392,7 +391,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
         downloadButton(NS(id, "export_selected"), "Export to file", class="btn-default")
       )
 
-      if(!is.null(selected_ids)) {
+      if(!is.null(selection)) {
         buttons <- c(
           list(actionButton(NS(id, "show_selected"), ui_config$show_button_label, class="btn-default")),
           buttons
@@ -417,11 +416,11 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     })
 
     observeEvent(input$show_selected, {
-      req(!is.null(selected_ids))
+      req(!is.null(selection))
       .df <- selected_genes()
       req(!is.null(.df), nrow(.df) > 0L, primary_id %in% colnames(.df))
       ids <- unique(stats::na.omit(as.character(.df[[primary_id]])))
-      selected_ids(ids[nzchar(ids)])
+      selection$ids <- ids[nzchar(ids)]
     })
 
     output$export_selected <- downloadHandler(
