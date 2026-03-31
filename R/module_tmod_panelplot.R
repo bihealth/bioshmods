@@ -1,3 +1,7 @@
+.tmod_panelplot_log <- function(...) {
+  .bioshmods_log(..., .prefix="tmod_panelplot")
+}
+
 .cleanup_ids <- function(ids) {
   ids <- gsub("_", " ", ids)
 
@@ -58,6 +62,7 @@ gg_panelplot <- function(res, pie, auc_thr=.5, q_thr=.05,
                          label_angle=45, cleanup=TRUE, add_ids=TRUE) {
 
   label_angle=as.numeric(label_angle)
+  res <- res[ !map_lgl(res, is.null) ]
   resS <- tmodSummary(res) 
 
   if(any(resS$Title != resS$ID)) {
@@ -78,7 +83,7 @@ gg_panelplot <- function(res, pie, auc_thr=.5, q_thr=.05,
   resS_l <- resS %>%
     pivot_longer(starts_with(c("AUC", "q")), 
                  names_to=c("Param", "Contrast"), 
-                 names_sep="\\.", 
+                 names_pattern="(AUC|q)\\.(.+)", 
                  values_to="Value") %>% 
     pivot_wider(all_of(c("ID", "Title", "Contrast")), 
                 names_from="Param", 
@@ -292,7 +297,7 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
 tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NULL, annot=NULL) {
 
   if(!is.data.frame(cntr[[1]])) {
-    message("tmodPanelPlotServer: cntr[[1]] is not a data frame, assuming multilevel mode")
+    .tmod_panelplot_log("cntr[[1]] is not a data frame; assuming multilevel mode.")
   } else {
     cntr <- list(default=cntr)
     tmod_res <- list(default=tmod_res)
@@ -332,7 +337,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
   }
 
 	moduleServer(id, function(input, output, session) {
-    message("Launching tmod panelplot server")
+    .tmod_panelplot_log("moduleServer started for id='", id, "'.")
     disable("save")
 
     observeEvent(input$dataset, {
@@ -360,15 +365,14 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
       output$contrast_select_field <- renderUI({
         #if(!is_single_ds) {
         if(.ds == "_all") {
-          print("ds is _all")
+          .tmod_panelplot_log("dataset selector is '_all'; showing contrasts from all datasets.")
           choices <- c("_all", flatten_chr(map(cntr, names)))
         } else {
-          print("ds is not _all")
+          .tmod_panelplot_log("dataset selector is '", .ds, "'; showing dataset-local contrasts.")
           choices <- c("_all", names(tmod_res[[.ds]]))
         }
         names(choices) <- c("All contrasts", choices[-1])
-        print("printing choices:")
-        print(choices)
+        .tmod_panelplot_log("contrast choices={", paste(choices, collapse=","), "}.")
 
         selectInput(NS(id, "contrast_select"), label="Select contrasts", 
                       multiple=TRUE, choices=choices, selected="_all")
@@ -401,7 +405,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
         .res <- .res[ sel ]
       }
 
-      message(sprintf("Saving to file %s", file))
+      .tmod_panelplot_log("saving plot to file='", file, "'.")
       save_pdf(
         file=file,
         width=fig_size$width / 75,
@@ -416,7 +420,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
           print(g)
         }
       )
-      message("returning")
+      .tmod_panelplot_log("save completed.")
      }
    )
 
@@ -449,8 +453,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
         .datasets <- ds_ids
       } else {
         .datasets <- input$dataset
-        warning(".datasets changed")
-        warning(paste(.datasets))
+        .tmod_panelplot_log("dataset filter changed to {", paste(.datasets, collapse=","), "}.")
       }
 
       # select results which correspond to the selected data sets and 
@@ -524,7 +527,7 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
       .pie <- pie()
       if(is.null(.pie)) { 
-        warning("pie() is NULL")
+        .tmod_panelplot_log("pie() is NULL; skipping panel plot render.")
         return(NULL)
       }
 
@@ -560,12 +563,15 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
   if(is.null(cntr)) { return(NULL) }
   #message("Making \U1F967 pie")
+  .tmod_panelplot_log("Making pie for db='", dbname, "'.")
 
   names(datasets) <- datasets <- names(tmod_res)
 
   pie <- map(datasets, ~ {
                ds <- .x
-               .make_pie_ds(tmod_res[[ds]], dbname=dbname, 
+               .make_pie_ds(tmod_res[[ds]], 
+                            dataset=ds,
+                            dbname=dbname, 
                      cntr=cntr[[ds]], 
                      tmod_db_obj=tmod_dbs[[ds]][[dbname]],
                      tmod_map=tmod_map[[ds]],
@@ -580,9 +586,12 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 .make_pie_ds <- function(res, dataset, dbname, cntr=NULL, tmod_db_obj=NULL, tmod_map=NULL, 
                            gene_pval=0.05, gene_lfc=0.5, ...) {
 
+  .tmod_panelplot_log("making pie for dataset='", dataset, "', db='", dbname, "'.")
+
   stopifnot(all(names(res) %in% names(cntr)))
   stopifnot(!is.null(tmod_db_obj) && !is.null(dbname) && !is.null(tmod_map))
 
+  res <- res[ !map_lgl(res, is.null) ]
   tmod_s <- tmodSummary(res)
   dbobj <- tmod_db_obj[ tmod_s[["ID"]] ]
   if(is(dbobj, "tmodGS")) {
