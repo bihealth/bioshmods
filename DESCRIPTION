@@ -1,6 +1,6 @@
 Package: bioshmods
 Title: Shiny Modules for Bioinformatics Data Exploration
-Version: 0.1.5.9001
+Version: 0.1.5.9002
 Authors@R: 
     person(given = "January",
            family = "Weiner",

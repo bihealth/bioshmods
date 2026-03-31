@@ -284,13 +284,15 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     ann_df <- sort_res$ann_df
   }
   top_anno <- NULL
+
+  cluster_cols <- !(isTRUE(sort_by_covar) && !is.null(ann_df) && ncol(ann_df) > 0L)
+
   if(!is.null(ann_df) && ncol(ann_df) > 0L) {
     pal_anno <- NULL
     if(!is.null(palettes)) {
       pal_anno <- lapply(palettes, \(x) x$pal)
     }
 
-    cluster_cols <- !(isTRUE(sort_by_covar) && !is.null(ann_df) && ncol(ann_df) > 0L)
     .plot_heatmap_log("building top annotation with columns={",
                       paste(colnames(ann_df), collapse=","), "} and palette keys={",
                       paste(names(pal_anno %||% list()), collapse=","), "}.")
