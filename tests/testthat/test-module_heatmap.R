@@ -43,6 +43,7 @@ test_that("heatmapUI builds sidebar layout with selector and options", {
   expect_true(grepl("hm-selected_genes_warning", html, fixed = TRUE))
   expect_true(grepl("hm-sel_annot", html, fixed = TRUE))
   expect_true(grepl("hm-annot_row_col", html, fixed = TRUE))
+  expect_true(grepl("hm-sort_by_covar", html, fixed = TRUE))
   expect_true(grepl("hm-show_legend", html, fixed = TRUE))
   expect_true(grepl("hm-save", html, fixed = TRUE))
   expect_true(grepl("hm-heatmap_plot", html, fixed = TRUE))
@@ -78,6 +79,46 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
       expect_equal(isolate(ret$heatmap())@row_names_param$labels, c("A", "B"))
       expect_equal(output$selected_genes_n, "Selected genes: 2")
       expect_equal(output$selected_genes_warning, "")
+    }
+  )
+})
+
+test_that("heatmapServer sorts columns by selected covariates when requested", {
+  annot <- data.frame(
+    PrimaryID = paste0("g", 1:2),
+    stringsAsFactors = FALSE
+  )
+  exprs <- matrix(
+    c(1, 4, 2, 3, 5, 8, 6, 7),
+    nrow = 2,
+    byrow = TRUE,
+    dimnames = list(annot$PrimaryID, c("s1", "s2", "s3", "s4"))
+  )
+  covar <- data.frame(
+    SampleID = c("s1", "s2", "s3", "s4"),
+    group = c("B", "A", "B", "A"),
+    sex = c("m", "f", "f", "m"),
+    stringsAsFactors = FALSE
+  )
+
+  testServer(
+    heatmapServer,
+    args = list(
+      annot = annot,
+      exprs = exprs,
+      covar = covar
+    ),
+    {
+      session$setInputs(`gene_selector-modus` = "by_name")
+      session$flushReact()
+      session$setInputs(`gene_selector-name_list` = "g1,g2")
+      session$setInputs(sel_annot = c("group", "sex"))
+      session$setInputs(sort_by_covar = TRUE)
+      session$flushReact()
+
+      hm <- isolate(session$returned$heatmap())
+      expect_false(hm@column_dend_param$cluster)
+      expect_equal(colnames(hm@matrix), c("s2", "s4", "s3", "s1"))
     }
   )
 })

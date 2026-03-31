@@ -75,6 +75,32 @@ test_that("plot_heatmap uses sel_annot to select annotation bars", {
   expect_equal(names(hm@top_annotation@anno_list), "group")
 })
 
+test_that("plot_heatmap can sort columns by selected covariates", {
+  exprs <- matrix(
+    c(1, 4, 2, 3, 5, 8, 6, 7),
+    nrow = 2,
+    byrow = TRUE,
+    dimnames = list(c("g1", "g2"), c("s1", "s2", "s3", "s4"))
+  )
+  covar <- data.frame(
+    SampleID = c("s1", "s2", "s3", "s4"),
+    group = c("B", "A", "B", "A"),
+    sex = c("m", "f", "f", "m"),
+    stringsAsFactors = FALSE
+  )
+
+  hm <- plot_heatmap(
+    exprs = exprs,
+    genes = c("g1", "g2"),
+    covar = covar,
+    sel_annot = c("group", "sex"),
+    sort_by_covar = TRUE
+  )
+
+  expect_false(hm@column_dend_param$cluster)
+  expect_equal(colnames(hm@matrix), c("s2", "s4", "s3", "s1"))
+})
+
 test_that("plot_heatmap validates sample_id_col and sel_annot", {
   x <- .plot_heatmap_test_inputs()
 

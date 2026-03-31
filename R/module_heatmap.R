@@ -135,10 +135,11 @@ heatmapUI <- function(id) {
             selected="",
             multiple=FALSE
           ),
+          checkboxInput(ns("sort_by_covar"), "Sort by covariates", value=FALSE),
           figsizeInput(ns("figure_size"), width="100%", selected="800x600"),
           checkboxInput(ns("show_legend"), "Show legend", value=TRUE),
           .ncol = 2,
-          .nrow = 2
+          .nrow = 3
         ),
         fluidRow(column(colorPalettesUI(ns("heatmap_color")), width=12)),
         fluidRow(column(downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success"), width=12))
@@ -406,6 +407,8 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         .heatmap_annotation_choices(covar_norm[[ds]], sample_id_col=sample_id_col)
       )
       .heatmap_log("sel_annot_safe={", paste(sel_annot_safe, collapse=","), "}.")
+      sort_by_covar_active <- isTRUE(input$sort_by_covar) && length(sel_annot_safe) > 0L
+      .heatmap_log("sort_by_covar active=", as.character(sort_by_covar_active), ".")
 
       hm_col_all <- heatmap_col()
       hm_col_ds <- hm_col_all[[1]]
@@ -430,6 +433,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         primary_id_col=primary_id,
         annot_row_col=if(isTruthy(input$annot_row_col)) input$annot_row_col else NULL,
         sel_annot=sel_annot_safe,
+        sort_by_covar=sort_by_covar_active,
         legend=isTRUE(input$show_legend),
         col=hm_col_ds$values$pal,
         palettes=annot_pal

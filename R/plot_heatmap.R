@@ -67,6 +67,30 @@
   ann_df
 }
 
+# Reorder heatmap columns by selected covariates in the given selector order.
+# Keeps ties stable and disables column clustering when a covariate sort is active.
+.plot_heatmap_order_columns_by_covar <- function(exprs, ann_df) {
+  if(is.null(ann_df) || ncol(ann_df) < 1L || ncol(exprs) < 2L) {
+    return(list(exprs=exprs, ann_df=ann_df, sorted=FALSE))
+  }
+
+  order_args <- lapply(ann_df, function(x) {
+    x <- as.character(x)
+    x[is.na(x)] <- ""
+    x
+  })
+  order_args <- c(order_args, list(seq_len(nrow(ann_df)), na.last=TRUE, method="radix"))
+  ord <- do.call(order, order_args)
+
+  .plot_heatmap_log("sorting columns by covariates; ordered sample IDs={",
+                    paste(rownames(ann_df)[ord], collapse=","), "}.")
+  list(
+    exprs=exprs[, ord, drop=FALSE],
+    ann_df=ann_df[ord, , drop=FALSE],
+    sorted=TRUE
+  )
+}
+
 # Scale expression by gene (row-wise z-score), replacing non-finite values with 0.
 .plot_heatmap_scale_rows <- function(x) {
   x <- t(scale(t(x)))
@@ -144,6 +168,9 @@
 #'   If `NULL` or missing in `annot`, row names from `exprs` are shown.
 #' @param sel_annot Character vector of column names from `covar` to display as
 #'   top annotations. If `NULL` (default), no annotation bars are shown.
+#' @param sort_by_covar Logical; if `TRUE` and covariates are selected in
+#'   `sel_annot`, samples are ordered by those covariates and column clustering
+#'   is disabled.
 #' @param legend Logical; whether heatmap and annotation legends should be shown.
 #' @param palettes Optional named list of palette definitions. When `col` is
 #'   `NULL` and `palettes$values$pal` exists, that value is used for heatmap
@@ -198,7 +225,8 @@
 #' @export
 plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
                          annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL,
-                         sel_annot=NULL, legend=TRUE, palettes = NULL, col = NULL) {
+                         sel_annot=NULL, sort_by_covar=FALSE,
+                         legend=TRUE, palettes = NULL, col = NULL) {
   .plot_heatmap_log("plot_heatmap called; exprs dim=", paste(dim(exprs), collapse="x"),
                     ", genes requested=", as.character(length(genes)),
                     ", sample_id_col='", sample_id_col, "'.")
@@ -250,12 +278,19 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     sample_id_col=sample_id_col,
     sel_annot=sel_annot
   )
+  sort_res <- .plot_heatmap_order_columns_by_covar(exprs, ann_df)
+  if(isTRUE(sort_by_covar) && isTRUE(sort_res$sorted)) {
+    exprs <- sort_res$exprs
+    ann_df <- sort_res$ann_df
+  }
   top_anno <- NULL
   if(!is.null(ann_df) && ncol(ann_df) > 0L) {
     pal_anno <- NULL
     if(!is.null(palettes)) {
       pal_anno <- lapply(palettes, \(x) x$pal)
     }
+
+    cluster_cols <- !(isTRUE(sort_by_covar) && !is.null(ann_df) && ncol(ann_df) > 0L)
     .plot_heatmap_log("building top annotation with columns={",
                       paste(colnames(ann_df), collapse=","), "} and palette keys={",
                       paste(names(pal_anno %||% list()), collapse=","), "}.")
@@ -271,7 +306,7 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     row_labels=row_labels,
     top_annotation=top_anno,
     cluster_rows=TRUE,
-    cluster_columns=TRUE,
+    cluster_columns=cluster_cols,
     show_heatmap_legend=isTRUE(legend),
     show_column_names=FALSE,
     col=col,
