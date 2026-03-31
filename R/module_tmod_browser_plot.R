@@ -1,4 +1,8 @@
 
+.tmod_browser_plot_log <- function(...) {
+  .bioshmods_log(..., .prefix="tmod_browser_plot")
+}
+
 .tmod_rev_db_map_ids <- function(ids, dbname, tmod_dbs_mapping_obj) {
 
   mp_id   <- tmod_dbs_mapping_obj$dbs[dbname]
@@ -68,7 +72,8 @@
     cntr[[primary_id]] <- rownames(cntr)
   }
 
-  if(is.null(tmod_gl)) {
+  if(is.null(tmod_gl) || is.null(tmod_gl[[cntr_id]]) || 
+     is.null(tmod_gl[[cntr_id]][[sort_id]])) {
     ## create an ad hoc list
     cntr <- cntr[ order(cntr$pvalue), ]
     gl <- tmod_map$maps[[ tmod_map$dbs[[ db_id ]] ]][ cntr[[primary_id]] ]
@@ -272,7 +277,7 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
 
   # XXX not a good check
   if(!is.data.frame(annot)) {
-    message("tmodBrowserPlotServer: running in multilevel mode")
+    .tmod_browser_plot_log("running in multilevel mode.")
   } else {
     tmod_dbs <- list(default=tmod_dbs)
     cntr     <- list(default=cntr)
@@ -282,7 +287,7 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
   }
     
   moduleServer(id, function(input, output, session) {
-    message("Launching tmod plot server")
+    .tmod_browser_plot_log("moduleServer started for id='", id, "'.")
 
     gene.but <- actionButton("go~%s~%s", label=" \U25B6 ", 
                         onclick=sprintf('Shiny.onInputChange(\"%s-gene_select_button\",  this.id)', id),  
@@ -341,7 +346,8 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
       enable("save")
 
       ds <- gs_id$ds
-      message("plotting ds=", ds, " id=", gs_id$id, " cntr=", gs_id$cntr, " db=", gs_id$db, " sort=", gs_id$sort)
+      .tmod_browser_plot_log("plotting ds=", ds, " id=", gs_id$id, " cntr=", gs_id$cntr,
+                             " db=", gs_id$db, " sort=", gs_id$sort, ".")
       .plot_evidence(mod_id=gs_id$id, cntr_id=gs_id$cntr, db_id=gs_id$db, sort_id=gs_id$sort, 
                      cntr=cntr[[ds]], tmod_dbs=tmod_dbs[[ds]], tmod_gl=tmod_gl[[ds]], 
                      tmod_map=tmod_map[[ds]], annot=annot[[ds]], primary_id)

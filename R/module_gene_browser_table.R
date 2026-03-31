@@ -1,3 +1,7 @@
+.gene_browser_table_log <- function(...) {
+  .bioshmods_log(..., .prefix="gene_browser_table")
+}
+
 ## prepare contrasts for the gene browser, adding action button, sorting,
 ## removing unnecessary columns etc.
 .gene_browser_prep_res <- function(cntr, but, annot, annot_linkout, primary_id, cols_to_hide) {
@@ -372,7 +376,7 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
 
         res <- res %>% filter(.data[["padj"]] < input$f_pval & abs(.data[["log2FoldChange"]]) > input$f_lfc) 
       }
-      message("number of results:", nrow(res))
+      .gene_browser_table_log("rendering result table with n=", as.character(nrow(res)), ".")
 
       res %>% datatable(escape=FALSE, selection='none', extensions="Buttons",
                 options=list(pageLength=5, dom="Bfrtip", scrollX=TRUE)) %>%

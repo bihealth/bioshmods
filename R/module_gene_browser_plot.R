@@ -1,3 +1,7 @@
+.gene_browser_plot_log <- function(...) {
+  .bioshmods_log(..., .prefix="gene_browser_plot")
+}
+
 ## prepare the additional gene info tab panel
 .gene_browser_info_tab <- function(id, x, y, covar) {
      ret <- ""
@@ -296,7 +300,7 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
     annot <- list(default=annot)
     cntr  <- list(default=cntr)
   } else {
-    message("geneBrowserPlotServer in multi dataset mode")
+    .gene_browser_plot_log("running in multi dataset mode.")
   }
 
   # vector holding the names of all datasets

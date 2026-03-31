@@ -1,3 +1,7 @@
+.tmod_browser_table_log <- function(...) {
+  .bioshmods_log(..., .prefix="tmod_browser_table")
+}
+
 ## call .tmod_browser_prepare_res_single for every data set
 .tmod_browser_prepare_res <- function(but, tmod_res) {
 
@@ -270,7 +274,7 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
   tmod_res <- .tmod_browser_prepare_res(but, tmod_res)
 
   moduleServer(id, function(input, output, session) {
-    message("Launching tmod browser server")
+    .tmod_browser_table_log("moduleServer started for id='", id, "'.")
 
     observeEvent(input$filter, {
                    if(input$filter) {

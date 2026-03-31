@@ -1,3 +1,7 @@
+.disco_log <- function(...) {
+  .bioshmods_log(..., .prefix="disco")
+}
+
 #' @rdname discoServer
 #' @importFrom shiny textInput
 #' @export
@@ -238,7 +242,7 @@ discoServer <- function(id, cntr, annot=NULL,
   annot <- normalized$annot
 
   if(!"default" %in% names(cntr)) {
-    message("discoServer in multi dataset mode")
+    .disco_log("running in multi dataset mode.")
   }
 
   link <- actionButton(NS(id, "gene_id~%s~%s"), label="%s \U25B6 ",
@@ -296,7 +300,7 @@ discoServer <- function(id, cntr, annot=NULL,
         ids <- sprintf("^(%s)$",
                        paste0(ids, collapse='|'))
         #message("IDS are ", paste(ids, collapse="><"))
-        message("IDS regex: ", ids)
+        .disco_log("manual label regex=", ids, ".")
         gene_labs(ids)
       } else {
         gene_labs(c())
@@ -346,7 +350,7 @@ discoServer <- function(id, cntr, annot=NULL,
     observe({
       req(input$match1)
       req(input$match2)
-      message("calculating plot")
+      .disco_log("calculating plot.")
 
       .ds <- try(disco_score(cntr[[dataset1()]][[contrast1()]], 
                         cntr[[dataset2()]][[contrast2()]], 
@@ -357,7 +361,7 @@ discoServer <- function(id, cntr, annot=NULL,
 
       disco(.ds)
       if(is(.ds, "try-error")) { 
-        message("An error occured")
+        .disco_log("plot calculation failed.")
         plot_df(NULL)
        #output$discoplot <- renderPlot({
        #  stop(.ds)
@@ -415,12 +419,12 @@ discoServer <- function(id, cntr, annot=NULL,
 
       g <- g + xlab(.xlab) + ylab(.ylab)
 
-      message("storing plot")
+      .disco_log("storing plot object.")
       plot_obj(g)
     })
 
     output$discoplot <- renderPlot({
-      message("rendering plot")
+      .disco_log("rendering plot.")
       .ds <- disco()
       if(is(.ds, "try-error")) { stop(.ds) }
       req(plot_obj())

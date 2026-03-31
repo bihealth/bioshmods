@@ -1,3 +1,8 @@
+## Write module-scoped log messages through the shared package logger.
+.volcano_log <- function(...) {
+  .bioshmods_log(..., .prefix="volcano")
+}
+
 ## Check whether an object is a non-empty list of data frames.
 .volcano_is_list_of_data_frames <- function(x) {
   is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
@@ -313,7 +318,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
   .check_selection_reactivevalues(selection, arg_name="selection")
 
   if(!"default" %in% names(cntr)) {
-    message("volcanoServer: running in multi data set mode")
+    .volcano_log("running in multi data set mode.")
   }
 
   df <- .volcano_process_data(cntr, annot, primary_id,

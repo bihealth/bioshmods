@@ -1,3 +1,7 @@
+.pca_log <- function(...) {
+  .bioshmods_log(..., .prefix="pca")
+}
+
 .gethovertext <- function(covar, ids) {
 
   ids <- setdiff(colnames(covar), ids)
@@ -114,7 +118,7 @@ pcaServer <- function(id, pca, covar, idcol="ID", threeD=FALSE, colorBy=NULL, sy
   stopifnot(is.logical(threeD))
 
   if(is(covar, "list") && !is.data.frame(covar) && is.data.frame(covar[[1]])) {
-    message("pcaServer: running in multilevel mode")
+    .pca_log("running in multilevel mode.")
   } else {
     pca   <- list(default=pca)
     covar <- list(default=covar)
@@ -273,4 +277,3 @@ plot_pca_shiny <- function(x, covar, colorBy=NULL, symbolBy=NULL) {
 
   shinyApp(ui, server)
 }
-
