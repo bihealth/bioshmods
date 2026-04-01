@@ -70,6 +70,40 @@
   invisible(NULL)
 }
 
+# Classify each column in a data frame using simple, stable type labels.
+# Used by table modules to decide which columns should receive numeric formatting.
+.data_frame_coltypes <- function(df) {
+  stopifnot(is.data.frame(df))
+
+  vapply(df, function(x) {
+    if(is.integer(x)) {
+      return("integer")
+    }
+    if(is.numeric(x)) {
+      return("numeric")
+    }
+    if(is.logical(x)) {
+      return("logical")
+    }
+    if(inherits(x, "Date")) {
+      return("date")
+    }
+    if(inherits(x, "POSIXt")) {
+      return("datetime")
+    }
+    if(is.factor(x)) {
+      return("factor")
+    }
+    if(is.character(x)) {
+      return("character")
+    }
+    if(is.list(x)) {
+      return("list")
+    }
+    "other"
+  }, character(1))
+}
+
 #' Sanitize Text for Filenames
 #'
 #' Normalize free text into a filesystem-safe filename fragment by replacing

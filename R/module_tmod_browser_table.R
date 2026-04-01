@@ -372,13 +372,14 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, t
 
     output$tmodResTab <- renderDT({
       if(!isTruthy(res())) { return(NULL) }
+      col_types <- .data_frame_coltypes(res()$res)
+      num_cols <- names(col_types)[col_types %in% c("integer", "numeric")]
       datatable(res()$res, escape=FALSE, selection='none', 
                options=list(pageLength=5, 
                             dom="Bfrtip", 
                             scrollX=TRUE)
                 ) %>%
-        formatSignif(columns=intersect(colnames(res()$res), 
-                                       c("AUC", "cerno", "P.Value", "adj.P.Val")), digits=2)
+        formatSignif(columns=num_cols, digits=2)
     })
 
     output$table_sel_db <- renderUI({

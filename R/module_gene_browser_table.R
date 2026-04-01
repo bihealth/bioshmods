@@ -377,11 +377,12 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
         res <- res %>% filter(.data[["padj"]] < input$f_pval & abs(.data[["log2FoldChange"]]) > input$f_lfc) 
       }
       .gene_browser_table_log("rendering result table with n=", as.character(nrow(res)), ".")
+      col_types <- .data_frame_coltypes(res)
+      num_cols <- names(col_types)[col_types %in% c("integer", "numeric")]
 
       res %>% datatable(escape=FALSE, selection='none', extensions="Buttons",
                 options=list(pageLength=5, dom="Bfrtip", scrollX=TRUE)) %>%
-        formatSignif(columns=intersect(colnames(res), 
-                                       c("baseMean", "log2FoldChange", "pvalue", "padj")), digits=2)
+        formatSignif(columns=num_cols, digits=2)
     })
     return(NULL)
   })
