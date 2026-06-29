@@ -10,11 +10,11 @@ test_that("colorPalettesUI provides dataset and rows containers", {
 })
 
 test_that("colorPalettesServer initializes palettes for all variable types", {
-  variables <- list(
+  variables <- list(default=list(
     sex=list(type="categorical", levels=c("female", "male")),
     stage=list(type="ordinal", levels=c("I", "II", "III")),
     expression=list(type="continuous", breaks=c(-2, -1, 0, 1, 2))
-  )
+  ))
 
   palettes <- reactiveVal(list())
 
@@ -51,10 +51,10 @@ test_that("colorPalettesServer initializes palettes for all variable types", {
 })
 
 test_that("colorPalettesServer initializes same-type variables with different palettes", {
-  variables <- list(
+  variables <- list(default=list(
     sex=list(type="categorical", levels=c("female", "male")),
     group=list(type="categorical", levels=c("A", "B"))
-  )
+  ))
 
   palettes <- reactiveVal(list())
 
@@ -75,9 +75,9 @@ test_that("colorPalettesServer initializes same-type variables with different pa
 })
 
 test_that("colorPalettesServer updates selected palette choices", {
-  variables <- list(
+  variables <- list(default=list(
     sex=list(type="categorical", levels=c("female", "male"))
-  )
+  ))
 
   palettes <- reactiveVal(list())
 
@@ -101,9 +101,9 @@ test_that("colorPalettesServer updates selected palette choices", {
 })
 
 test_that("colorPalettesServer accepts reactive variables input", {
-  variables_rv <- reactiveVal(list(
+  variables_rv <- reactiveVal(list(default=list(
     sex=list(type="categorical", levels=c("female", "male"))
-  ))
+  )))
   palettes <- reactiveVal(list())
 
   testServer(
@@ -117,9 +117,9 @@ test_that("colorPalettesServer accepts reactive variables input", {
       expect_named(isolate(palettes()), "default")
       expect_named(isolate(palettes())$default, "sex")
 
-      variables_rv(list(
+      variables_rv(list(default=list(
         expression=list(type="continuous", breaks=c(-2, 0, 2))
-      ))
+      )))
       session$flushReact()
       expect_named(isolate(palettes()), "default")
       expect_named(isolate(palettes())$default, "expression")
@@ -129,9 +129,9 @@ test_that("colorPalettesServer accepts reactive variables input", {
 })
 
 test_that("colorPalettesServer supports reversing continuous palettes", {
-  variables <- list(
+  variables <- list(default=list(
     expression=list(type="continuous", breaks=c(-2, -1, 0, 1, 2))
-  )
+  ))
 
   palettes <- reactiveVal(list())
 
@@ -156,9 +156,9 @@ test_that("colorPalettesServer supports reversing continuous palettes", {
 })
 
 test_that("colorPalettesServer supports cycling categorical palettes", {
-  variables <- list(
+  variables <- list(default=list(
     sex=list(type="categorical", levels=c("female", "male", "unknown"))
-  )
+  ))
 
   palettes <- reactiveVal(list())
 
@@ -234,9 +234,9 @@ test_that("colorPalettesServer validates malformed variables specification", {
     testServer(
       colorPalettesServer,
       args=list(
-        variables=list(
+        variables=list(default=list(
           sex=list(type="categorical")
-        ),
+        )),
         palettes=palettes
       ),
       {
@@ -250,9 +250,9 @@ test_that("colorPalettesServer validates malformed variables specification", {
     testServer(
       colorPalettesServer,
       args=list(
-        variables=list(
+        variables=list(default=list(
           expression=list(type="continuous", breaks=0)
-        ),
+        )),
         palettes=palettes
       ),
       {
@@ -261,4 +261,45 @@ test_that("colorPalettesServer validates malformed variables specification", {
     ),
     "breaks"
   )
+
+  expect_warning(
+    testServer(
+      colorPalettesServer,
+      args=list(
+        variables=list(
+          default=data.frame(type=c("A", "B"), stringsAsFactors=FALSE)
+        ),
+        palettes=palettes
+      ),
+      {
+        session$flushReact()
+      }
+    ),
+    "Convert covariates explicitly"
+  )
+})
+
+test_that("colorPalettesServer handles variables named type explicitly", {
+  variables <- list(default=list(
+    type=list(type="categorical", levels=c("case", "control")),
+    type_foo_baz=list(type="categorical", levels=c("A", "B"))
+  ))
+
+  palettes <- reactiveVal(list())
+
+  testServer(
+    colorPalettesServer,
+    args=list(
+      variables=variables,
+      palettes=palettes
+    ),
+    {
+      session$flushReact()
+    }
+  )
+
+  p <- isolate(palettes())$default
+  expect_named(p, c("type", "type_foo_baz"))
+  expect_equal(p$type$type, "categorical")
+  expect_equal(p$type_foo_baz$type, "categorical")
 })

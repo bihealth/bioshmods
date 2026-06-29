@@ -298,7 +298,7 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     palettes <- palettes %||% reactiveVal(NULL)
     selection_ggs <- reactiveValues(ids=character(0))
 
-    heatmap_col_var <- list(values = list(type="continuous", breaks = c(-2, -1, 0, 1, 2)))
+    heatmap_col_var <- list(default=list(values=list(type="continuous", breaks=c(-2, -1, 0, 1, 2))))
     heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
 
     selector <- geneGroupSelectorServer(

@@ -13,10 +13,11 @@ colorPalettesServer(id, variables, palettes = NULL, compact = FALSE)
 \item{id}{Shiny module id (same as passed to \code{\link[=colorPalettesUI]{colorPalettesUI()}}).}
 
 \item{variables}{Variable specification input as either a named list or a
-reactive value/expression returning one. Single-dataset input can be a
-variable specification list or a covariate data frame. Multi-dataset
-input must be a named list where each element is a variable specification
-list or covariate data frame.}
+reactive value/expression returning one. The value must always be a named
+list of datasets. Each dataset entry must be a variable specification list.
+For a single dataset, use \code{list(default=<variable specification list>)}.
+Covariate data frames are not accepted here; convert them explicitly with
+\code{\link[=infer_palette_variables]{infer_palette_variables()}} first.}
 
 \item{palettes}{Optional reactiveVal-like placeholder kept for compatibility.
 If supplied, it must be a function; the module returns its own reactive
@@ -46,8 +47,10 @@ one variable. Each variable entry must include:
 
 Single-dataset form:
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{list(sex=list(type="categorical", levels=c("female", "male")), 
-     expression=list(type="continuous", breaks=c(-2, 0, 2)))
+\if{html}{\out{<div class="sourceCode">}}\preformatted{list(default=list(
+  sex=list(type="categorical", levels=c("female", "male")),
+  expression=list(type="continuous", breaks=c(-2, 0, 2))
+))
 }\if{html}{\out{</div>}}
 
 Multi-dataset form:
@@ -60,11 +63,11 @@ Multi-dataset form:
 }
 \examples{
 if(interactive()) {
-  variables <- list(
+  variables <- list(default=list(
     sex=list(type="categorical", levels=c("female", "male")),
     stage=list(type="ordinal", levels=c("I", "II", "III", "IV")),
     expression=list(type="continuous", breaks=c(-2, -1, 0, 1, 2))
-  )
+  ))
 
   ui <- fluidPage(
     colorPalettesUI("pal"),

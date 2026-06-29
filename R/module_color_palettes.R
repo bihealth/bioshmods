@@ -65,78 +65,52 @@
   out
 }
 
-# Return TRUE when x is a valid variable specification list.
-.color_palettes_is_varspec <- function(x) {
-  if(!is.list(x) || length(x) < 1L) {
-    return(FALSE)
-  }
-
-  isTRUE(tryCatch({
-    .color_palettes_validate_variables(x)
-    TRUE
-  }, error=function(e) FALSE))
-}
-
-# Ensure list names are present and non-empty.
-.color_palettes_ensure_names <- function(x, prefix="dataset_") {
-  if(is.null(names(x))) {
-    names(x) <- paste0(prefix, seq_along(x))
-  }
-  nm <- as.character(names(x))
-  bad <- is.na(nm) | trimws(nm) == ""
-  nm[bad] <- paste0(prefix, seq_along(x))[bad]
-  names(x) <- nm
-  x
-}
-
-# Normalize variable input to named dataset -> variable-spec-list form.
-# Supports:
-# - single variable specification list
-# - data.frame (converted via infer_palette_variables)
-# - named list of variable specification lists and/or data.frames
+# Validate variable input as named dataset -> variable-spec-list form.
+# No shape guessing is allowed: callers must provide one entry per dataset.
 .color_palettes_normalize_datasets <- function(variables) {
-
-  # there are four possible input forms.
-  # 1. A single data frame (single dataset)
-  if(is.data.frame(variables)) {
-    return(list(default=infer_palette_variables(variables)))
-  }
-
-
-  # 2. A list of variable specification lists (multiple datasets)
-  if(is.list(variables) && length(variables) > 0L &&
-     all(vapply(variables, function(x) is.list(x) && !is.null(x$type), logical(1)))) {
-    return(list(default=.color_palettes_validate_variables(variables)))
-  }
-
-  # 3. A single variable specification list (single dataset)
-  if(.color_palettes_is_varspec(variables)) {
-    return(list(default=.color_palettes_validate_variables(variables)))
-  }
-
-  # 4. What remains must be a named list of data frames.
-
   if(!is.list(variables) || length(variables) < 1L) {
-    stop("`variables` must be a variable specification list, a data frame, or a list of datasets.")
+    stop(
+      "`variables` must be a non-empty named list of dataset specifications. ",
+      "For a single dataset, use `list(default=<variable specification list>)`."
+    )
   }
 
-  variables <- .color_palettes_ensure_names(variables, "dataset_")
-  out <- stats::setNames(vector("list", length(variables)), names(variables))
+  ds_names <- names(variables)
+  if(is.null(ds_names)) {
+    stop(
+      "`variables` must be named with dataset identifiers. ",
+      "For a single dataset, use `list(default=<variable specification list>)`."
+    )
+  }
+
+  ds_names <- trimws(as.character(ds_names))
+  if(any(is.na(ds_names) | ds_names == "")) {
+    stop("All entries in `variables` must have non-empty dataset names.")
+  }
+
+  out <- stats::setNames(vector("list", length(variables)), ds_names)
 
   for(i in seq_along(variables)) {
-    ds <- names(variables)[i]
+    ds <- ds_names[i]
     x <- variables[[i]]
 
     if(is.data.frame(x)) {
-      out[[i]] <- infer_palette_variables(x)
-    } else if(.color_palettes_is_varspec(x)) {
-      out[[i]] <- .color_palettes_validate_variables(x)
-    } else {
       stop(sprintf(
-        "`variables[['%s']]` must be a data frame or a valid variable specification list.",
+        "`variables[['%s']]` is a data frame. Convert covariates explicitly with `infer_palette_variables()` before calling `colorPalettesServer()`.",
         ds
       ))
     }
+
+    out[[i]] <- tryCatch(
+      .color_palettes_validate_variables(x),
+      error=function(e) {
+        stop(sprintf(
+          "Invalid variable specification for dataset '%s': %s",
+          ds,
+          conditionMessage(e)
+        ), call.=FALSE)
+      }
+    )
   }
 
   out
@@ -567,10 +541,11 @@ colorPalettesUI <- function(id) {
 #'
 #' @param id Shiny module id (same as passed to [colorPalettesUI()]).
 #' @param variables Variable specification input as either a named list or a
-#'   reactive value/expression returning one. Single-dataset input can be a
-#'   variable specification list or a covariate data frame. Multi-dataset
-#'   input must be a named list where each element is a variable specification
-#'   list or covariate data frame.
+#'   reactive value/expression returning one. The value must always be a named
+#'   list of datasets. Each dataset entry must be a variable specification list.
+#'   For a single dataset, use `list(default=<variable specification list>)`.
+#'   Covariate data frames are not accepted here; convert them explicitly with
+#'   [infer_palette_variables()] first.
 #' @param palettes Optional reactiveVal-like placeholder kept for compatibility.
 #'   If supplied, it must be a function; the module returns its own reactive
 #'   palette specification and does not mutate external state. The value is a
@@ -586,8 +561,10 @@ colorPalettesUI <- function(id) {
 #'
 #' Single-dataset form:
 #' ```
-#' list(sex=list(type="categorical", levels=c("female", "male")), 
-#'      expression=list(type="continuous", breaks=c(-2, 0, 2)))
+#' list(default=list(
+#'   sex=list(type="categorical", levels=c("female", "male")),
+#'   expression=list(type="continuous", breaks=c(-2, 0, 2))
+#' ))
 #' ```
 #'
 #' Multi-dataset form:
@@ -603,11 +580,11 @@ colorPalettesUI <- function(id) {
 #'
 #' @examples
 #' if(interactive()) {
-#'   variables <- list(
+#'   variables <- list(default=list(
 #'     sex=list(type="categorical", levels=c("female", "male")),
 #'     stage=list(type="ordinal", levels=c("I", "II", "III", "IV")),
 #'     expression=list(type="continuous", breaks=c(-2, -1, 0, 1, 2))
-#'   )
+#'   ))
 #'
 #'   ui <- fluidPage(
 #'     colorPalettesUI("pal"),
