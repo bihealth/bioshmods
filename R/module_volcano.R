@@ -63,6 +63,67 @@
   list(cntr = cntr, annot = annot, annot_full = annot_full)
 }
 
+# Generate readable ggplot code for the current volcano plot.
+# The generated code mirrors the renderPlot body without running it.
+.volcano_plot_chunk <- function(df, input, lfc_col, pval_col, primary_id,
+                                annot_full, env_map=list(df="df")) {
+  scales <- ifelse(input$samescaleX,
+                   ifelse(input$samescaleY, "fixed", "free_y"),
+                   ifelse(input$samescaleY, "free_x", "free"))
+
+  code <- "# Prepare volcano plot data."
+  code <- code %+n% sprintf("plot_df <- %s", env_map[["df"]])
+  if(!identical(input$dataset, "_all")) {
+    code <- code %+n% sprintf("plot_df <- plot_df[plot_df$Dataset == %s, ]", .r_code(input$dataset))
+  }
+  code <- code %+n% sprintf(
+    "plot_df$Significant <- abs(plot_df$%s) > %s & plot_df$%s < %s",
+    lfc_col, .r_code(input$lfc_thr), pval_col, .r_code(input$pval_thr)
+  )
+  code <- code %+n% sprintf("plot_df$y <- -log10(plot_df$%s)", pval_col)
+  code <- code %+n% "\n# Pick top labels separately for each contrast."
+  code <- code %+n% "label_df <- NULL"
+
+  if(isTRUE(input$show_top_labels)) {
+    label_col <- trimws(as.character(input$label_col %||% primary_id)[1])
+    if(!nzchar(label_col) || is.na(label_col)) {
+      label_col <- primary_id
+    }
+
+    code <- code %+n% sprintf("top_n <- %s", .r_code(as.integer(input$top_label_n)[1]))
+    code <- code %+n% sprintf("label_df <- plot_df[!is.na(plot_df$%s) & plot_df$%s != \"\", ]", primary_id, primary_id)
+    code <- code %+n% sprintf("label_df <- label_df[order(label_df$Dataset_Contrast, -label_df$Significant, -label_df$y, -abs(label_df$%s)), ]", lfc_col)
+    code <- code %+n% sprintf("label_df <- do.call(rbind, lapply(split(label_df, label_df$Dataset_Contrast), head, n=top_n))")
+    code <- code %+n% sprintf("label_df$label <- as.character(label_df$%s)", primary_id)
+    code <- code %+n% sprintf("label_col <- %s", .r_code(label_col))
+    code <- code %+n% sprintf("if(label_col != %s && exists(\"annot\")) {", .r_code(primary_id))
+    code <- code %+n% "  label_df$label <- vapply(seq_len(nrow(label_df)), function(i) {"
+    code <- code %+n% "    dataset <- label_df$Dataset[i]"
+    code <- code %+n% sprintf("    id <- label_df$%s[i]", primary_id)
+    code <- code %+n% "    annotation <- annot[[dataset]]"
+    code <- code %+n% sprintf("    value <- annotation[[label_col]][match(id, annotation[[%s]])]", .r_code(primary_id))
+    code <- code %+n% "    value <- as.character(value)[1]"
+    code <- code %+n% "    if(is.na(value) || !nzchar(value)) as.character(id) else value"
+    code <- code %+n% "  }, character(1))"
+    code <- code %+n% "}"
+  }
+
+  code <- code %+n% "\n# Draw the volcano plot."
+  code <- code %+n% sprintf("g <- ggplot(plot_df, aes(x=%s, y=y, color=Significant)) +", lfc_col)
+  code <- code %+n% "  geom_point(alpha=.5) +"
+  code <- code %+n% sprintf("  facet_wrap(~ Dataset_Contrast, scales=%s) +", .r_code(scales))
+  code <- code %+n% "  scale_color_manual(values=c(\"TRUE\"=\"red\", \"FALSE\"=\"black\")) +"
+  code <- code %+n% sprintf("  theme(text=element_text(size=%s)) +", .r_code(input$font_size))
+  code <- code %+n% "  theme(legend.position=\"bottom\")"
+  code <- code %+n% "if(!is.null(label_df) && nrow(label_df) > 0L) {"
+  code <- code %+n% "  g <- g + geom_text(data=label_df, aes(label=label), check_overlap=TRUE,"
+  code <- code %+n% sprintf("                     vjust=-0.4, size=max(2.5, %s / 4), show.legend=FALSE)", .r_code(input$font_size))
+  code <- code %+n% "}"
+  code <- code %+n% "g"
+
+  list(required_pkgs=c("ggplot2"), type="figure", env_map=env_map, code=code)
+}
+
 #' @rdname volcanoServer
 #' @export
 volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
@@ -400,6 +461,22 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
         })
       }
     )
+
+    ## Keep the report-code tab in sync with the current volcano controls.
+    ## This generates text only; the rendered plot still uses the existing path.
+    observe({
+      req(input$dataset, input$lfc_thr, input$pval_thr)
+      code <- .volcano_plot_chunk(
+        df=df,
+        input=input,
+        lfc_col=lfc_col,
+        pval_col=pval_col,
+        primary_id=primary_id,
+        annot_full=annot_full,
+        env_map=list(df="df")
+      )$code
+      updateTextAreaInput(session, "report_code", value=code)
+    })
 
     observeEvent(input$plot_hover, {
       .df <- dfvar()

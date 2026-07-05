@@ -195,6 +195,96 @@ plot_disco <- function(contrast1, contrast2, lower=-100, upper=100,
   return(g)
 }
 
+#' Create code for a disco plot
+#'
+#' Create readable R code that mirrors [plot_disco()] without calling it.
+#' @inheritParams plot_disco
+#' @param env_map optional list mapping `contrast1`, `contrast2`, `annot1`,
+#'   `annot2`, and `disco` to names used in the generated code.
+#' @return a list with metadata and generated code
+#' @export
+plot_disco_chunk <- function(contrast1, contrast2, lower=-100, upper=100,
+  show_top_labels=0, top_labels_both=TRUE, annot1=NULL, annot2=NULL,
+  alpha=.5, disco=NULL, by=0,
+  primary_id="PrimaryID", label_col="SYMBOL", label_sel=NULL,
+  env_map=NULL) {
+
+  env_map <- .normalize_env_map(env_map, c("contrast1", "contrast2", "annot1", "annot2", "disco"))
+
+  use_disco <- !is.null(disco)
+  code <- "# Prepare disco plot data."
+  if(use_disco) {
+    code <- code %+n% sprintf("cc <- %s", env_map[["disco"]])
+  } else {
+    code <- code %+n% sprintf(
+      "cc <- merge(%s, %s, by=%s, suffixes=c(\".x\", \".y\"))",
+      env_map[["contrast1"]],
+      env_map[["contrast2"]],
+      .r_code(by)
+    )
+    code <- code %+n% sprintf("names(cc)[names(cc) == \"Row.names\"] <- %s", .r_code(primary_id))
+    code <- code %+n% "cc$disco <- with(cc, log2FoldChange.x * log2FoldChange.y * (-log10(pvalue.x + 1e-16) - log10(pvalue.y + 1e-16)))"
+    code <- code %+n% "cc$disco[is.na(cc$disco)] <- 0"
+  }
+
+  code <- code %+n% sprintf("lower <- %s", .r_code(lower))
+  code <- code %+n% sprintf("upper <- %s", .r_code(upper))
+  code <- code %+n% "cc <- cc[!is.na(cc$log2FoldChange.x) & !is.na(cc$log2FoldChange.y) & !is.na(cc$disco), ]"
+  code <- code %+n% "cc$disco <- ifelse(cc$disco > upper, upper, ifelse(cc$disco < lower, lower, cc$disco))"
+  code <- code %+n% "cc <- cc[order(abs(cc$disco)), ]"
+
+  code <- code %+n% "\n# Prepare optional labels."
+  code <- code %+n% "lab_df <- NULL"
+  if(show_top_labels > 0) {
+    code <- code %+n% sprintf("top_n <- min(%s, nrow(cc))", .r_code(as.integer(show_top_labels)))
+    code <- code %+n% sprintf("top_sel <- order(-abs(cc$disco))[seq_len(top_n)]")
+    code <- code %+n% sprintf("lab_df <- cc[top_sel, c(%s, \"log2FoldChange.x\", \"log2FoldChange.y\", \"disco\"), drop=FALSE]", .r_code(primary_id))
+    code <- code %+n% "lab_df$label <- NA_character_"
+    code <- code %+n% sprintf("for(annotation in list(%s, %s, %s, %s)) {", env_map[["annot1"]], env_map[["annot2"]], env_map[["contrast1"]], env_map[["contrast2"]])
+    code <- code %+n% sprintf("  if(is.data.frame(annotation) && all(c(%s, %s) %%in%% colnames(annotation))) {", .r_code(primary_id), .r_code(label_col))
+    code <- code %+n% sprintf("    vals <- as.character(annotation[[%s]][match(lab_df[[%s]], annotation[[%s]])])", .r_code(label_col), .r_code(primary_id), .r_code(primary_id))
+    code <- code %+n% "    fill <- is.na(lab_df$label) & !is.na(vals) & nzchar(vals)"
+    code <- code %+n% "    lab_df$label[fill] <- vals[fill]"
+    code <- code %+n% "  }"
+    code <- code %+n% "}"
+    code <- code %+n% sprintf("lab_df$label[is.na(lab_df$label)] <- as.character(lab_df[[%s]][is.na(lab_df$label)])", .r_code(primary_id))
+  }
+  if(!is.null(label_sel) && length(label_sel) > 0L) {
+    code <- code %+n% sprintf("label_sel <- %s", .r_code(label_sel))
+    code <- code %+n% sprintf("manual_df <- cc[, %s, drop=FALSE]", .r_code(primary_id))
+    code <- code %+n% "manual_df$label <- NA_character_"
+    code <- code %+n% sprintf("for(annotation in list(%s, %s, %s, %s)) {", env_map[["contrast1"]], env_map[["contrast2"]], env_map[["annot1"]], env_map[["annot2"]])
+    code <- code %+n% sprintf("  if(is.data.frame(annotation) && all(c(%s, %s) %%in%% colnames(annotation))) {", .r_code(primary_id), .r_code(label_col))
+    code <- code %+n% sprintf("    vals <- as.character(annotation[[%s]][match(manual_df[[%s]], annotation[[%s]])])", .r_code(label_col), .r_code(primary_id), .r_code(primary_id))
+    code <- code %+n% "    vals[!grepl(label_sel, vals)] <- NA_character_"
+    code <- code %+n% "    fill <- is.na(manual_df$label) & !is.na(vals) & nzchar(vals)"
+    code <- code %+n% "    manual_df$label[fill] <- vals[fill]"
+    code <- code %+n% "  }"
+    code <- code %+n% "}"
+    code <- code %+n% "manual_df <- manual_df[!is.na(manual_df$label), , drop=FALSE]"
+    code <- code %+n% sprintf("manual_df <- merge(cc, manual_df, by=%s)", .r_code(primary_id))
+    code <- code %+n% "lab_df <- if(is.null(lab_df)) manual_df else unique(rbind(lab_df, manual_df))"
+  }
+
+  code <- code %+n% "\n# Draw the disco plot."
+  code <- code %+n% "g <- ggplot(cc, aes(x=log2FoldChange.x, y=log2FoldChange.y)) +"
+  code <- code %+n% sprintf("  geom_point(aes(color=disco), alpha=%s) +", .r_code(alpha))
+  code <- code %+n% "  scale_color_gradient2(low=\"blue\", mid=\"grey\", high=\"red\") +"
+  code <- code %+n% "  theme(legend.position=\"none\") +"
+  code <- code %+n% "  geom_hline(yintercept=0, color=\"grey\") +"
+  code <- code %+n% "  geom_vline(xintercept=0, color=\"grey\") +"
+  code <- code %+n% "  geom_abline(slope=1, intercept=0, color=\"grey\") +"
+  code <- code %+n% "  ggtitle(sprintf(\"Correlation between log2FC\\nr=%.2f rho=%.2f\","
+  code <- code %+n% "                  cor(cc$log2FoldChange.x, cc$log2FoldChange.y, use=\"p\"),"
+  code <- code %+n% "                  cor(cc$log2FoldChange.x, cc$log2FoldChange.y, method=\"s\", use=\"p\")))"
+  code <- code %+n% "if(!is.null(lab_df) && nrow(lab_df) > 0L) {"
+  code <- code %+n% "  g <- g + geom_label(data=lab_df, aes(label=label, color=disco))"
+  code <- code %+n% "}"
+  code <- code %+n% "g"
+
+  list(required_pkgs=c("ggplot2"), type="figure", env_map=env_map, code=code)
+}
+
 
 #' Calculate the disco score
 #'

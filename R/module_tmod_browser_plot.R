@@ -123,6 +123,49 @@
   evidencePlot(gl, m=mod_id, mset=mset, gene.colors=colors, gene.labels=gene.labels)
 }
 
+# Generate readable code for the current tmod evidence plot.
+# The generated code prepares inputs and calls `tmod::evidencePlot()` directly.
+.plot_evidence_chunk <- function(mod_id, cntr_id, db_id, sort_id, cntr, tmod_dbs,
+                                 tmod_gl=NULL, tmod_map=NULL, annot=NULL, primary_id,
+                                 env_map=NULL) {
+  env_map <- .normalize_env_map(env_map, c("cntr", "tmod_dbs", "tmod_gl", "tmod_map", "annot"))
+
+  code <- "# Prepare tmod evidence plot data."
+  code <- code %+n% sprintf("module_id <- %s", .r_code(mod_id))
+  code <- code %+n% sprintf("contrast_id <- %s", .r_code(cntr_id))
+  code <- code %+n% sprintf("db_id <- %s", .r_code(db_id))
+  code <- code %+n% sprintf("sort_id <- %s", .r_code(sort_id))
+  code <- code %+n% sprintf("contrast <- %s[[contrast_id]]", env_map[["cntr"]])
+  code <- code %+n% sprintf("mset <- %s[[db_id]]", env_map[["tmod_dbs"]])
+  code <- code %+n% sprintf("annotation <- %s", env_map[["annot"]])
+  code <- code %+n% sprintf("tmod_map <- %s", env_map[["tmod_map"]])
+  code <- code %+n% sprintf("tmod_gl <- %s", env_map[["tmod_gl"]])
+  code <- code %+n% sprintf("if(!%s %%in%% colnames(contrast)) contrast[[%s]] <- rownames(contrast)",
+                            .r_code(primary_id), .r_code(primary_id))
+  code <- code %+n% "if(is.null(tmod_gl) || is.null(tmod_gl[[contrast_id]]) || is.null(tmod_gl[[contrast_id]][[sort_id]])) {"
+  code <- code %+n% "  contrast <- contrast[order(contrast$pvalue), ]"
+  code <- code %+n% sprintf("  gl <- tmod_map$maps[[tmod_map$dbs[[db_id]]]][contrast[[%s]]]", .r_code(primary_id))
+  code <- code %+n% "} else {"
+  code <- code %+n% "  gl <- tmod_gl[[contrast_id]][[sort_id]]"
+  code <- code %+n% sprintf("  gl <- tmod_map$maps[[tmod_map$dbs[[db_id]]]][annotation[[%s]][gl]]", .r_code(primary_id))
+  code <- code %+n% "}"
+  code <- code %+n% "symbols <- names(gl)"
+  code <- code %+n% sprintf("if(is.data.frame(annotation) && \"SYMBOL\" %%in%% colnames(annotation)) symbols <- annotation$SYMBOL[match(symbols, annotation[[%s]])]", .r_code(primary_id))
+  code <- code %+n% "names(symbols) <- names(gl)"
+  code <- code %+n% "module_genes <- tmod::getModuleMembers(module_id, mset)[[module_id]]"
+  code <- code %+n% "selected <- gl %in% module_genes"
+  code <- code %+n% "gene_labels <- symbols[selected]"
+  code <- code %+n% "names(gene_labels) <- gl[selected]"
+  code <- code %+n% sprintf("contrast <- contrast[match(names(gl), contrast[[%s]]), ]", .r_code(primary_id))
+  code <- code %+n% "p_values <- contrast$padj"
+  code <- code %+n% "log2fc <- contrast$log2FoldChange"
+  code <- code %+n% "gene_colours <- ifelse(log2fc < 0, ifelse(p_values < .05, \"blue\", \"#000066\"), ifelse(p_values < .05, \"red\", \"#660000\"))"
+  code <- code %+n% "names(gene_colours) <- gl"
+  code <- code %+n% "tmod::evidencePlot(gl, m=module_id, mset=mset, gene.colors=gene_colours, gene.labels=gene_labels)"
+
+  list(required_pkgs=c("tmod"), type="figure", env_map=env_map, code=code)
+}
+
 ## given a module, contrast, sorting: prepare a module info tab contents,
 ## including which genes are significant in the given contrast
 .tmod_browser_mod_info <- function(id, ds, db_name, cntr_name, sort_name, tmod_dbs, cntr, tmod_map, tmod_res=NULL) {
@@ -283,6 +326,17 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
   tmod_map <- .check_dataset_list(tmod_map, "tmod_map", is.list, "a tmod mapping object", datasets=datasets, allow_null=TRUE)
   tmod_gl <- .check_dataset_list(tmod_gl, "tmod_gl", is.list, "a tmod gene-list object", datasets=datasets, allow_null=TRUE)
   tmod_res <- .check_dataset_list(tmod_res, "tmod_res", is.list, "a tmod result object", datasets=datasets, allow_null=TRUE)
+
+  env_maps <- lapply(datasets, function(ds) {
+    list(
+      cntr=sprintf('cntr[["%s"]]', ds),
+      tmod_dbs=sprintf('tmod_dbs[["%s"]]', ds),
+      tmod_gl=if(is.null(tmod_gl)) "NULL" else sprintf('tmod_gl[["%s"]]', ds),
+      tmod_map=if(is.null(tmod_map)) "NULL" else sprintf('tmod_map[["%s"]]', ds),
+      annot=sprintf('annot[["%s"]]', ds)
+    )
+  })
+  names(env_maps) <- datasets
     
   moduleServer(id, function(input, output, session) {
     .tmod_browser_plot_log("moduleServer started for id='", id, "'.")
@@ -350,6 +404,30 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
                      cntr=cntr[[ds]], tmod_dbs=tmod_dbs[[ds]], tmod_gl=tmod_gl[[ds]], 
                      tmod_map=tmod_map[[ds]], annot=annot[[ds]], primary_id)
     }, width=800, height=600)
+
+    ## Keep the report-code tab in sync with the selected evidence plot.
+    ## This generates text only; rendering still uses `.plot_evidence()`.
+    observe({
+      req(gs_id$id, gs_id$ds, gs_id$cntr, gs_id$db, gs_id$sort)
+      ds <- gs_id$ds
+      req(ds %in% datasets)
+
+      code <- .plot_evidence_chunk(
+        mod_id=gs_id$id,
+        cntr_id=gs_id$cntr,
+        db_id=gs_id$db,
+        sort_id=gs_id$sort,
+        cntr=cntr[[ds]],
+        tmod_dbs=tmod_dbs[[ds]],
+        tmod_gl=tmod_gl[[ds]],
+        tmod_map=tmod_map[[ds]],
+        annot=annot[[ds]],
+        primary_id=primary_id,
+        env_map=env_maps[[ds]]
+      )$code
+
+      updateTextAreaInput(session, "report_code", value=code)
+    })
 
 
     output$modinfo <- renderTable({

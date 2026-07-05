@@ -315,3 +315,83 @@ plot_heatmap <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
     show_row_names=TRUE
   )
 }
+
+#' Generate code for an expression heatmap
+#'
+#' Generate readable R code that mirrors [plot_heatmap()] without calling it.
+#' @inheritParams plot_heatmap
+#' @param env_map optional list mapping `exprs`, `genes`, `covar`, `annot`,
+#'   `palettes`, and `col` to names used in the generated code.
+#' @return a list with metadata and generated code
+#' @export
+plot_heatmap_chunk <- function(exprs, genes, covar=NULL, sample_id_col="SampleID",
+                               annot=NULL, primary_id_col="PrimaryID", annot_row_col=NULL,
+                               sel_annot=NULL, sort_by_covar=FALSE,
+                               legend=TRUE, palettes=NULL, col=NULL,
+                               env_map=NULL) {
+  env_map <- .normalize_env_map(env_map, c("exprs", "genes", "covar", "annot", "palettes", "col"))
+
+  code <- "# Prepare heatmap expression matrix."
+  code <- code %+n% sprintf("exprs_mat <- as.matrix(%s)", env_map[["exprs"]])
+  code <- code %+n% sprintf("genes <- unique(as.character(%s))", env_map[["genes"]])
+  code <- code %+n% "genes <- genes[!is.na(genes) & genes != \"\"]"
+  code <- code %+n% "genes <- intersect(genes, rownames(exprs_mat))"
+  code <- code %+n% "exprs_mat <- exprs_mat[genes, , drop=FALSE]"
+  code <- code %+n% "exprs_mat <- t(scale(t(exprs_mat)))"
+  code <- code %+n% "exprs_mat[is.na(exprs_mat)] <- 0"
+
+  code <- code %+n% "\n# Resolve row labels."
+  code <- code %+n% "row_labels <- rownames(exprs_mat)"
+  if(!is.null(annot_row_col) && nzchar(as.character(annot_row_col)[1])) {
+    code <- code %+n% sprintf("annotation <- %s", env_map[["annot"]])
+    code <- code %+n% sprintf("if(is.data.frame(annotation) && all(c(%s, %s) %%in%% colnames(annotation))) {",
+                              .r_code(primary_id_col), .r_code(annot_row_col))
+    code <- code %+n% sprintf("  row_labels <- as.character(annotation[[%s]][match(rownames(exprs_mat), annotation[[%s]])])",
+                              .r_code(annot_row_col), .r_code(primary_id_col))
+    code <- code %+n% "  row_labels[is.na(row_labels) | row_labels == \"\"] <- rownames(exprs_mat)[is.na(row_labels) | row_labels == \"\"]"
+    code <- code %+n% "}"
+  }
+
+  code <- code %+n% "\n# Prepare optional top annotations."
+  if(!is.null(covar)) {
+    code <- code %+n% sprintf("covar_df <- %s", env_map[["covar"]])
+    code <- code %+n% sprintf("sample_id_col <- %s", .r_code(sample_id_col))
+    code <- code %+n% sprintf("selected_annotations <- %s", .r_code(sel_annot %||% character(0)))
+    code <- code %+n% "ann_df <- covar_df[match(colnames(exprs_mat), covar_df[[sample_id_col]]), , drop=FALSE]"
+    code <- code %+n% "rownames(ann_df) <- ann_df[[sample_id_col]]"
+    code <- code %+n% "selected_annotations <- intersect(selected_annotations, setdiff(colnames(ann_df), sample_id_col))"
+    code <- code %+n% "ann_df <- ann_df[, selected_annotations, drop=FALSE]"
+    if(isTRUE(sort_by_covar)) {
+      code <- code %+n% "if(ncol(ann_df) > 0L) {"
+      code <- code %+n% "  ord <- do.call(order, ann_df)"
+      code <- code %+n% "  ann_df <- ann_df[ord, , drop=FALSE]"
+      code <- code %+n% "  exprs_mat <- exprs_mat[, rownames(ann_df), drop=FALSE]"
+      code <- code %+n% "}"
+    }
+    code <- code %+n% sprintf("palettes <- %s", env_map[["palettes"]])
+    code <- code %+n% "annotation_colours <- if(is.null(palettes)) NULL else lapply(palettes, function(x) x$pal)"
+    code <- code %+n% sprintf("top_annotation <- if(ncol(ann_df) > 0L) ComplexHeatmap::HeatmapAnnotation(df=ann_df, show_legend=%s, col=annotation_colours) else NULL",
+                              .r_code(isTRUE(legend)))
+  } else {
+    code <- code %+n% "top_annotation <- NULL"
+  }
+
+  cluster_cols <- !(isTRUE(sort_by_covar) && !is.null(covar) && length(sel_annot %||% character(0)) > 0L)
+  code <- code %+n% "\n# Draw the heatmap."
+  code <- code %+n% "hm <- ComplexHeatmap::Heatmap("
+  code <- code %+n% "  exprs_mat,"
+  code <- code %+n% "  name=\"Expression\","
+  code <- code %+n% "  row_labels=row_labels,"
+  code <- code %+n% "  top_annotation=top_annotation,"
+  code <- code %+n% "  cluster_rows=TRUE,"
+  code <- code %+n% sprintf("  cluster_columns=%s,", .r_code(cluster_cols))
+  code <- code %+n% sprintf("  show_heatmap_legend=%s,", .r_code(isTRUE(legend)))
+  code <- code %+n% "  show_column_names=FALSE,"
+  code <- code %+n% sprintf("  col=%s,", env_map[["col"]])
+  code <- code %+n% "  show_row_names=TRUE"
+  code <- code %+n% ")"
+  code <- code %+n% sprintf("ComplexHeatmap::draw(hm, heatmap_legend_side=\"right\", annotation_legend_side=\"right\", show_heatmap_legend=%s, show_annotation_legend=%s)",
+                            .r_code(isTRUE(legend)), .r_code(isTRUE(legend)))
+
+  list(required_pkgs=c("ComplexHeatmap"), type="figure", env_map=env_map, code=code)
+}

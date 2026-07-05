@@ -154,6 +154,100 @@ gg_panelplot <- function(res, pie, auc_thr=.5, q_thr=.05,
     
 }
 
+#' Generate code for a tmod panel plot
+#'
+#' Generate readable R code that mirrors [gg_panelplot()] without calling it.
+#' @inheritParams gg_panelplot
+#' @param env_map optional list mapping `res` and `pie` to names used in the generated code.
+#' @return a list with metadata and generated code
+#' @export
+gg_panelplot_chunk <- function(res, pie, auc_thr=.5, q_thr=.05,
+                               filter_row_q=.01,
+                               filter_row_auc=.65,
+                               q_cutoff=1e-12,
+                               label_angle=45, cleanup=TRUE, add_ids=TRUE,
+                               env_map=NULL) {
+  env_map <- .normalize_env_map(env_map, c("res", "pie"))
+
+  code <- "# Summarise tmod enrichment results."
+  code <- code %+n% sprintf("res <- %s", env_map[["res"]])
+  code <- code %+n% sprintf("pie <- %s", env_map[["pie"]])
+  code <- code %+n% "res <- res[!purrr::map_lgl(res, is.null)]"
+  code <- code %+n% "res_summary <- tmod::tmodSummary(res)"
+  code <- code %+n% "if(any(res_summary$Title != res_summary$ID)) {"
+  code <- code %+n% "  module_names <- res_summary$Title"
+  if(isTRUE(cleanup)) {
+    code <- code %+n% "  module_names <- gsub(\"^[A-Z0-9_]+[._ -]+\", \"\", module_names)"
+  }
+  if(isTRUE(add_ids)) {
+    code <- code %+n% "  module_names <- paste(res_summary$ID, module_names)"
+  }
+  code <- code %+n% "} else {"
+  code <- code %+n% "  module_names <- res_summary$ID"
+  code <- code %+n% "}"
+  code <- code %+n% "names(module_names) <- res_summary$ID"
+
+  code <- code %+n% "\n# Convert AUC/q columns into long form and filter displayed modules."
+  code <- code %+n% "res_long <- res_summary %>%"
+  code <- code %+n% "  tidyr::pivot_longer(tidyselect::starts_with(c(\"AUC\", \"q\")),"
+  code <- code %+n% "                       names_to=c(\"Param\", \"Contrast\"),"
+  code <- code %+n% "                       names_pattern=\"(AUC|q)\\\\.(.+)\","
+  code <- code %+n% "                       values_to=\"Value\") %>%"
+  code <- code %+n% "  tidyr::pivot_wider(c(ID, Title, Contrast), names_from=Param, values_from=Value) %>%"
+  code <- code %+n% "  dplyr::mutate(q=ifelse(is.na(q), 1, q), AUC=ifelse(is.na(AUC), .5, AUC)) %>%"
+  code <- code %+n% sprintf("  dplyr::filter(AUC > %s & q < %s) %s", .r_code(auc_thr), .r_code(q_thr), "%>%")
+  code <- code %+n% sprintf("  dplyr::mutate(q=ifelse(q < %s, %s, q), alpha=-log10(q) / -log10(%s))",
+                            .r_code(q_cutoff), .r_code(q_cutoff), .r_code(q_cutoff))
+  code <- code %+n% "selected_modules <- res_summary$ID"
+  if(!is.na(filter_row_auc)) {
+    code <- code %+n% sprintf("selected_modules <- intersect(selected_modules, res_long %%>%% dplyr::filter(AUC > %s) %%>%% dplyr::pull(ID))",
+                              .r_code(filter_row_auc))
+  }
+  if(!is.na(filter_row_q)) {
+    code <- code %+n% sprintf("selected_modules <- intersect(selected_modules, res_long %%>%% dplyr::filter(q < %s) %%>%% dplyr::pull(ID))",
+                              .r_code(filter_row_q))
+  }
+  code <- code %+n% "res_long <- res_long %>% dplyr::filter(ID %in% selected_modules)"
+
+  code <- code %+n% "\n# Add gene-direction summaries."
+  code <- code %+n% "pie_tables <- purrr::imap(pie, function(x, contrast) {"
+  code <- code %+n% "  colnames(x) <- paste0(contrast, \".\", colnames(x))"
+  code <- code %+n% "  tibble::rownames_to_column(as.data.frame(x), \"ID\")"
+  code <- code %+n% "})"
+  code <- code %+n% "pie_summary <- Reduce(function(x, y) merge(x, y, all=TRUE), pie_tables) %>%"
+  code <- code %+n% "  tidyr::pivot_longer(-1, names_to=c(\"Contrast\", \"Direction\"), names_sep=\"\\\\.\", values_to=\"Number\")"
+  code <- code %+n% "plot_df <- merge(res_long, pie_summary, by=c(\"ID\", \"Contrast\"), all.x=TRUE) %>%"
+  code <- code %+n% "  dplyr::group_by(paste(ID, Contrast)) %>%"
+  code <- code %+n% "  dplyr::mutate(Tot=sum(Number)) %>%"
+  code <- code %+n% "  dplyr::ungroup() %>%"
+  code <- code %+n% "  dplyr::mutate(Number=Number * AUC / Tot,"
+  code <- code %+n% "                Direction=factor(Direction, levels=c(\"up\", \"N\", \"down\")))"
+  code <- code %+n% "plot_df <- plot_df %>%"
+  code <- code %+n% "  dplyr::group_by(paste0(Contrast, Direction)) %>%"
+  code <- code %+n% "  dplyr::slice(match(res_summary$ID, ID)) %>%"
+  code <- code %+n% "  dplyr::ungroup()"
+  code <- code %+n% "plot_df$Contrast <- factor(plot_df$Contrast, levels=names(res))"
+  code <- code %+n% "direction_colours <- c(up=\"red\", N=\"grey\", down=\"blue\")"
+  code <- code %+n% "max_log_q <- max(-log10(plot_df$q))"
+
+  code <- code %+n% "\n# Draw the panel plot."
+  code <- code %+n% "g <- ggplot(plot_df, aes(x=ID, y=Number, fill=Direction, contrast=Contrast, id=ID, alpha=-log10(q))) +"
+  code <- code %+n% "  facet_wrap(~ Contrast, nrow=1, drop=FALSE) +"
+  code <- code %+n% "  geom_bar(stat=\"identity\") +"
+  code <- code %+n% "  coord_flip() +"
+  code <- code %+n% "  scale_fill_manual(values=direction_colours) +"
+  code <- code %+n% "  scale_x_discrete(breaks=names(module_names), labels=module_names) +"
+  code <- code %+n% sprintf("  theme(strip.text.x=element_text(angle=%s), strip.background=element_blank(),", .r_code(as.numeric(label_angle)))
+  code <- code %+n% "        axis.text.x=element_text(angle=90), axis.title.y=element_blank()) +"
+  code <- code %+n% "  scale_y_continuous(breaks=c(0, .5, 1), labels=c(\"0\", \".5\", \"1\"), limits=c(0, 1)) +"
+  code <- code %+n% "  guides(alpha=guide_legend(override.aes=list(fill=\"grey\"))) +"
+  code <- code %+n% "  lims(alpha=c(0, max_log_q)) +"
+  code <- code %+n% "  ylab(\"Effect size\")"
+  code <- code %+n% "g"
+
+  list(required_pkgs=c("ggplot2", "dplyr", "tidyr", "tibble", "purrr", "tmod"), type="figure", env_map=env_map, code=code)
+}
+
 #' @importFrom shinycssloaders withSpinner
 #' @rdname tmodPanelPlotServer
 #' @export
@@ -552,6 +646,35 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 
       g
     }, width=fig_size$width, height=fig_size$height) })
+
+    ## Keep the report-code tab in sync with the current panel plot controls.
+    ## This generates the plotting code for the current selected `res` and `pie`.
+    observe({
+      .pie <- pie()
+      .res_nested <- res()
+      req(!is.null(.pie), !is.null(.res_nested))
+
+      .res <- flatten(.res_nested)
+      if(! "_all" %in% input$contrast_select) {
+        sel <- input$contrast_select
+        sel <- sel[ sel %in% names(.res) ]
+        .res <- .res[ sel ]
+      }
+
+      code <- "# Current selected tmod results and pie summaries.\n"
+      code <- code %+n% "# In a standalone report, create `res` and `pie` from `tmod_res`, `cntr`, `tmod_dbs`, and `tmod_map` first."
+      code <- code %+n% gg_panelplot_chunk(
+        .res,
+        pie=.pie,
+        filter_row_auc=input$filter_auc,
+        filter_row_q=input$filter_pval,
+        label_angle=input$label_angle,
+        env_map=list(res="res", pie="pie")
+      )$code
+      code <- code %+n% sprintf("g <- g + theme(text=element_text(size=%s))", .r_code(input$font_size))
+
+      updateTextAreaInput(session, "report_code", value=code)
+    })
 
 	})
 

@@ -257,6 +257,15 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     }
   }
 
+  env_maps <- lapply(datasets, function(ds) {
+    list(
+      exprs=sprintf('exprs[["%s"]]', ds),
+      covar=sprintf('covar[["%s"]]', ds),
+      annot=sprintf('annot[["%s"]]', ds)
+    )
+  })
+  names(env_maps) <- datasets
+
   moduleServer(id, function(input, output, session) {
     .heatmap_log("moduleServer started for id='", id, "'.")
     fig_size <- reactiveValues(width=800, height=600)
@@ -403,6 +412,58 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
         col=hm_col_ds$values$pal,
         palettes=annot_pal
       )
+    })
+
+    ## Keep the report-code tab in sync with the current heatmap state.
+    ## This generates text only; rendering still uses `plot_heatmap()`.
+    observe({
+      ds <- selector$dataset()
+      req(isTruthy(ds))
+      req(ds %in% datasets)
+      req(length(selected_ids_for_heatmap()) > 0L)
+
+      sel_annot_safe <- intersect(
+        as.character(input$sel_annot %||% character(0)),
+        .heatmap_annotation_choices(covar_norm[[ds]], sample_id_col=sample_id_col)
+      )
+      sort_by_covar_active <- isTRUE(input$sort_by_covar) && length(sel_annot_safe) > 0L
+
+      hm_col_all <- heatmap_col()
+      hm_col_ds <- hm_col_all[[1]]
+      if(is.list(hm_col_all) && "default" %in% names(hm_col_all)) {
+        hm_col_ds <- hm_col_all[["default"]]
+      }
+
+      annot_pal_all <- palettes()
+      annot_pal <- annot_pal_all
+      if(is.list(annot_pal_all) && ds %in% names(annot_pal_all)) {
+        annot_pal <- annot_pal_all[[ds]]
+      }
+
+      code <- plot_heatmap_chunk(
+        exprs=exprs_norm[[ds]],
+        genes=selected_ids_for_heatmap(),
+        covar=covar_norm[[ds]],
+        sample_id_col=sample_id_col,
+        annot=annot_norm[[ds]],
+        primary_id_col=primary_id,
+        annot_row_col=if(isTruthy(input$annot_row_col)) input$annot_row_col else NULL,
+        sel_annot=sel_annot_safe,
+        sort_by_covar=sort_by_covar_active,
+        legend=isTRUE(input$show_legend),
+        col=hm_col_ds$values$pal,
+        palettes=annot_pal,
+        env_map=list(
+          exprs=env_maps[[ds]]$exprs,
+          genes=.r_code(selected_ids_for_heatmap()),
+          covar=env_maps[[ds]]$covar,
+          annot=env_maps[[ds]]$annot,
+          palettes=.r_code(annot_pal),
+          col=.r_code(hm_col_ds$values$pal)
+        )
+      )$code
+
+      updateTextAreaInput(session, "report_code", value=code)
     })
 
     observe({ output$heatmap_plot <- renderPlot({

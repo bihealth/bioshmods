@@ -6,6 +6,10 @@
 # Concatenate strings with a newline separator.
 `%+n%` <- function(a, b) paste(a, b, sep="\n")
 
+# Convert an R value into one-line R source code.
+# Used by report chunk generators for strings, vectors, and palettes.
+.r_code <- function(x) paste(deparse(x), collapse="")
+
 # Global debug switch for package-internal tracing.
 # Enable with: options(bioshmods.debug = TRUE)
 .bioshmods_debug_enabled <- function() {

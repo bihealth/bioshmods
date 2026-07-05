@@ -42,6 +42,26 @@
   return(tmod_res)
 }
 
+# Generate readable code for the optional tmod UpSet plot.
+# The generated code mirrors the renderPlot path without executing it.
+.tmod_upset_chunk <- function(modules, db, min_size=2, value="number",
+                              group_stat="jaccard", env_map=NULL) {
+  env_map <- .normalize_env_map(env_map, c("modules", "db"))
+
+  code <- "# Draw an UpSet plot for selected tmod modules."
+  code <- code %+n% sprintf("modules <- %s", env_map[["modules"]])
+  code <- code %+n% sprintf("mset <- %s", env_map[["db"]])
+  code <- code %+n% "if(length(mset) < 2) stop(\"Too few gene sets in the result list to show an upset plot\")"
+  code <- code %+n% sprintf(
+    "tmod::upset(modules, mset, min.size=%s, value=%s, group.stat=%s)",
+    .r_code(min_size),
+    .r_code(tolower(value)),
+    .r_code(tolower(group_stat))
+  )
+
+  list(required_pkgs=c("tmod"), type="figure", env_map=env_map, code=code)
+}
+
 
 
 #' @rdname tmodBrowserTableServer
@@ -367,6 +387,39 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, tmod_dbs=NULL) {
               min.size=.min_size,
               value=tolower(.value), group.stat=tolower(.group_stat))
       }, width=fig_size$width, height=fig_size$height)
+    })
+
+    ## Keep the report-code tab in sync with the optional UpSet plot.
+    ## This generates text only; rendering still uses `tmod::upset()`.
+    observe({
+      if(is.null(.res <- res())) { return(NULL) }
+      if(is.null(tmod_dbs[[.res$ds]])) { return(NULL) }
+
+      modules <- .res$res$ID
+      if(!isTruthy(.value <- input$upset_value)) {
+        .value <- "number"
+      }
+      if(!isTruthy(.group_stat <- input$upset_group_stat)) {
+        .group_stat <- "jaccard"
+      }
+      if(!isTruthy(.min_size <- input$upset_min_size)) {
+        .min_size <- 2
+      }
+
+      code <- .tmod_upset_chunk(
+        modules=modules,
+        db=tmod_dbs[[.res$ds]][[.res$db]],
+        min_size=.min_size,
+        value=.value,
+        group_stat=.group_stat,
+        env_map=list(
+          modules=sprintf('tmod_res[["%s"]][["%s"]][["%s"]][["%s"]]$ID',
+                          .res$ds, .res$contrast, .res$db, .res$sort),
+          db=sprintf('tmod_dbs[["%s"]][["%s"]]', .res$ds, .res$db)
+        )
+      )$code
+
+      updateTextAreaInput(session, "report_code", value=code)
     })
 
     output$tmodResTab <- renderDT({

@@ -197,6 +197,15 @@ discoServer <- function(id, cntr, annot=NULL,
     plot_obj  <- reactiveVal()
     plot_df   <- reactiveVal()
 
+    env_maps <- lapply(names(cntr), function(ds) {
+      lapply(names(cntr[[ds]]), function(contrast) {
+        list(
+          contrast=sprintf('cntr[["%s"]][["%s"]]', ds, contrast),
+          annot=sprintf('annot[["%s"]]', ds)
+        )
+      }) |> stats::setNames(names(cntr[[ds]]))
+    }) |> stats::setNames(names(cntr))
+
     observeEvent(input$contrast1, {
       contrast1(gsub(".*::", "", input$contrast1))
       dataset1(gsub("::.*", "", input$contrast1))
@@ -353,6 +362,47 @@ discoServer <- function(id, cntr, annot=NULL,
 
       .disco_log("storing plot object.")
       plot_obj(g)
+    })
+
+    ## Keep the report-code tab in sync with the current disco plot.
+    ## The generated text mirrors the plot logic without executing it.
+    observe({
+      req(disco())
+      req(dataset1(), dataset2(), contrast1(), contrast2(), input$match1, input$match2)
+
+      if(input$autoscale) {
+        .lower <- -100
+        .upper <- 100
+      } else {
+        .lower <- input$min
+        .upper <- input$max
+      }
+
+      .glabs <- if(isTruthy(gene_labs)) gene_labs() else NULL
+      code <- plot_disco_chunk(
+        cntr[[dataset1()]][[contrast1()]],
+        cntr[[dataset2()]][[contrast2()]],
+        annot1=annot[[dataset1()]],
+        annot2=annot[[dataset2()]],
+        lower=.lower,
+        upper=.upper,
+        show_top_labels=if(isTRUE(input$show_top_labels)) input$top_label_n else 0,
+        label_sel=.glabs,
+        by=c(input$match1, input$match2),
+        primary_id=primary_id,
+        env_map=list(
+          contrast1=env_maps[[dataset1()]][[contrast1()]]$contrast,
+          contrast2=env_maps[[dataset2()]][[contrast2()]]$contrast,
+          annot1=env_maps[[dataset1()]][[contrast1()]]$annot,
+          annot2=env_maps[[dataset2()]][[contrast2()]]$annot
+        )
+      )$code
+
+      .xlab <- if(dataset1() == "default") contrast1() else paste0(dataset1(), ": ", contrast1())
+      .ylab <- if(dataset2() == "default") contrast2() else paste0(dataset2(), ": ", contrast2())
+      code <- code %+n% sprintf("g <- g + xlab(%s) + ylab(%s)", .r_code(.xlab), .r_code(.ylab))
+
+      updateTextAreaInput(session, "report_code", value=code)
     })
 
     output$discoplot <- renderPlot({
