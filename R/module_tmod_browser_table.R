@@ -92,7 +92,8 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
                                                 figsizeInput(NS(id, "upset_fig_size"), "Figure size", selected="800x600"))
                                                 
                                          ),
-                                fluidRow(plotOutput(NS(id, "upset_plot"), height="100%")))
+                                fluidRow(plotOutput(NS(id, "upset_plot"), height="100%"))),
+                       .report_code_tab(id)
                      )
   } else {
     main_pane <- column(DTOutput(NS(id, "tmodResTab")), width=12)

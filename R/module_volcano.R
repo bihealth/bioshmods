@@ -192,18 +192,25 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
       fluidRow(tableOutput(NS(id, "point_id"))),
     width=2),
     mainPanel(
-      column(width=8,
-      withSpinner(
-                  plotOutput(NS(id, "volcanoPlot"), width="100%", height="100%",
-                    hover=hoverOpts(NS(id, "plot_hover"), delay=50, delayType="throttle"),
-                    click=NS(id, "plot_click"),
-                    brush=NS(id, "plot_brush"))
-                  )
+      tabsetPanel(
+        tabPanel(
+          "Plot",
+          column(width=8,
+          withSpinner(
+                      plotOutput(NS(id, "volcanoPlot"), width="100%", height="100%",
+                        hover=hoverOpts(NS(id, "plot_hover"), delay=50, delayType="throttle"),
+                        click=NS(id, "plot_click"),
+                        brush=NS(id, "plot_brush"))
+                      )
+          ),
+          column(width=4,
+            uiOutput(NS(id, "show_selected_ui")),
+            tableOutput(NS(id, "sel_genes"))
+          )
+        ),
+        .report_code_tab(id)
       ),
-      column(width=4,
-        uiOutput(NS(id, "show_selected_ui")),
-        tableOutput(NS(id, "sel_genes"))
-      ), width=10
+      width=10
     )
   )
 

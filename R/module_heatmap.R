@@ -147,7 +147,10 @@ heatmapUI <- function(id) {
       width=3
     ),
     mainPanel(
-      plotOutput(ns("heatmap_plot")),
+      tabsetPanel(
+        tabPanel("Plot", plotOutput(ns("heatmap_plot"))),
+        .report_code_tab(id)
+      ),
       width=9
     )
   )

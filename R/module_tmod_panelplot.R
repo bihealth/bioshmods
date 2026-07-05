@@ -237,14 +237,20 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
            width=5, offset=1)),
         width=3),
       mainPanel(
-          fluidRow( textOutput(NS(id, "hover_pos"))),
-          column(width=12,
-            withSpinner(plotOutput(NS(id, "panelPlot"), 
-                                   hover=hoverOpts(NS(id, "plot_hover"), delay=50, delayType="throttle"),
-                                   click=NS(id, "plot_click"),
-                                   height="100%")),
-           ), 
-                width=9)
+        tabsetPanel(
+          tabPanel(
+            "Plot",
+            fluidRow(textOutput(NS(id, "hover_pos"))),
+            column(width=12,
+              withSpinner(plotOutput(NS(id, "panelPlot"),
+                                     hover=hoverOpts(NS(id, "plot_hover"), delay=50, delayType="throttle"),
+                                     click=NS(id, "plot_click"),
+                                     height="100%"))
+            )
+          ),
+          .report_code_tab(id)
+        ),
+        width=9)
            
 
 

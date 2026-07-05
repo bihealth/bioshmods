@@ -176,12 +176,18 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
       mainPanel(
       column(9, style="padding:20px;", tabsetPanel(
       tabPanel("Plot", fluidRow(br(), plot_ui)),
-      tabPanel("Contrast overview", fluidRow(br(), DTOutput(NS(id, "contr_sum"))))
+      tabPanel("Contrast overview", fluidRow(br(), DTOutput(NS(id, "contr_sum")))),
+      .report_code_tab(id)
       )))))
   } else {
     return(sidebarLayout(
                          col_control,
-      mainPanel(plot_ui)))
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Plot", fluidRow(br(), plot_ui)),
+          .report_code_tab(id)
+        )
+      )))
   }
 
 }
@@ -353,7 +359,6 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       fig_size$width <- size$width
       fig_size$height <- size$height
     })
-
 
     ## Save figure as a PDF
     output$save <- downloadHandler(

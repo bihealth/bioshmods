@@ -39,20 +39,27 @@ discoUI <- function(id, cntr_titles) {
         )
     ),
 
-    column(width=5, 
-      withSpinner(plotOutput(NS(id, "discoplot"), 
-                 hover=hoverOpts(NS(id, "plot_hover"), delay=50, delayType="throttle"),
-                 click=NS(id, "plot_click"),
-                 brush=NS(id, "plot_brush"),
-                 height="600px")
-      ),
-      HTML("<br/>Hover to identify genes, click to select, or click & drag to select an area<br/><br/>"),
-      fluidRow(tableOutput(NS(id, "point_id")))
-    ),
-    column(width=4,
-      HTML("Click on the button to view an expression profile"),
-      tableOutput(NS(id, "sel_genes"))
+    column(width=9,
+      tabsetPanel(
+        tabPanel(
+          "Plot",
+          withSpinner(plotOutput(NS(id, "discoplot"), 
+                     hover=hoverOpts(NS(id, "plot_hover"), delay=50, delayType="throttle"),
+                     click=NS(id, "plot_click"),
+                     brush=NS(id, "plot_brush"),
+                     height="600px")
+          ),
+          HTML("<br/>Hover to identify genes, click to select, or click & drag to select an area<br/><br/>"),
+          fluidRow(tableOutput(NS(id, "point_id")))
+        ),
+        tabPanel(
+          "Genes",
+          HTML("Click on the button to view an expression profile"),
+          tableOutput(NS(id, "sel_genes"))
+        ),
+        .report_code_tab(id)
       )
+    )
   )
   }
 }
