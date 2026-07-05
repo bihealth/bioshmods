@@ -20,6 +20,12 @@
   return(cntr) 
 }
 
+# annot_linkout is a named list. Each name can correspond to a column or
+# slot in .x and is a URL with a %s placeholder for the value in that
+# column. So for example you can provide 
+# list(SYMBOL="https://www.genecards.org/cgi-bin/carddisp.pl?gene=%s") and 
+# then each value of .x$SYMBOL (if present) will be replaced by a URL
+# targetting this symbol.
 .apply_annot_linkout <- function(.x, annot_linkout) {
 
   for(n in intersect(colnames(.x), names(annot_linkout))) {

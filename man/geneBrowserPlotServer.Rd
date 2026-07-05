@@ -15,8 +15,6 @@ geneBrowserPlotServer(
   annot = NULL,
   cntr = NULL,
   primary_id = "PrimaryID",
-  symbol_col = "SYMBOL",
-  description_col = "GENENAME",
   annot_linkout = NULL,
   exprs_label = "Expression",
   palettes = NULL
@@ -45,12 +43,6 @@ containing column 'PrimaryID'}
 \item{cntr}{(optional) named list of dataset contrast lists}
 
 \item{primary_id}{name of the column which holds the primary identifiers}
-
-\item{symbol_col}{name of the column in \code{annot} which contains the gene
-symbols; use NULL if no such column}
-
-\item{description_col}{name of the column in \code{annot} which contains the gene
-title / description; use NULL if no such column}
 
 \item{annot_linkout}{a list; see Details.}
 

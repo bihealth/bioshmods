@@ -1,5 +1,11 @@
 `%||%` <- function(x, y) if(is.null(x)) y else x
 
+# Concatenate strings
+`%+%` <- function(a, b) paste0(a, b, sep="\n")
+
+# Concatenate strings with a newline separator.
+`%+n%` <- function(a, b) paste(a, b, sep="\n")
+
 # Global debug switch for package-internal tracing.
 # Enable with: options(bioshmods.debug = TRUE)
 .bioshmods_debug_enabled <- function() {
@@ -20,6 +26,26 @@
   message(msg)
   invisible(NULL)
 }
+
+# for each member of the terms vector, check if it is present in env_map
+.normalize_env_map <- function(env_map, terms) {
+
+  if(is.null(env_map) || !is.list(env_map) || length(env_map) == 0L) {
+    return(setNames(as.list(terms), terms))
+  }
+
+  ret <- list()
+  for(term in terms) {
+    if(!is.null(env_map[[term]])) {
+      ret[[term]] <- env_map[[term]]
+    } else {
+      ret[[term]] <- term
+    }
+  }
+
+  ret
+}
+
 
 # Normalize and validate shared show-button UI configuration.
 # Supports a custom label while rejecting unknown or empty values.

@@ -63,7 +63,8 @@
 }
 
 
-## Wrapper around plot_gene, mainly to replace "N/A" with NA
+## Wrapper around plot_gene, mainly to replace "N/A" with NA - the UI
+## uses N/A because it is easier to understand than NA by some people, apparently
 .gene_browser_plot <- function(covar, id, covarXName, covarYName, rld, annot, 
                                groupBy = "N/A", colorBy = "N/A", symbolBy = "N/A", trellisBy="N/A",
                                trellisScales = "fixed",
@@ -83,17 +84,56 @@
   ## weirdly, the line below is really, really slow
   #.args <- map(.args, ~ if(!is.na(.x) && .x == "N/A") { NA } else { .x })
 
-  if(.args$groupBy == "N/A")    .args$groupBy   <- NA
-  if(.args$colorBy == "N/A")    .args$colorBy   <- NA
-  if(.args$symbolBy == "N/A")   .args$symbolBy  <- NA
-  if(.args$trellisBy == "N/A")  .args$trellisBy <- NA
-  #message(sprintf("Calling plot_gene with arguments: \n\tid=%s\n\txCovar=%s\n\tyCovar=%s\n\tgroupBy=%s\n\tcolorBy=%s\n\tsymbolBy=%s\n\ttrellisBy=%s\n\ttrellisScales=%s\n\tcategoricalPlot=%s\n\ttranspose=%s",
-  #                .args$id, .args$xCovar, .args$yCovar, .args$groupBy, .args$colorBy, .args$symbolBy, .args$trellisBy, .args$trellisScales, .args$categoricalPlot, .args$transpose))
+  if(.args$groupBy   == "N/A") .args$groupBy   <- NA
+  if(.args$colorBy   == "N/A") .args$colorBy   <- NA
+  if(.args$symbolBy  == "N/A") .args$symbolBy  <- NA
+  if(.args$trellisBy == "N/A") .args$trellisBy <- NA
+
   do.call(plot_gene, .args)
+}
+
+# Build the report-code chunk for the current gene-browser plot.
+# Mirrors `.gene_browser_plot()` but returns code text instead of a ggplot.
+.gene_browser_plot_chunk <- function(covar, id, rld, annot, input,
+                                     exprs_label = "Expression",
+                                     colorScale=NULL,
+                                     env_map = NULL) {
+  covarXName <- input$covarXName
+  covarYName <- input$covarYName
+  if(covarYName == "Expression") { covarYName <- exprs_label }
+  if(covarXName == "Expression") { covarXName <- exprs_label }
+
+  .args <- list(
+    id=id,
+    xCovar=covarXName,
+    yCovar=covarYName,
+    covar=covar,
+    exprs=rld,
+    groupBy=input$groupBy,
+    annot=annot,
+    expressionLabel=exprs_label,
+    colorBy=input$colorBy,
+    symbolBy=input$symbolBy,
+    trellisBy=input$trellisBy,
+    trellisScales=input$trellisScales,
+    categoricalPlot=input$plotType,
+    colorScale=colorScale,
+    transpose=input$transposePlot,
+    env_map=env_map
+  )
+
+  if(.args$groupBy   == "N/A") .args$groupBy   <- NA
+  if(.args$colorBy   == "N/A") .args$colorBy   <- NA
+  if(.args$symbolBy  == "N/A") .args$symbolBy  <- NA
+  if(.args$trellisBy == "N/A") .args$trellisBy <- NA
+
+  do.call(plot_gene_chunk, .args)$code
 }
 
 
 
+# create the interface dynamically, depending on the data - covariates
+# and datasets
 .dynamic_col_control <- function(id, covar, datasets, ds_selected) {
 
   covar_sum <- summary_colorDF(covar)
@@ -228,10 +268,6 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @param id module identifier (same as the one passed to geneBrowserTableUI)
 #' @param covar named list of dataset covariate data frames
 #' @param cntr (optional) named list of dataset contrast lists
-#' @param symbol_col name of the column in `annot` which contains the gene
-#'        symbols; use NULL if no such column
-#' @param description_col name of the column in `annot` which contains the gene
-#'        title / description; use NULL if no such column
 #' @param exprs_label Label to be used for the expression values
 #' @param palettes (optional) reactive value with current color palettes
 #' @return does not return anything useful
@@ -290,20 +326,9 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @importFrom shiny updateSelectizeInput
 #' @export
 geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NULL, 
-                                  primary_id="PrimaryID", symbol_col="SYMBOL", description_col="GENENAME", 
+                                  primary_id="PrimaryID",
                                   annot_linkout=NULL,
                                   exprs_label = "Expression", palettes=NULL) {
-## XXX make checks
-# stopifnot(is.reactive(gene_id))
-# stopifnot(!is.reactive(covar))
-# stopifnot(!is.reactive(exprs))
-# stopifnot(!is.reactive(annot))
-# stopifnot(is.null(annot) || is.data.frame(annot))
-# if(!is.null(annot)) {
-#   stopifnot(all(c(primary_id, symbol_col, description_col) %in% 
-#                 colnames(annot)))
-# }
-
   covar <- .check_dataset_data_frames(covar, "covar")
   datasets <- names(covar)
   exprs <- .check_dataset_matrices(exprs, "exprs", datasets=datasets)
@@ -312,6 +337,15 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 
   # vector holding the names of all datasets
   names(datasets) <- datasets
+
+  # Code chunks refer to the module-level dataset lists by selected dataset.
+  env_maps <- lapply(datasets, function(dataset) {
+    list(
+      exprs=sprintf('exprs[["%s"]]', dataset),
+      covar=sprintf('covar[["%s"]]', dataset)
+    )
+  })
+  names(env_maps) <- datasets
 
   # start the module server
   moduleServer(id, function(input, output, session) {
@@ -457,6 +491,34 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       .ds <- ds()
       if(!isTruthy(.ds)) { .ds <- 1 }
       .dynamic_col_control(id, covar[[.ds]], names(covar), datasets[.ds])
+    })
+
+    ## Keep the report-code tab in sync with the current plot inputs.
+    ## This generates text only; the plot itself still uses `plot_gene()`.
+    observe({
+      if(!isTruthy(ds()) || !isTruthy(g_id())) { return(NULL) }
+      if(!isTruthy(input$covarXName)) { return(NULL) }
+      if(!isTruthy(input$covarYName)) { return(NULL) }
+      if(is.na(g_id())) { return(NULL) }
+
+      color_scale <- .gene_browser_palette_scale(
+        palettes=palettes,
+        dataset=ds(),
+        color_by=input$colorBy
+      )
+
+      code <- .gene_browser_plot_chunk(
+        covar[[ds()]],
+        g_id(),
+        exprs[[ds()]],
+        annot[[ds()]],
+        input,
+        exprs_label=exprs_label,
+        colorScale=color_scale,
+        env_map=env_maps[[ds()]]
+      )
+
+      updateTextAreaInput(session, "report_code", value=code)
     })
  
     ## The actual plot. need to put inside "observe" to use the reactive

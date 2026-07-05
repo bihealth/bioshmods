@@ -706,3 +706,144 @@ plot_gene <- function(id, xCovar, exprs, covar, annot=NULL,
 
   return(g)
 }
+
+
+#' Show gene expression in relation to a covariate
+#'
+#' Show gene expression in relation to a covariate
+#'
+#' @param id PrimaryID of the gene (usually ENSEMBL ID)
+#' @param xCovar the x covariate – column name from the covariate table
+#' @param yCovar the y covariate – column name from the covariate table
+#' @param expressionLabel - what should be the label for the gene expression covariate
+#' @param exprs gene expression matrix to show on the y axis; rownames must
+#'        be PrimaryIDs. If NULL, the rld object from the pipeline is used.
+#' @param annot_symb_col name of the column in the annot data frame which should be added to the title of the plot.
+#' @param annot_id_col name of the column in the annot data frame which corresponds to the rownames of the expression matrix. 
+#' @param annot annotation data frame (as returned by the get_annot()
+#'        function). If empty, it will be loaded.
+#' @param covar the covariate data frame containing the column `xCovar`
+#' @param groupBy name of the covariate column by which to group and connect by lines the data points 
+#' @param symbolBy name of the covariate column by which to select point symbols
+#' @param colorBy name of the covariate column by which to color the data
+#' @param colorScale optional color scale specification as produced by
+#'        `.cast_palette_to_ggplot()`
+#' @param trellisBy name of the covariate column for use in a trellis (multipanel) plot
+#' @param trellisScales scales argument passed to [ggplot2::facet_wrap()] when
+#'        `trellisBy` is set. One of `"fixed"`, `"free"`, `"free_x"`, `"free_y"`.
+#' @param categoricalPlot plot style used when `xCovar` is categorical and
+#'        `groupBy` is not set. One of `"box"`, `"violin"`, or `"raincloud"`.
+#' @param transpose logical; if TRUE, transpose the whole plot by flipping
+#'        coordinates.
+#' @return a text chunk which can be run to generate the plot
+#' @import ggplot2 
+#' @importFrom rlang .data
+#' @importFrom gghalves geom_half_violin
+#' @importFrom ggdist stat_dots
+#' @export
+plot_gene_chunk <- function(id, xCovar, exprs, covar, annot=NULL, 
+                      env_map = NULL,
+                      annot_id_col="PrimaryID",
+                      annot_symb_col="SYMBOL",
+                      expressionLabel="Expression",
+                      yCovar=expressionLabel, 
+                      groupBy = NA, colorBy = NA, symbolBy = NA,
+                      colorScale = NULL,
+                      trellisBy=NA,
+                      trellisScales = c("fixed", "free", "free_x", "free_y"),
+                      categoricalPlot = c("box", "violin", "raincloud"),
+                      transpose = FALSE) {
+
+  r_code <- function(x) paste(deparse(x), collapse="")
+
+  chunk <- list(
+                required_pkgs = c("ggplot2", "gghalves", "ggdist"),
+                type = "figure",
+                env_map = env_map
+                )
+
+  # make sure we have every name we need
+  env_map <- .normalize_env_map(env_map, c("exprs", "covar"))
+
+  trellisScales   <- match.arg(trellisScales)
+  categoricalPlot <- match.arg(categoricalPlot)
+
+  cd <- sprintf("df <- data.frame(%s)",
+                       env_map[["covar"]])
+  cd <- cd %+n% sprintf("df[[%s]] <- %s[%s, ]",
+                       r_code(expressionLabel),
+                       env_map[["exprs"]],
+                       r_code(id))
+
+  if(!is.null(annot)) {
+    title <- sprintf("%s (%s)", id, annot[ match(id, annot[[annot_id_col]]), ][[annot_symb_col]])
+  } else {
+    title <- id
+  }
+
+  if(!is.na(colorBy) && is.list(colorScale) && identical(colorScale$type, "manual")) {
+    cd <- cd %+n% sprintf('df[["%s"]] <- as.character(df[["%s"]])', colorBy, colorBy)
+  }
+
+  cd <- cd %+n% sprintf("g <- ggplot(df, aes(x=%s, y=%s", xCovar, yCovar)
+
+  if(!is.na(colorBy)) {
+    cd <- cd %+% sprintf(", color=%s", colorBy)
+  }
+
+  if(!is.na(groupBy)) {
+    cd <- cd %+% sprintf(", group=%s", groupBy)
+  }
+
+  cd <- cd %+% ")) +"
+
+  if(!is.numeric(covar[[xCovar]]) && is.na(groupBy)) {
+
+    if(categoricalPlot == "box") {
+      cd <- cd %+n% "  geom_boxplot(outlier.shape = NA) + " %+n%
+                    "  geom_jitter(size=3, alpha=.5, width=.1) +"
+    } else if(categoricalPlot == "violin") {
+      cd <- cd %+n% "  " %+% "geom_violin(trim=FALSE, alpha=.4) + geom_jitter(size=3, alpha=.5, width=.1) +"
+    } else if(categoricalPlot == "raincloud") {
+      cd <- cd %+n% "  " %+% 
+        "geom_half_violin(side=\"r\", trim=FALSE, alpha=.45, nudge=.08) + " %+n% 
+        "geom_boxplot(width=.1, outlier.shape=NA, alpha=.75) + " %+n% 
+        "stat_dots(side = \"left\", dotsize = .2) +"
+    }
+  } else {
+    if(!is.na(symbolBy)) {
+      cd <- cd %+n% sprintf("  geom_point(aes(shape=%s), size=3) +", symbolBy)
+    } else {
+      cd <- cd %+n% "  geom_point(size=3) +"
+    }
+  }
+
+  if(!is.na(groupBy)) {
+    cd <- cd %+n% "  geom_line() +"
+  }
+
+  if(!is.na(trellisBy)) {
+    cd <- cd %+n% sprintf("  facet_wrap(~ %s, scales=%s) +",
+                          trellisBy, r_code(trellisScales))
+  }
+
+  if(!is.na(colorBy) && is.list(colorScale)) {
+    if(identical(colorScale$type, "manual") && length(colorScale$values) > 0L) {
+      cd <- cd %+n% sprintf("  scale_color_manual(values=%s, drop=FALSE) +", 
+                            r_code(colorScale$values))
+    } else if(identical(colorScale$type, "gradientn") && length(colorScale$colours) > 1L) {
+      cd <- cd %+n% sprintf("  scale_color_gradientn(colours=%s, values=%s, limits=%s) +", 
+                            r_code(colorScale$colours), 
+                            r_code(colorScale$values), 
+                            r_code(colorScale$limits))
+    }
+  }
+
+  if(isTRUE(transpose)) {
+    cd <- cd %+n% "  coord_flip() +"
+  }
+
+  cd <- cd %+n% sprintf("  ggtitle(%s)", r_code(title))
+  chunk$code <- cd
+  return(chunk)
+}
