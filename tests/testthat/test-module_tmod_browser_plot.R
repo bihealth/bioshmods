@@ -1,5 +1,7 @@
 library(shiny)
 
+.default_dataset <- function(x) list(default = x)
+
 test_that("tmodBrowserPlotUI contains show placeholder next to save button", {
   ui <- tmodBrowserPlotUI("tp")
   html <- as.character(ui)
@@ -41,10 +43,10 @@ test_that("tmodBrowserPlotServer updates selection ids on Show button click", {
     tmodBrowserPlotServer,
     args = list(
       gs_id = gs_id,
-      tmod_dbs = tmod_dbs,
-      cntr = cntr,
-      tmod_map = tmod_map,
-      annot = annot,
+      tmod_dbs = .default_dataset(tmod_dbs),
+      cntr = .default_dataset(cntr),
+      tmod_map = .default_dataset(tmod_map),
+      annot = .default_dataset(annot),
       selection = selection,
       ui_config = list(show_button_label = "Send")
     ),
@@ -89,10 +91,10 @@ test_that("tmodBrowserPlotServer validates selection and ui_config", {
       tmodBrowserPlotServer,
       args = list(
         gs_id = gs_id,
-        tmod_dbs = tmod_dbs,
-        cntr = cntr,
-        tmod_map = tmod_map,
-        annot = annot,
+        tmod_dbs = .default_dataset(tmod_dbs),
+        cntr = .default_dataset(cntr),
+        tmod_map = .default_dataset(tmod_map),
+        annot = .default_dataset(annot),
         selection = character(0)
       ),
       {}
@@ -105,10 +107,10 @@ test_that("tmodBrowserPlotServer validates selection and ui_config", {
       tmodBrowserPlotServer,
       args = list(
         gs_id = gs_id,
-        tmod_dbs = tmod_dbs,
-        cntr = cntr,
-        tmod_map = tmod_map,
-        annot = annot,
+        tmod_dbs = .default_dataset(tmod_dbs),
+        cntr = .default_dataset(cntr),
+        tmod_map = .default_dataset(tmod_map),
+        annot = .default_dataset(annot),
         ui_config = list(show_button_label = "")
       ),
       {}

@@ -302,17 +302,13 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
 #' @export
 tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NULL, annot=NULL) {
 
-  if(!is.data.frame(cntr[[1]])) {
-    .tmod_panelplot_log("cntr[[1]] is not a data frame; assuming multilevel mode.")
-  } else {
-    cntr <- list(default=cntr)
-    tmod_res <- list(default=tmod_res)
-    tmod_dbs <- list(default=tmod_dbs)
-    tmod_map <- list(default=tmod_map)
-    annot <- list(default=annot)
-  }
+  cntr <- .check_dataset_contrasts(cntr, "cntr")
+  ds_ids <- names(cntr)
+  tmod_res <- .check_dataset_list(tmod_res, "tmod_res", is.list, "a tmod result object", datasets=ds_ids)
+  tmod_dbs <- .check_dataset_list(tmod_dbs, "tmod_dbs", is.list, "a list of tmod databases", datasets=ds_ids)
+  tmod_map <- .check_dataset_list(tmod_map, "tmod_map", is.list, "a tmod mapping object", datasets=ds_ids)
+  annot <- .check_dataset_data_frames(annot, "annot", datasets=ds_ids, allow_null=TRUE)
 
-  ds_ids       <- names(cntr)  # dataset ids
   is_single_ds <- length(ds_ids) == 1L
 
   ## in this module, we use labels which combine the dataset and the

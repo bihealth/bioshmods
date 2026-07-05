@@ -7,13 +7,7 @@
 \usage{
 tmodBrowserTableUI(id, cntr_titles, upset_pane = FALSE)
 
-tmodBrowserTableServer(
-  id,
-  tmod_res,
-  gs_id = NULL,
-  multilevel = FALSE,
-  tmod_dbs = NULL
-)
+tmodBrowserTableServer(id, tmod_res, gs_id = NULL, tmod_dbs = NULL)
 }
 \arguments{
 \item{id}{identifier for the namespace of the module}
@@ -22,16 +16,14 @@ tmodBrowserTableServer(
 
 \item{upset_pane}{if TRUE, UI for the upset plot will be created}
 
-\item{tmod_res}{results of tmod analysis. It is a list of lists of lists
-of data frames. See Details.}
+\item{tmod_res}{named list of dataset tmod result objects. For a single
+dataset, use \code{list(default=tmod_res)}.}
 
 \item{gs_id}{a list of reactive values (returned by \code{\link[shiny:reactiveValues]{shiny::reactiveValues()}}), including
 dataset (\code{ds}), gene set ID (\code{id}), contrast id (\code{cntr}), database ID
 (\code{db}) and sorting mode (\code{sort}). If \code{mod_id} is not \code{NULL}, these
 reactive values will be populated, possibly triggering an action in
 another shiny module.}
-
-\item{multilevel}{if TRUE, the results are grouped in data sets}
 
 \item{tmod_dbs}{(optional) list of tmod database objects (or lists
 of list of tmod database object in multi data set mode). If NULL, upset
@@ -69,7 +61,7 @@ gene set information to the 'bioshmods' functions. Each such structure
 is a named list with one element per gene set collection (i.e., if you
 have gene set enrichment results for KEGG and REACTOME, you will have
 two such elements). Each of these element is a tmod database object
-(returned, for example, by the \code{\link[tmod:tmodGS-class]{tmod::makeTmod()}} function from the 'tmod'
+(returned, for example, by the \code{\link[tmod:makeTmod]{tmod::makeTmod()}} function from the 'tmod'
 package). See the example dataset \link{C19_gs}.
 }
 
@@ -81,7 +73,7 @@ next level, there is a named element for each gene set collection (see
 'Use of tmod objects'). Finally, there may be different sorting options
 (if in doubt, use \code{pval} as the only element). The lowest level are data
 frames containing column 'ID', 'Title', 'AUC', 'P.Value' and 'adj.P.Val'
-as returned by e.g. \code{\link[tmod:tmodUtest]{tmod::tmodCERNOtest()}}.
+as returned by e.g. \code{\link[tmod:tmodCERNOtest]{tmod::tmodCERNOtest()}}.
 }
 
 \examples{
@@ -111,7 +103,7 @@ if(interactive()) {
 
   ui <- fluidPage(tmodBrowserTableUI("tt", names(tmod_res)))
   server <- function(input, output) {
-    tmodBrowserTableServer("tt", tmod_res)
+    tmodBrowserTableServer("tt", list(default=tmod_res))
   }
   shinyApp(ui, server)
 
@@ -122,10 +114,10 @@ if(interactive()) {
 
 if(interactive()) {
 
-  ui <- fluidPage(tmodBrowserTableUI("tt", names(C19_gs$tmod_res), upset=TRUE))
+  ui <- fluidPage(tmodBrowserTableUI("tt", list(default=names(C19_gs$tmod_res)), upset=TRUE))
   server <- function(input, output) {
-    tmodBrowserTableServer("tt", C19_gs$tmod_res, gs_id = NULL,
-                                 tmod_dbs = C19_gs$tmod_dbs)
+    tmodBrowserTableServer("tt", list(default=C19_gs$tmod_res), gs_id = NULL,
+                                 tmod_dbs = list(default=C19_gs$tmod_dbs))
   }
   shinyApp(ui, server)
 

@@ -60,37 +60,6 @@
   k
 }
 
-# Check whether x is a non-empty list of data frames.
-# Used for validating annotation and contrast container structures.
-.gene_group_is_named_df_list <- function(x) {
-  is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
-}
-
-# Check whether x is a non-empty list of matrix/data.frame expression objects.
-# This accepts both matrix and data.frame expression representations.
-.gene_group_is_named_matrix_list <- function(x) {
-  is.list(x) && length(x) > 0L &&
-    all(vapply(x, function(y) is.matrix(y) || is.data.frame(y), logical(1)))
-}
-
-# Check whether one dataset-level contrast object is valid.
-# A valid contrast dataset is a non-empty list of data frames.
-.gene_group_is_contrast_dataset <- function(x) {
-  is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
-}
-
-# Ensure a list has non-empty names using a prefix for missing entries.
-# Keeps list order unchanged while filling invalid names.
-.gene_group_ensure_names <- function(x, default_prefix) {
-  if(is.null(names(x))) {
-    names(x) <- paste0(default_prefix, seq_along(x))
-  }
-  names(x) <- as.character(names(x))
-  names(x)[is.na(names(x)) | trimws(names(x)) == ""] <- paste0(default_prefix, seq_along(x))[is.na(names(x)) | trimws(names(x)) == ""]
-  x
-}
-
-
 ## ---------------------------------------------
 ## Sanity checks
 ## ---------------------------------------------
@@ -118,98 +87,6 @@
 }
 
 
-
-## ---------------------------------------------
-## Input Normalization
-## ---------------------------------------------
-
-# Normalize annotation input to a named list keyed by dataset.
-# Accepts a single data frame or a list of data frames.
-.gene_group_normalize_annot <- function(annot) {
-  .gene_group_log("normalize annot input class=", paste(class(annot), collapse="/"), ".")
-  if(is.data.frame(annot)) {
-    .gene_group_log("annot provided as data.frame; assigning dataset 'default'.")
-    return(list(default=annot))
-  }
-  if(.gene_group_is_named_df_list(annot)) {
-    annot <- .gene_group_ensure_names(annot, "dataset_")
-    .gene_group_log("annot datasets={", paste(names(annot), collapse=","), "}.")
-    return(annot)
-  }
-  stop("`annot` must be a data frame or a named list of data frames.")
-}
-
-# Normalize expression input to a named list aligned to datasets.
-# Supports single matrix/data.frame or per-dataset list input.
-.gene_group_normalize_exprs <- function(exprs, datasets) {
-  .gene_group_log("normalize exprs input class=", paste(class(exprs), collapse="/"),
-                  "; expected datasets={", paste(datasets, collapse=","), "}.")
-  if(is.null(exprs)) {
-    .gene_group_log("exprs is NULL.")
-    return(NULL)
-  }
-
-  if(is.matrix(exprs) || is.data.frame(exprs)) {
-    if(length(datasets) != 1L) {
-      stop("If multiple datasets are present, `exprs` must be a named list.")
-    }
-    .gene_group_log("exprs provided as matrix/data.frame for single dataset '", datasets, "'.")
-    return(stats::setNames(list(exprs), datasets))
-  }
-
-  if(!.gene_group_is_named_matrix_list(exprs)) {
-    stop("`exprs` must be NULL, a matrix/data frame, or a named list of matrices/data frames.")
-  }
-
-  exprs <- .gene_group_ensure_names(exprs, "dataset_")
-  if(length(datasets) == 1L && length(exprs) == 1L && !datasets[1] %in% names(exprs)) {
-    names(exprs) <- datasets
-  }
-  missing_ds <- setdiff(datasets, names(exprs))
-  if(length(missing_ds) > 0L) {
-    .gene_group_log("exprs missing datasets: ", paste(missing_ds, collapse=","))
-    stop(sprintf("`exprs` is missing dataset(s): %s", paste(missing_ds, collapse=", ")))
-  }
-
-  .gene_group_log("normalized exprs datasets={", paste(datasets, collapse=","), "}.")
-  exprs[datasets]
-}
-
-# Normalize contrast input to a named list aligned to datasets.
-# Supports single contrast list or per-dataset nested contrast lists.
-.gene_group_normalize_cntr <- function(cntr, datasets) {
-  .gene_group_log("normalize cntr input class=", paste(class(cntr), collapse="/"),
-                  "; expected datasets={", paste(datasets, collapse=","), "}.")
-  if(is.null(cntr)) {
-    .gene_group_log("cntr is NULL.")
-    return(NULL)
-  }
-
-  if(.gene_group_is_contrast_dataset(cntr)) {
-    if(length(datasets) != 1L) {
-      stop("If multiple datasets are present, `cntr` must be a named list of contrast lists.")
-    }
-    .gene_group_log("cntr provided as contrast list for single dataset '", datasets, "'.")
-    return(stats::setNames(list(cntr), datasets))
-  }
-
-  if(!is.list(cntr) || length(cntr) == 0L || !all(vapply(cntr, .gene_group_is_contrast_dataset, logical(1)))) {
-    stop("`cntr` must be NULL, a contrast list, or a named list of contrast lists.")
-  }
-
-  cntr <- .gene_group_ensure_names(cntr, "dataset_")
-  if(length(datasets) == 1L && length(cntr) == 1L && !datasets[1] %in% names(cntr)) {
-    names(cntr) <- datasets
-  }
-  missing_ds <- setdiff(datasets, names(cntr))
-  if(length(missing_ds) > 0L) {
-    .gene_group_log("cntr missing datasets: ", paste(missing_ds, collapse=","))
-    stop(sprintf("`cntr` is missing dataset(s): %s", paste(missing_ds, collapse=", ")))
-  }
-
-  .gene_group_log("normalized cntr datasets={", paste(datasets, collapse=","), "}.")
-  cntr[datasets]
-}
 
 # Compute numeric columns shared across selected contrast tables.
 # Used to build robust DGE UI choices that exist in every selected contrast.
@@ -1057,12 +934,12 @@ geneGroupSelectorUI <- function(id) {
 #' missing adjusted p-values (FDR).
 #'
 #' @param id module identifier (same as passed to [geneGroupSelectorUI()])
-#' @param annot annotation data frame (minimum input), or named list of data frames
-#'   for multiple datasets
-#' @param exprs optional expression matrix/data frame, or named list of matrices/data
-#'   frames for multiple datasets
-#' @param cntr optional contrasts list (named list of data frames), or named list of
-#'   such lists for multiple datasets
+#' @param annot named list of dataset annotation data frames. For a single dataset,
+#'   use `list(default=annot)`.
+#' @param exprs optional named list of dataset expression matrices/data frames. For
+#'   a single dataset, use `list(default=exprs)`.
+#' @param cntr optional named list of dataset contrast lists. For a single dataset,
+#'   use `list(default=cntr)`.
 #' @param primary_id default annotation column used as the primary gene identifier
 #' @param dge_pval_col optional p-value column name in contrast tables for DGE mode.
 #' @param dge_lfc_col optional log fold-change column name in contrast tables for
@@ -1115,9 +992,9 @@ geneGroupSelectorUI <- function(id) {
 #'
 #'     geneGroupSelectorServer(
 #'       "gsel",
-#'       annot=annot,
-#'       exprs=exprs,
-#'       cntr=cntr,
+#'       annot=list(default=annot),
+#'       exprs=list(default=exprs),
+#'       cntr=list(default=cntr),
 #'       selection=selection
 #'     )
 #'
@@ -1142,9 +1019,9 @@ geneGroupSelectorUI <- function(id) {
 #'
 #'     geneGroupSelectorServer(
 #'       "gsel",
-#'       annot=C19$annotation,
-#'       exprs=C19$expression,
-#'       cntr=C19$contrasts,
+#'       annot=list(default=C19$annotation),
+#'       exprs=list(default=C19$expression),
+#'       cntr=list(default=C19$contrasts),
 #'       selection=selection
 #'     )
 #'
@@ -1168,9 +1045,7 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
                                     dataset=NULL) {
   .gene_group_log("geneGroupSelectorServer init id='", id, "'.")
 
-  # after this, annot is a list with data frames (different datasets)
-  # or a single one called "default"
-  annot <- .gene_group_normalize_annot(annot)
+  annot <- .check_dataset_data_frames(annot, "annot")
 
   # sanity checks; stop with informative errors if the input is not as expected
   .gene_group_check_primary_id(annot, primary_id)
@@ -1197,8 +1072,8 @@ geneGroupSelectorServer <- function(id, annot, exprs=NULL, cntr=NULL,
 
   datasets <- names(annot)
   dataset <- dataset %||% reactiveVal()
-  exprs <- .gene_group_normalize_exprs(exprs, datasets)
-  cntr <- .gene_group_normalize_cntr(cntr, datasets)
+  exprs <- .check_dataset_matrices(exprs, "exprs", datasets=datasets, allow_null=TRUE)
+  cntr <- .check_dataset_contrasts(cntr, "cntr", datasets=datasets, allow_null=TRUE)
   selector_config <- .gene_group_selector_config(
     primary_id=primary_id,
     defaults=defaults,

@@ -10,9 +10,9 @@ if(interactive()) {
     cntr2$SecondaryID <- sample(cntr2$PrimaryID, replace=TRUE)
     rownames(cntr2) <- paste0("ID", 1:5000)
     cntr <- list("Contrast 1"=cntr1, "Contrast 2"=cntr2)
+    annot <- data.frame(PrimaryID=paste0("ID", 1:5000), stringsAsFactors=FALSE)
     shinyApp(ui=fluidPage(discoUI("disco", names(cntr))),
              server=function(input, output, session) {
-                discoServer("disco", cntr)
+                discoServer("disco", list(default=cntr), annot=list(default=annot))
              })
 }
-

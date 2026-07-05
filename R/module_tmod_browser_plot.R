@@ -276,16 +276,13 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
   .check_selection_reactivevalues(selection, arg_name="selection")
   ui_config <- .normalize_show_button_ui_config(ui_config)
 
-  # XXX not a good check
-  if(!is.data.frame(annot)) {
-    .tmod_browser_plot_log("running in multilevel mode.")
-  } else {
-    tmod_dbs <- list(default=tmod_dbs)
-    cntr     <- list(default=cntr)
-    tmod_map <- list(default=tmod_map)
-    tmod_gl  <- list(default=tmod_gl)
-    annot    <- list(default=annot)
-  }
+  cntr <- .check_dataset_contrasts(cntr, "cntr")
+  datasets <- names(cntr)
+  annot <- .check_dataset_data_frames(annot, "annot", datasets=datasets)
+  tmod_dbs <- .check_dataset_list(tmod_dbs, "tmod_dbs", is.list, "a list of tmod databases", datasets=datasets)
+  tmod_map <- .check_dataset_list(tmod_map, "tmod_map", is.list, "a tmod mapping object", datasets=datasets, allow_null=TRUE)
+  tmod_gl <- .check_dataset_list(tmod_gl, "tmod_gl", is.list, "a tmod gene-list object", datasets=datasets, allow_null=TRUE)
+  tmod_res <- .check_dataset_list(tmod_res, "tmod_res", is.list, "a tmod result object", datasets=datasets, allow_null=TRUE)
     
   moduleServer(id, function(input, output, session) {
     .tmod_browser_plot_log("moduleServer started for id='", id, "'.")

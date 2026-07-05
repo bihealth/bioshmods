@@ -34,14 +34,15 @@ either a list containing at least the element \code{id} and possibly
 the element \code{ds} (if multiple datasets are used). Alternatively,
 it is a \code{reactiveValues} object with the same elements.}
 
-\item{covar}{data frame with all covariates}
+\item{covar}{named list of dataset covariate data frames}
 
-\item{exprs}{expression matrix; row names must correspond to the primary identifiers}
+\item{exprs}{named list of dataset expression matrices/data frames; row names
+must correspond to the primary identifiers}
 
-\item{annot}{(optional) annotation data frame containing column 'PrimaryID'
-corresponding to the rownames of the contrast data frames}
+\item{annot}{(optional) named list of dataset annotation data frames
+containing column 'PrimaryID'}
 
-\item{cntr}{(optional) list of contrasts}
+\item{cntr}{(optional) named list of dataset contrast lists}
 
 \item{primary_id}{name of the column which holds the primary identifiers}
 
@@ -91,7 +92,12 @@ covar <- data.frame(
 if(interactive()) {
    ui  <- fluidPage(geneBrowserPlotUI("gplot", FALSE))
    serv <- function(input, output, session) {
-     geneBrowserPlotServer("gplot", list(id="MUZG"), covar, mtx)
+     geneBrowserPlotServer(
+       "gplot",
+       list(id="MUZG"),
+       covar=list(default=covar),
+       exprs=list(default=mtx)
+     )
    }
    shinyApp(ui, serv)
 }
@@ -116,10 +122,10 @@ if(interactive()) {
     })
 
     geneBrowserPlotServer("gplot", gene_id=gene_id, 
-                          covar=C19$covariates, 
-                          exprs=C19$expression,
-                          annot=C19$annotation, 
-                          cntr=C19$contrasts
+                          covar=list(default=C19$covariates),
+                          exprs=list(default=C19$expression),
+                          annot=list(default=C19$annotation),
+                          cntr=list(default=C19$contrasts)
      )
   }
   shinyApp(ui, server)

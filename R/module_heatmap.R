@@ -1,53 +1,5 @@
-# Normalize covariates to dataset-keyed list form.
-# Supports single-data-frame and multi-dataset list inputs.
 .heatmap_log <- function(...) {
   .bioshmods_log(..., .prefix="heatmap")
-}
-
-.heatmap_normalize_covar <- function(covar, datasets) {
-  .heatmap_log(
-    "normalize covar called with datasets={",
-    paste(datasets, collapse=","),
-    "}, covar class=",
-    paste(class(covar), collapse="/")
-  )
-
-  if(is.null(covar)) {
-    .heatmap_log("covar is NULL; creating empty covar list for all datasets.")
-    return(stats::setNames(vector("list", length(datasets)), datasets))
-  }
-
-  if(is.data.frame(covar)) {
-    if(length(datasets) != 1L) {
-      stop("If multiple datasets are present, `covar` must be a named list.")
-    }
-    .heatmap_log("covar is a data.frame; assigning to dataset '", datasets, "'.")
-    return(stats::setNames(list(covar), datasets))
-  }
-
-  if(!is.list(covar) || length(covar) == 0L || !all(vapply(covar, is.data.frame, logical(1)))) {
-    stop("`covar` must be a data frame or a named list of data frames.")
-  }
-
-  if(is.null(names(covar))) {
-    names(covar) <- paste0("dataset_", seq_along(covar))
-  }
-  names(covar) <- as.character(names(covar))
-  missing_names <- is.na(names(covar)) | trimws(names(covar)) == ""
-  names(covar)[missing_names] <- paste0("dataset_", seq_along(covar))[missing_names]
-
-  if(length(datasets) == 1L && length(covar) == 1L && !datasets[1] %in% names(covar)) {
-    names(covar) <- datasets
-  }
-
-  missing_ds <- setdiff(datasets, names(covar))
-  if(length(missing_ds) > 0L) {
-    .heatmap_log("covar missing datasets: ", paste(missing_ds, collapse=","))
-    stop(sprintf("`covar` is missing dataset(s): %s", paste(missing_ds, collapse=", ")))
-  }
-
-  .heatmap_log("normalized covar datasets={", paste(datasets, collapse=","), "}.")
-  covar[datasets]
 }
 
 # Draw a ComplexHeatmap object while controlling legend visibility.
@@ -162,13 +114,13 @@ heatmapUI <- function(id) {
 #' on the left side and renders a heatmap for selected genes on the right side.
 #'
 #' @param id Module identifier (same as passed to [heatmapUI()]).
-#' @param annot Annotation data frame (single dataset) or named list of data
-#'   frames (multi-dataset mode), as in [geneGroupSelectorServer()].
-#' @param exprs Expression matrix/data frame (single dataset) or named list of
-#'   matrices/data frames (multi-dataset mode), as in [geneGroupSelectorServer()].
+#' @param annot Named list of dataset annotation data frames, as in
+#'   [geneGroupSelectorServer()]. For a single dataset, use `list(default=annot)`.
+#' @param exprs Named list of dataset expression matrices/data frames, as in
+#'   [geneGroupSelectorServer()]. For a single dataset, use `list(default=exprs)`.
 #' @param cntr Optional contrast object, same format as [geneGroupSelectorServer()].
-#' @param covar Sample covariate data frame (single dataset) or named list of
-#'   data frames (multi-dataset mode).
+#' @param covar Named list of dataset sample covariate data frames. For a single
+#'   dataset, use `list(default=covar)`.
 #' @param palettes Optional reactive expression or `reactiveVal` returning a
 #'   palette list forwarded to [plot_heatmap()]. Useful when heatmap colors are
 #'   coordinated across modules.
@@ -220,7 +172,13 @@ heatmapUI <- function(id) {
 #' if(interactive()) {
 #'   ui <- fluidPage(heatmapUI("hm"))
 #'   server <- function(input, output, session) {
-#'     heatmapServer("hm", annot=annot, exprs=exprs, cntr=cntr, covar=covar)
+#'     heatmapServer(
+#'       "hm",
+#'       annot=list(default=annot),
+#'       exprs=list(default=exprs),
+#'       cntr=list(default=cntr),
+#'       covar=list(default=covar)
+#'     )
 #'   }
 #'   shinyApp(ui, server)
 #' }
@@ -231,10 +189,10 @@ heatmapUI <- function(id) {
 #'   server <- function(input, output, session) {
 #'     heatmapServer(
 #'       "hm",
-#'       annot=C19$annotation,
-#'       exprs=C19$expression,
-#'       cntr=C19$contrasts,
-#'       covar=C19$covariates,
+#'       annot=list(default=C19$annotation),
+#'       exprs=list(default=C19$expression),
+#'       cntr=list(default=C19$contrasts),
+#'       covar=list(default=C19$covariates),
 #'       sample_id_col="label"
 #'     )
 #'   }
@@ -259,12 +217,16 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
 
   .heatmap_log("heatmapServer init; sample_id_col='", sample_id_col, "', primary_id='",
                primary_id, "', max_genes=", as.character(max_genes), ".")
-  annot_norm <- .gene_group_normalize_annot(annot)
+  annot_norm <- .check_dataset_data_frames(annot, "annot")
   datasets <- names(annot_norm)
   .heatmap_log("annotation datasets={", paste(datasets, collapse=","), "}.")
-  exprs_norm <- .gene_group_normalize_exprs(exprs, datasets)
-  .heatmap_log("covar is: ", if(is.null(covar)) "NULL" else paste(class(covar), collapse="/"), ".")
-  covar_norm <- .heatmap_normalize_covar(covar, datasets)
+  exprs_norm <- .check_dataset_matrices(exprs, "exprs", datasets=datasets)
+  cntr_norm <- .check_dataset_contrasts(cntr, "cntr", datasets=datasets, allow_null=TRUE)
+  covar_norm <- .check_dataset_data_frames(covar, "covar", datasets=datasets, allow_null=TRUE)
+  annot <- annot_norm
+  exprs <- exprs_norm
+  cntr <- cntr_norm
+  covar <- covar_norm
   primary_id <- as.character(primary_id)[1]
   max_genes <- suppressWarnings(as.integer(max_genes)[1])
   annot_row_col <- as.character(annot_row_col)[1]

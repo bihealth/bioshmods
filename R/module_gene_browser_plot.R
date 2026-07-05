@@ -217,16 +217,17 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #'        the element `ds` (if multiple datasets are used). Alternatively,
 #'        it is a `reactiveValues` object with the same elements.
 #' @param primary_id name of the column which holds the primary identifiers
-#' @param exprs expression matrix; row names must correspond to the primary identifiers
+#' @param exprs named list of dataset expression matrices/data frames; row names
+#'        must correspond to the primary identifiers
 #' @param contrasts (logical) whether or not create an additional panel
 #'        next to the plot which can be used to show detailed contrast
 #'        information for a gene
-#' @param annot (optional) annotation data frame containing column 'PrimaryID'
-#'        corresponding to the rownames of the contrast data frames
+#' @param annot (optional) named list of dataset annotation data frames
+#'        containing column 'PrimaryID'
 #' @param annot_linkout a list; see Details. 
 #' @param id module identifier (same as the one passed to geneBrowserTableUI)
-#' @param covar data frame with all covariates
-#' @param cntr (optional) list of contrasts
+#' @param covar named list of dataset covariate data frames
+#' @param cntr (optional) named list of dataset contrast lists
 #' @param symbol_col name of the column in `annot` which contains the gene
 #'        symbols; use NULL if no such column
 #' @param description_col name of the column in `annot` which contains the gene
@@ -246,7 +247,12 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' if(interactive()) {
 #'    ui  <- fluidPage(geneBrowserPlotUI("gplot", FALSE))
 #'    serv <- function(input, output, session) {
-#'      geneBrowserPlotServer("gplot", list(id="MUZG"), covar, mtx)
+#'      geneBrowserPlotServer(
+#'        "gplot",
+#'        list(id="MUZG"),
+#'        covar=list(default=covar),
+#'        exprs=list(default=mtx)
+#'      )
 #'    }
 #'    shinyApp(ui, serv)
 #' }
@@ -271,10 +277,10 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #'     })
 #'
 #'     geneBrowserPlotServer("gplot", gene_id=gene_id, 
-#'                           covar=C19$covariates, 
-#'                           exprs=C19$expression,
-#'                           annot=C19$annotation, 
-#'                           cntr=C19$contrasts
+#'                           covar=list(default=C19$covariates),
+#'                           exprs=list(default=C19$expression),
+#'                           annot=list(default=C19$annotation),
+#'                           cntr=list(default=C19$contrasts)
 #'      )
 #'   }
 #'   shinyApp(ui, server)
@@ -298,19 +304,13 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
 #                 colnames(annot)))
 # }
 
-  #message("Received palettes: ", if(is.null(palettes)) "NULL" else paste(names(palettes), collapse=", "))
-  # if we have a single dataset, we need to wrap it into a list
-  if(is.data.frame(covar)) {
-    covar <- list(default=covar)
-    exprs <- list(default=exprs)
-    annot <- list(default=annot)
-    cntr  <- list(default=cntr)
-  } else {
-    .gene_browser_plot_log("running in multi dataset mode.")
-  }
+  covar <- .check_dataset_data_frames(covar, "covar")
+  datasets <- names(covar)
+  exprs <- .check_dataset_matrices(exprs, "exprs", datasets=datasets)
+  annot <- .check_dataset_data_frames(annot, "annot", datasets=datasets, allow_null=TRUE)
+  cntr <- .check_dataset_contrasts(cntr, "cntr", datasets=datasets, allow_null=TRUE)
 
   # vector holding the names of all datasets
-  datasets        <- names(covar)
   names(datasets) <- datasets
 
   # start the module server

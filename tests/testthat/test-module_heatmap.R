@@ -1,5 +1,7 @@
 library(shiny)
 
+.default_dataset <- function(x) list(default = x)
+
 .heatmap_test_inputs <- function(use_label = FALSE) {
   annot <- data.frame(
     PrimaryID = paste0("g", 1:6),
@@ -55,9 +57,9 @@ test_that("heatmapServer returns reactives and computes heatmap for selected gen
   testServer(
     heatmapServer,
     args = list(
-      annot = x$annot,
-      exprs = x$exprs,
-      covar = x$covar
+      annot = .default_dataset(x$annot),
+      exprs = .default_dataset(x$exprs),
+      covar = .default_dataset(x$covar)
     ),
     {
       session$setInputs(show_legend = FALSE)
@@ -104,9 +106,9 @@ test_that("heatmapServer sorts columns by selected covariates when requested", {
   testServer(
     heatmapServer,
     args = list(
-      annot = annot,
-      exprs = exprs,
-      covar = covar
+      annot = .default_dataset(annot),
+      exprs = .default_dataset(exprs),
+      covar = .default_dataset(covar)
     ),
     {
       session$setInputs(`gene_selector-modus` = "by_name")
@@ -130,9 +132,9 @@ test_that("heatmapServer does not write local selections back to external select
   testServer(
     heatmapServer,
     args = list(
-      annot = x$annot,
-      exprs = x$exprs,
-      covar = x$covar,
+      annot = .default_dataset(x$annot),
+      exprs = .default_dataset(x$exprs),
+      covar = .default_dataset(x$covar),
       selection = selection
     ),
     {
@@ -156,9 +158,9 @@ test_that("heatmapServer mirrors external selection ids into the embedded select
   testServer(
     heatmapServer,
     args = list(
-      annot = x$annot,
-      exprs = x$exprs,
-      covar = x$covar,
+      annot = .default_dataset(x$annot),
+      exprs = .default_dataset(x$exprs),
+      covar = .default_dataset(x$covar),
       selection = selection
     ),
     {
@@ -178,9 +180,9 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
   testServer(
     heatmapServer,
     args = list(
-      annot = x$annot,
-      exprs = x$exprs,
-      covar = x$covar,
+      annot = .default_dataset(x$annot),
+      exprs = .default_dataset(x$exprs),
+      covar = .default_dataset(x$covar),
       sample_id_col = "label"
     ),
     {
@@ -202,9 +204,9 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
     testServer(
       heatmapServer,
       args = list(
-        annot = x$annot,
-        exprs = x$exprs,
-        covar = x$covar,
+        annot = .default_dataset(x$annot),
+        exprs = .default_dataset(x$exprs),
+        covar = .default_dataset(x$covar),
         sample_id_col = "missing_col"
       ),
       {}
@@ -216,9 +218,9 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
     testServer(
       heatmapServer,
       args = list(
-        annot = x$annot,
-        exprs = x$exprs,
-        covar = x$covar,
+        annot = .default_dataset(x$annot),
+        exprs = .default_dataset(x$exprs),
+        covar = .default_dataset(x$covar),
         primary_id = "missing_primary_id_col"
       ),
       {}
@@ -230,9 +232,9 @@ test_that("heatmapServer supports custom sample_id_col and validates missing col
     testServer(
       heatmapServer,
       args = list(
-        annot = x$annot,
-        exprs = x$exprs,
-        covar = x$covar,
+        annot = .default_dataset(x$annot),
+        exprs = .default_dataset(x$exprs),
+        covar = .default_dataset(x$covar),
         selection = character(0)
       ),
       {}
@@ -256,10 +258,10 @@ test_that("heatmapServer forwards DGE column params to gene selector module", {
   testServer(
     heatmapServer,
     args = list(
-      annot = x$annot,
-      exprs = x$exprs,
-      cntr = cntr,
-      covar = x$covar,
+      annot = .default_dataset(x$annot),
+      exprs = .default_dataset(x$exprs),
+      cntr = .default_dataset(cntr),
+      covar = .default_dataset(x$covar),
       dge_pval_col = "PVAL",
       dge_lfc_col = "L2FC",
       dge_fdr_col = "QVAL"
@@ -301,9 +303,9 @@ test_that("heatmapServer limits shown genes and displays warning", {
   testServer(
     heatmapServer,
     args = list(
-      annot = annot,
-      exprs = exprs,
-      covar = covar,
+      annot = .default_dataset(annot),
+      exprs = .default_dataset(exprs),
+      covar = .default_dataset(covar),
       max_genes = 150
     ),
     {

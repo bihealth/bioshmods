@@ -3,78 +3,15 @@
   .bioshmods_log(..., .prefix="volcano")
 }
 
-## Check whether an object is a non-empty list of data frames.
-.volcano_is_list_of_data_frames <- function(x) {
-  is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
-}
-
-## Check whether an object is a non-empty list of contrast lists.
-.volcano_is_list_of_list_of_data_frames <- function(x) {
-  is.list(x) && length(x) > 0L &&
-    all(vapply(x, function(ds) .volcano_is_list_of_data_frames(ds), logical(1)))
-}
-
-## Collect unique primary IDs across all contrasts in one dataset.
-.volcano_cntr_primary_ids <- function(cntr_ds, primary_id) {
-  unique(unlist(lapply(cntr_ds, function(df) as.character(df[[primary_id]])), use.names = FALSE))
-}
-
-## Build a minimal annotation table from the contrast primary IDs.
-.volcano_make_annotation_from_cntr <- function(cntr_ds, primary_id) {
-  data.frame(
-    stats::setNames(list(.volcano_cntr_primary_ids(cntr_ds, primary_id)), primary_id),
-    check.names = FALSE
-  )
-}
-
-## Normalize and validate contrast and annotation inputs for the module.
-.normalize_volcano_inputs <- function(cntr, annot, primary_id, lfc_col, pval_col, annot_show) {
+## Validate contrast and annotation inputs for the module.
+.check_volcano_inputs <- function(cntr, annot, primary_id, lfc_col, pval_col, annot_show) {
   primary_id <- trimws(as.character(primary_id)[1])
   if(is.na(primary_id) || !nzchar(primary_id)) {
     stop("`primary_id` must be a non-empty character column name.")
   }
 
-  if (.volcano_is_list_of_data_frames(cntr)) {
-    cntr <- list(default=cntr)
-    if (is.null(annot) || is.data.frame(annot)) {
-      annot <- list(default=annot)
-    } else if (is.list(annot) && length(annot) == 1L &&
-               (is.null(annot[[1]]) || is.data.frame(annot[[1]]))) {
-      names(annot) <- "default"
-    } else {
-      stop("For single-dataset cntr, annot must be NULL, a data frame, or a single-element list.")
-    }
-  } else if (.volcano_is_list_of_list_of_data_frames(cntr)) {
-    if (is.null(names(cntr)) || any(names(cntr) == "")) {
-      stop("When cntr is a list of datasets, all datasets must be named.")
-    }
-    if (is.null(annot)) {
-      annot <- stats::setNames(vector("list", length(cntr)), names(cntr))
-    } else if (is.data.frame(annot)) {
-      stop("When cntr is a list of datasets, annot must be a list of data frames (or NULL).")
-    }
-  } else {
-    stop("cntr must be a list of data frames, or a named list of such lists.")
-  }
-
-  if (!is.list(annot)) {
-    stop("annot must be NULL, a data frame, or a list of data frames.")
-  }
-
-  if (is.null(names(annot))) {
-    if (length(annot) != length(cntr)) {
-      stop("Unnamed annot list must have the same length as cntr.")
-    }
-    names(annot) <- names(cntr)
-  } else if (any(names(annot) == "")) {
-    stop("When annot is a list, all elements must be named.")
-  }
-
-  if (!all(names(cntr) %in% names(annot))) {
-    stop("annot must contain an entry for each dataset in cntr.")
-  }
-
-  annot <- annot[names(cntr)]
+  cntr <- .check_dataset_contrasts(cntr, "cntr")
+  annot <- .check_dataset_data_frames(annot, "annot", datasets=names(cntr))
   annot_full <- annot
 
   for (ds in names(cntr)) {
@@ -100,15 +37,6 @@
     }
 
     cntr[[ds]] <- cntr_ds
-
-    if (is.null(annot[[ds]])) {
-      annot[[ds]] <- .volcano_make_annotation_from_cntr(cntr_ds, primary_id)
-      annot_full[[ds]] <- annot[[ds]]
-    }
-
-    if (!is.data.frame(annot[[ds]])) {
-      stop(sprintf("Annotation for dataset '%s' must be a data frame or NULL.", ds))
-    }
 
     if (!primary_id %in% colnames(annot[[ds]])) {
       stop(sprintf("Annotation for dataset '%s' must contain '%s'.", ds, primary_id))
@@ -222,9 +150,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #'
 #' Shiny module for displaying volcano plots
 #' @param id module identifier (same as the one passed to volcanoUI)
-#' @param cntr either a named list of data frames, each being the results
-#' of differential expression analysis for one contrast, or a list of data
-#' sets, each data set being a named list of data frames.
+#' @param cntr named list of dataset contrast lists. For a single dataset, use
+#'   `list(default=cntr)`.
 #' @param datasets character vector specifying datasets
 #' @param lfc_thr default lfc threshold
 #' @param lfc_col,pval_col names of the columns in the contrast data
@@ -232,10 +159,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #' @param pval_thr default p-value threshold
 #' @param primary_id name of the primary ID column in contrasts and
 #' annotation data frame.
-#' @param annot data frame with gene annotations (containing at least the
-#' column specified with the `primary_id` parameter) or (if there are
-#' multiple data sets) a named list of such data frames. Names of this list
-#' must match the names of the `cntr` list.
+#' @param annot named list of dataset annotation data frames. Names must match
+#'   `cntr`; for a single dataset, use `list(default=annot)`.
 #' @param gene_id must be a `reactiveValues` object. If not NULL, then
 #' clicking on a gene identifier will modify this object (possibly
 #' triggering an event in another module).
@@ -270,8 +195,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #'   server <- function(input, output, session) {
 #'     volcanoServer(
 #'       "volcano",
-#'       cntr = cntr,
-#'       annot = annot
+#'       cntr = list(default=cntr),
+#'       annot = list(default=annot)
 #'     )
 #'   }
 #'
@@ -293,15 +218,15 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #'   server <- function(input, output, session) {
 #'     selection <- reactiveValues(ids=character(0))
 #'     volcanoServer("vol", 
-#'                   cntr=C19$contrasts, 
-#'                   annot=C19$annotation, 
+#'                   cntr=list(default=C19$contrasts),
+#'                   annot=list(default=C19$annotation),
 #'                   selection=selection)
 #'     heatmapServer(
 #'       "hm",
-#'       annot=C19$annotation,
-#'       exprs=C19$expression,
-#'       cntr=C19$contrasts,
-#'       covar=C19$covariates,
+#'       annot=list(default=C19$annotation),
+#'       exprs=list(default=C19$expression),
+#'       cntr=list(default=C19$contrasts),
+#'       covar=list(default=C19$covariates),
 #'       sample_id_col="label",
 #'       selection=selection
 #'     )
@@ -316,10 +241,10 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
                           ui_config=NULL,
                           annot_show=c("SYMBOL", "ENTREZID")) {
 
-  normalized <- .normalize_volcano_inputs(cntr, annot, primary_id, lfc_col, pval_col, annot_show)
-  cntr <- normalized$cntr
-  annot <- normalized$annot
-  annot_full <- normalized$annot_full
+  checked <- .check_volcano_inputs(cntr, annot, primary_id, lfc_col, pval_col, annot_show)
+  cntr <- checked$cntr
+  annot <- checked$annot
+  annot_full <- checked$annot_full
   ui_config <- .normalize_show_button_ui_config(ui_config)
 
   .check_selection_reactivevalues(selection, arg_name="selection")

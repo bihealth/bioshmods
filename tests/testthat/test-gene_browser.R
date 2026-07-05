@@ -26,7 +26,11 @@ check_serverrun <- function(cntr, cntr_names=NULL, annot=NULL) {
 
 test_that("geneBrowserTable can be build", {
 
-  check_serverrun(C19$contrasts, names(C19$contrasts), C19$annotation)
+  check_serverrun(
+    list(default=C19$contrasts),
+    list(default=names(C19$contrasts)),
+    list(default=C19$annotation)
+  )
   cntr <- list(testing=C19$contrasts)
   annot <- list(testing=C19$annotation)
   cntr_names <- list(testing=names(C19$contrasts))

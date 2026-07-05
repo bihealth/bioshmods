@@ -105,78 +105,11 @@ discoUI <- function(id, cntr_titles) {
   ret
 }
 
-# Check whether an object is a non-empty list where every element is a data frame.
-# Used to detect single-dataset contrast containers.
-.is_list_of_data_frames <- function(x) {
-  is.list(x) && length(x) > 0L && all(vapply(x, is.data.frame, logical(1)))
-}
-
-# Check whether an object is a non-empty list of dataset-level data-frame lists.
-# Used to detect multi-dataset contrast containers.
-.is_list_of_list_of_data_frames <- function(x) {
-  is.list(x) && length(x) > 0L &&
-    all(vapply(x, function(ds) .is_list_of_data_frames(ds), logical(1)))
-}
-
-# Collect unique primary identifiers from all contrasts in one dataset.
-# Returns a character vector for annotation construction and validation.
-.cntr_primary_ids <- function(cntr_ds, primary_id) {
-  unique(unlist(lapply(cntr_ds, function(df) as.character(df[[primary_id]])), use.names = FALSE))
-}
-
-# Build a minimal annotation table when no annotation is supplied by the caller.
-# Uses unique primary IDs extracted from all contrasts in a dataset.
-.make_annotation_from_cntr <- function(cntr_ds, primary_id) {
-  data.frame(
-    stats::setNames(list(.cntr_primary_ids(cntr_ds, primary_id)), primary_id),
-    check.names = FALSE
-  )
-}
-
-# Normalize and validate `cntr`/`annot` into a consistent dataset-keyed structure.
+# Validate `cntr`/`annot` as explicit dataset-keyed lists.
 # Ensures required ID columns exist and annotations cover all contrast identifiers.
-.normalize_disco_inputs <- function(cntr, annot, primary_id) {
-  if (.is_list_of_data_frames(cntr)) {
-    cntr <- list(default=cntr)
-    if (is.null(annot) || is.data.frame(annot)) {
-      annot <- list(default=annot)
-    } else if (is.list(annot) && length(annot) == 1L &&
-               (is.null(annot[[1]]) || is.data.frame(annot[[1]]))) {
-      names(annot) <- "default"
-    } else {
-      stop("For single-dataset cntr, annot must be NULL, a data frame, or a single-element list.")
-    }
-  } else if (.is_list_of_list_of_data_frames(cntr)) {
-    if (is.null(names(cntr)) || any(names(cntr) == "")) {
-      stop("When cntr is a list of datasets, all datasets must be named.")
-    }
-    if (is.null(annot)) {
-      annot <- stats::setNames(vector("list", length(cntr)), names(cntr))
-    } else if (is.data.frame(annot)) {
-      stop("When cntr is a list of datasets, annot must be a list of data frames (or NULL).")
-    }
-  } else {
-    stop("cntr must be a list of data frames, or a named list of such lists.")
-  }
-
-  if (!is.list(annot)) {
-    stop("annot must be NULL, a data frame, or a list of data frames.")
-  }
-
-  if (is.null(names(annot))) {
-    if (length(annot) != length(cntr)) {
-      stop("Unnamed annot list must have the same length as cntr.")
-    }
-    names(annot) <- names(cntr)
-  } else if (any(names(annot) == "")) {
-    stop("When annot is a list, all elements must be named.")
-  }
-
-  if (!all(names(cntr) %in% names(annot))) {
-    stop("annot must contain an entry for each dataset in cntr.")
-  }
-
-  annot <- annot[names(cntr)]
+.check_disco_inputs <- function(cntr, annot, primary_id) {
+  cntr <- .check_dataset_contrasts(cntr, "cntr")
+  annot <- .check_dataset_data_frames(annot, "annot", datasets=names(cntr))
 
   for (ds in names(cntr)) {
     cntr_ds <- cntr[[ds]]
@@ -187,14 +120,6 @@ discoUI <- function(id, cntr_titles) {
         "In dataset '%s', all contrasts must contain the '%s' column. Missing in: %s",
         ds, primary_id, paste(bad, collapse = ", ")
       ))
-    }
-
-    if (is.null(annot[[ds]])) {
-      annot[[ds]] <- .make_annotation_from_cntr(cntr_ds, primary_id)
-    }
-
-    if (!is.data.frame(annot[[ds]])) {
-      stop(sprintf("Annotation for dataset '%s' must be a data frame or NULL.", ds))
     }
 
     if (!primary_id %in% colnames(annot[[ds]])) {
@@ -224,12 +149,12 @@ discoUI <- function(id, cntr_titles) {
 #' Shiny Module – disco plots
 #' @param id identifier of the shiny module (character vector)
 #' @param primary_id name of the contrast data frame column with the primary IDs
-#' @param cntr list of data frames containing the contrast information.
-#'        Data frames must have the columns log2FoldChange and pvalue. Rownames of
-#'        the data frames should be IDs.
-#' @param annot Annotation data frame. The annotation data frame must have
-#'        a column named "PrimaryID" which corresponds to the rownames of the data
-#'        frames in the `cntr` list.
+#' @param cntr named list of dataset contrast lists. Contrast data frames must
+#'        have the columns log2FoldChange and pvalue. For a single dataset, use
+#'        `list(default=cntr)`.
+#' @param annot named list of dataset annotation data frames. Each annotation
+#'        data frame must have a column named "PrimaryID". For a single dataset,
+#'        use `list(default=annot)`.
 #' @param selcols which column in the gene table when genes are selected
 #'        from the plot
 #' @param cntr_titles character vector containing the IDs of the contrasts
@@ -244,9 +169,9 @@ discoServer <- function(id, cntr, annot=NULL,
     selcols=c("PrimaryID", "ENTREZ", "SYMBOL"),
     primary_id="PrimaryID", gene_id=NULL) {
 
-  normalized <- .normalize_disco_inputs(cntr, annot, primary_id)
-  cntr <- normalized$cntr
-  annot <- normalized$annot
+  checked <- .check_disco_inputs(cntr, annot, primary_id)
+  cntr <- checked$cntr
+  annot <- checked$annot
 
   if(!"default" %in% names(cntr)) {
     .disco_log("running in multi dataset mode.")

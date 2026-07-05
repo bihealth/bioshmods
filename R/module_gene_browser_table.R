@@ -144,69 +144,20 @@ geneBrowserTableUI <- function(id, cntr_titles) {
   )
 }
 
-## check whether data is list of lists or just a list of dfs
-.check_multilevel <- function(cntr) {
-  !any(map_lgl(cntr, is.data.frame)) 
-}
-
-.check_params <- function(multilevel, annot=NULL, cntr=NULL, annot_linkout=NULL, primary_id="PrimaryID") {
-
-  if(!is.null(cntr)) {
-    stopifnot(!is.null(names(cntr)))
-
-    if(multilevel) {
-      for(c in names(cntr)) {
-        stopifnot(all(map_lgl(cntr[[c]], ~ is.data.frame(.x) || is(.x, "disk.frame"))))
-      }
-    }
-  }
-
-  if(!is.null(annot)) {
-    if(multilevel) {
-      stopifnot(all(map_lgl(annot, \(.x) is.data.frame(.x) || is(.x, "disk.frame"))))
-      if(primary_id == 0) {
-        stopifnot(all(map_lgl(annot, \(.x) !is.null(rownames(.x)))))
-      } else {
-        stopifnot(all(map_lgl(annot, \(.x) primary_id %in% names(.x))))
-      }
-    } else {
-      stopifnot(is.data.frame(annot) || is(annot, "disk.frame"))
-      if(primary_id == 0) {
-        stopifnot(!is.null(rownames(annot)))
-      } else {
-        stopifnot(primary_id %in% names(annot))
-      }
-    }
-  }
-
-  if(!is.null(annot) && !is.null(cntr)) {
-    if(multilevel) {
-      stopifnot(!is.null(names(annot)))
-      stopifnot(all(names(cntr) %in% names(annot)))
-    }
-  }
-}
-
-
 #' Shiny Module – gene browser table selection
 #'
 #' Shiny Module – gene browser table selection
 #'
-#' The basic data set structure that this module takes is a named list of data
-#' frames. These data frames will be shown in the browser when the specific
-#' contrast (corresponding to a name in the list) is selected from the
-#' configuration sidebar. The data frames *must* contain a column called
-#' "PrimaryID" (this identifier can be changed with the parameter
-#' `primary_id`). This is necessary in order to link the table rows with
-#' e.g. plotting genes with `geneBrowserPlotServer`.
+#' The basic data structure is a named list of datasets. Each dataset is a named
+#' list of contrast data frames. For a single dataset, use
+#' `list(default=<contrast list>)`. The contrast data frames *must* contain a
+#' column called "PrimaryID" (this identifier can be changed with the parameter
+#' `primary_id`). This is necessary in order to link the table rows with e.g.
+#' plotting genes with `geneBrowserPlotServer`.
 #'
 #' Log2 fold changes must be stored in a column called
 #' "log2FoldChange", and p-values in a column called "padj". These are the
 #' default column names returned by DESeq2.
-#'
-#' Alternatively, tmodBrowserTableServer takes a list of lists of data
-#' frames; that is, it allows to group the results of differential gene
-#' analysis.
 #'
 #' The linkout feature (parameter `annot_linkout`) allows to define how the
 #' different columns from the annotation data frame are represented as
@@ -231,11 +182,9 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 #' there is only a single data set).
 #' 
 #'
-#' @param cntr a list of data frames containing the DE analysis results, or
-#'             a list of lists of data frames
-#' @param annot annotation data frame containing column 'PrimaryID' (
-#'        or another specified by the parameter `primary_id`)
-#'        corresponding to the rownames of the contrast data frames
+#' @param cntr named list of dataset contrast lists
+#' @param annot named list of dataset annotation data frames containing column
+#'        'PrimaryID' (or another specified by the parameter `primary_id`)
 #' @param id identifier for the namespace of the module
 #' @param primary_id name of the column which holds the primary identifiers
 #' @param cntr_titles named character vector for contrast choices
@@ -260,8 +209,8 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 #'         )
 #'
 #'   server <- function(input, output) {
-#'     geneBrowserTableServer("gb", cntr=C19$contrasts,
-#'                                  annot=C19$annotation)
+#'     geneBrowserTableServer("gb", cntr=list(default=C19$contrasts),
+#'                                  annot=list(default=C19$annotation))
 #'   }
 #'
 #'   shinyApp(ui, server)
@@ -278,8 +227,8 @@ geneBrowserTableUI <- function(id, cntr_titles) {
 #'   server <- function(input, output) {
 #'     gene_id <- reactiveValues()
 #'     geneBrowserTableServer("gb", gene_id=gene_id,
-#'                                  cntr=C19$contrasts,
-#'                                  annot=C19$annotation)
+#'                                  cntr=list(default=C19$contrasts),
+#'                                  annot=list(default=C19$annotation))
 #'     output$gene <- 
 #'       renderText(sprintf("gene ID: %s, data set: %s", gene_id$id, gene_id$ds))
 #'   }
@@ -293,14 +242,31 @@ geneBrowserTableServer <- function(id, cntr, annot, annot_linkout=NULL,
                                    ) {
 
   stopifnot(is.null(gene_id) || is.reactivevalues(gene_id))
-  multilevel <- .check_multilevel(cntr)
-  .check_params(multilevel, cntr=cntr, annot=annot, 
-                annot_linkout=annot_linkout, primary_id=primary_id)
+  cntr <- .check_dataset_contrasts(cntr, "cntr")
+  datasets <- names(cntr)
+  annot <- .check_dataset_data_frames(annot, "annot", datasets=datasets)
 
-  if(!multilevel) {
-    cntr <- list(default=cntr)
-    annot <- list(default=annot)
-    annot_linkout <- list(default=annot_linkout)
+  if(is.null(annot_linkout)) {
+    annot_linkout <- stats::setNames(vector("list", length(datasets)), datasets)
+  } else {
+    annot_linkout <- .check_dataset_list(
+      annot_linkout,
+      "annot_linkout",
+      predicate=function(x) is.null(x) || is.list(x),
+      element_description="NULL or a linkout specification list",
+      datasets=datasets
+    )
+  }
+
+  if(primary_id != 0) {
+    missing_primary <- datasets[!vapply(annot, function(x) primary_id %in% names(x), logical(1))]
+    if(length(missing_primary) > 0L) {
+      stop(sprintf(
+        "`primary_id` ('%s') not found in annotation for dataset(s): %s.",
+        primary_id,
+        paste(missing_primary, collapse=", ")
+      ))
+    }
   }
 
   ## in this case we take primary id from row names of annot / cntr
@@ -435,15 +401,15 @@ gene_browser <- function(x, annot_linkout=NULL,
   server <- function(input, output, session) {
     gene_id <- reactiveValues()
     geneBrowserTableServer("geneTab", 
-                           cntr=x$contrasts, 
-                           annot=x$annotation, 
+                           cntr=list(default=x$contrasts),
+                           annot=list(default=x$annotation),
                            gene_id=gene_id,
-                           annot_linkout=annot_linkout)
+                           annot_linkout=if(is.null(annot_linkout)) NULL else list(default=annot_linkout))
     geneBrowserPlotServer("genePlot", 
                           gene_id, 
-                          covar=x$covariates, 
-                          exprs=x$expression, 
-                          annot=x$annotation)
+                          covar=list(default=x$covariates),
+                          exprs=list(default=x$expression),
+                          annot=list(default=x$annotation))
   }
 
   shinyApp(ui, server)

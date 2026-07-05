@@ -49,10 +49,10 @@ another shiny module.}
 clicking on a gene identifier will modify this object (possibly
 triggering an event in another module).}
 
-\item{selection}{Optional \code{reactiveValues()} object with an \code{ids}
-element populated with the primary IDs from the genes shown in the \code{Genes}
-tab when the user clicks the \code{Show} button. If \code{NULL}, the button is
-not shown and no external state is updated.}
+\item{selection}{Optional \code{reactiveValues()} object with an \code{ids} element
+populated with the primary IDs from the genes shown in the \code{Genes} tab
+when the user clicks the \code{Show} button. If \code{NULL}, the button is not
+shown and no external state is updated.}
 
 \item{ui_config}{Optional list configuring UI text. Supported keys:
 \code{show_button_label} for the label shown on the \code{Show} button.}
@@ -119,7 +119,7 @@ gene set information to the 'bioshmods' functions. Each such structure
 is a named list with one element per gene set collection (i.e., if you
 have gene set enrichment results for KEGG and REACTOME, you will have
 two such elements). Each of these element is a tmod database object
-(returned, for example, by the \code{\link[tmod:tmodGS-class]{tmod::makeTmod()}} function from the 'tmod'
+(returned, for example, by the \code{\link[tmod:makeTmod]{tmod::makeTmod()}} function from the 'tmod'
 package). See the example dataset \link{C19_gs}.
 }
 
@@ -130,24 +130,23 @@ if(interactive()) {
   library(shiny)
 
   ui <- fluidPage(
-   fluidRow(tmodBrowserTableUI("tt", names(C19_gs$tmod_res), upset=TRUE)),
+   fluidRow(tmodBrowserTableUI("tt", list(default=names(C19_gs$tmod_res)), upset=TRUE)),
    fluidRow(tmodBrowserPlotUI("tp"))
    )
 
   server <- function(input, output) {
     gs_id <- reactiveValues()
-    tmodBrowserTableServer("tt", C19_gs$tmod_res, gs_id = gs_id,
-                                 tmod_dbs = C19_gs$tmod_dbs)
+    tmodBrowserTableServer("tt", list(default=C19_gs$tmod_res), gs_id = gs_id,
+                                 tmod_dbs = list(default=C19_gs$tmod_dbs))
     tmodBrowserPlotServer("tp",
              gs_id=gs_id,
-             tmod_map=C19_gs$tmod_map,
-             tmod_dbs=C19_gs$tmod_dbs,
-             tmod_gl=C19_gs$tmod_gl,
-             cntr=C19$contrasts,
-             annot=C19$annotation)
+             tmod_map=list(default=C19_gs$tmod_map),
+             tmod_dbs=list(default=C19_gs$tmod_dbs),
+             tmod_gl=list(default=C19_gs$tmod_gl),
+             cntr=list(default=C19$contrasts),
+             annot=list(default=C19$annotation))
   }
   runApp(shinyApp(ui, server))
 }
-
 
 }

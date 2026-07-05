@@ -15,7 +15,7 @@ colorPalettesServer(id, variables, palettes = NULL, compact = FALSE)
 \item{variables}{Variable specification input as either a named list or a
 reactive value/expression returning one. The value must always be a named
 list of datasets. Each dataset entry must be a variable specification list.
-For a single dataset, use \code{list(default=<variable specification list>)}.
+For a single dataset, use \verb{list(default=<variable specification list>)}.
 Covariate data frames are not accepted here; convert them explicitly with
 \code{\link[=infer_palette_variables]{infer_palette_variables()}} first.}
 

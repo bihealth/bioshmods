@@ -17,9 +17,9 @@ heatmapServer(
   selection = NULL,
   sample_id_col = "SampleID",
   primary_id = "PrimaryID",
-  dge_pval_col = NULL,
-  dge_lfc_col = NULL,
-  dge_fdr_col = NULL,
+  dge_pval_col = "pvalue",
+  dge_lfc_col = "log2FoldChange",
+  dge_fdr_col = "padj",
   max_genes = 150,
   annot_row_col = NULL
 )
@@ -27,24 +27,24 @@ heatmapServer(
 \arguments{
 \item{id}{Module identifier (same as passed to \code{\link[=heatmapUI]{heatmapUI()}}).}
 
-\item{annot}{Annotation data frame (single dataset) or named list of data
-frames (multi-dataset mode), as in \code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}.}
+\item{annot}{Named list of dataset annotation data frames, as in
+\code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}. For a single dataset, use \code{list(default=annot)}.}
 
-\item{exprs}{Expression matrix/data frame (single dataset) or named list of
-matrices/data frames (multi-dataset mode), as in \code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}.}
+\item{exprs}{Named list of dataset expression matrices/data frames, as in
+\code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}. For a single dataset, use \code{list(default=exprs)}.}
 
 \item{cntr}{Optional contrast object, same format as \code{\link[=geneGroupSelectorServer]{geneGroupSelectorServer()}}.}
 
-\item{covar}{Sample covariate data frame (single dataset) or named list of
-data frames (multi-dataset mode).}
+\item{covar}{Named list of dataset sample covariate data frames. For a single
+dataset, use \code{list(default=covar)}.}
 
 \item{palettes}{Optional reactive expression or \code{reactiveVal} returning a
 palette list forwarded to \code{\link[=plot_heatmap]{plot_heatmap()}}. Useful when heatmap colors are
 coordinated across modules.}
 
 \item{selection}{Optional incoming \code{reactiveValues()} object with an \code{ids}
-element containing gene IDs to import into the embedded gene-group selector.
-Heatmap selections are not written back there.}
+element containing gene IDs to import into the embedded gene-group
+selector. Heatmap selections are not written back there.}
 
 \item{sample_id_col}{Name of the sample ID column in \code{covar}.}
 
@@ -102,7 +102,13 @@ covar <- data.frame(
 if(interactive()) {
   ui <- fluidPage(heatmapUI("hm"))
   server <- function(input, output, session) {
-    heatmapServer("hm", annot=annot, exprs=exprs, cntr=cntr, covar=covar)
+    heatmapServer(
+      "hm",
+      annot=list(default=annot),
+      exprs=list(default=exprs),
+      cntr=list(default=cntr),
+      covar=list(default=covar)
+    )
   }
   shinyApp(ui, server)
 }
@@ -113,10 +119,10 @@ if(interactive()) {
   server <- function(input, output, session) {
     heatmapServer(
       "hm",
-      annot=C19$annotation,
-      exprs=C19$expression,
-      cntr=C19$contrasts,
-      covar=C19$covariates,
+      annot=list(default=C19$annotation),
+      exprs=list(default=C19$expression),
+      cntr=list(default=C19$contrasts),
+      covar=list(default=C19$covariates),
       sample_id_col="label"
     )
   }

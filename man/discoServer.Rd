@@ -22,13 +22,13 @@ discoServer(
 \item{cntr_titles}{character vector containing the IDs of the contrasts
 (same as \code{names(cntr)}).}
 
-\item{cntr}{list of data frames containing the contrast information.
-Data frames must have the columns log2FoldChange and pvalue. Rownames of
-the data frames should be IDs.}
+\item{cntr}{named list of dataset contrast lists. Contrast data frames must
+have the columns log2FoldChange and pvalue. For a single dataset, use
+\code{list(default=cntr)}.}
 
-\item{annot}{Annotation data frame. The annotation data frame must have
-a column named "PrimaryID" which corresponds to the rownames of the data
-frames in the \code{cntr} list.}
+\item{annot}{named list of dataset annotation data frames. Each annotation
+data frame must have a column named "PrimaryID". For a single dataset,
+use \code{list(default=annot)}.}
 
 \item{selcols}{which column in the gene table when genes are selected
 from the plot}
@@ -58,10 +58,10 @@ if(interactive()) {
     cntr2$SecondaryID <- sample(cntr2$PrimaryID, replace=TRUE)
     rownames(cntr2) <- paste0("ID", 1:5000)
     cntr <- list("Contrast 1"=cntr1, "Contrast 2"=cntr2)
+    annot <- data.frame(PrimaryID=paste0("ID", 1:5000), stringsAsFactors=FALSE)
     shinyApp(ui=fluidPage(discoUI("disco", names(cntr))),
              server=function(input, output, session) {
-                discoServer("disco", cntr)
+                discoServer("disco", list(default=cntr), annot=list(default=annot))
              })
 }
-
 }

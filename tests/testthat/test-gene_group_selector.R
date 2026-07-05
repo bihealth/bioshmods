@@ -1,5 +1,7 @@
 library(shiny)
 
+.default_dataset <- function(x) list(default = x)
+
 test_that("geneGroupSelectorUI returns controls-only UI", {
   ui <- geneGroupSelectorUI("gsel")
   html <- as.character(ui)
@@ -21,7 +23,7 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
+      annot = .default_dataset(annot),
       selection = selection
     ),
     {
@@ -37,7 +39,7 @@ test_that("geneGroupSelectorServer populates external reactiveVal with PrimaryID
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
+      annot = .default_dataset(annot),
       selection = selection
     ),
     {
@@ -68,8 +70,8 @@ test_that("geneGroupSelectorServer defaults to expression mode and top 50 by mea
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
-      exprs = exprs,
+      annot = .default_dataset(annot),
+      exprs = .default_dataset(exprs),
       selection = selection
     ),
     {
@@ -107,9 +109,9 @@ test_that("geneGroupSelectorServer supports custom mode order and defaults", {
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
-      exprs = exprs,
-      cntr = cntr,
+      annot = .default_dataset(annot),
+      exprs = .default_dataset(exprs),
+      cntr = .default_dataset(cntr),
       mode_order = c("by_name", "by_expression", "by_dge"),
       defaults = list(expr_top_value = 3),
       selection = selection
@@ -141,8 +143,8 @@ test_that("geneGroupSelectorServer switches to by_name when selection ids change
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
-      exprs = exprs,
+      annot = .default_dataset(annot),
+      exprs = .default_dataset(exprs),
       selection = selection
     ),
     {
@@ -176,8 +178,8 @@ test_that("geneGroupSelectorServer can switch away from by_name after external I
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
-      exprs = exprs,
+      annot = .default_dataset(annot),
+      exprs = .default_dataset(exprs),
       selection = selection
     ),
     {
@@ -211,8 +213,8 @@ test_that("geneGroupSelectorServer keeps external by_name state when modus is tr
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
-      exprs = exprs,
+      annot = .default_dataset(annot),
+      exprs = .default_dataset(exprs),
       selection = selection
     ),
     {
@@ -249,8 +251,8 @@ test_that("geneGroupSelectorServer uses server-level DGE column params", {
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
-      cntr = cntr,
+      annot = .default_dataset(annot),
+      cntr = .default_dataset(cntr),
       dge_pval_col = "PVAL",
       dge_lfc_col = "L2FC",
       dge_fdr_col = "QVAL",
@@ -288,8 +290,8 @@ test_that("geneGroupSelectorServer does not auto-detect DGE columns", {
   testServer(
     geneGroupSelectorServer,
     args = list(
-      annot = annot,
-      cntr = cntr,
+      annot = .default_dataset(annot),
+      cntr = .default_dataset(cntr),
       selection = selection
     ),
     {
@@ -349,7 +351,7 @@ test_that("geneGroupSelectorServer validates defaults strictly", {
     testServer(
       geneGroupSelectorServer,
       args = list(
-        annot = annot,
+        annot = .default_dataset(annot),
         defaults = list(unknown_default = 1)
       ),
       {
@@ -363,7 +365,7 @@ test_that("geneGroupSelectorServer validates defaults strictly", {
     testServer(
       geneGroupSelectorServer,
       args = list(
-        annot = annot,
+        annot = .default_dataset(annot),
         defaults = list(expr_top_mode = "invalid_mode")
       ),
       {
@@ -377,7 +379,7 @@ test_that("geneGroupSelectorServer validates defaults strictly", {
     testServer(
       geneGroupSelectorServer,
       args = list(
-        annot = annot,
+        annot = .default_dataset(annot),
         defaults = list(dge_pval_thr = 2)
       ),
       {
@@ -391,7 +393,7 @@ test_that("geneGroupSelectorServer validates defaults strictly", {
     testServer(
       geneGroupSelectorServer,
       args = list(
-        annot = annot,
+        annot = .default_dataset(annot),
         defaults = list(dge_require_fdr = "yes")
       ),
       {

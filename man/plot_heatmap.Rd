@@ -13,6 +13,7 @@ plot_heatmap(
   primary_id_col = "PrimaryID",
   annot_row_col = NULL,
   sel_annot = NULL,
+  sort_by_covar = FALSE,
   legend = TRUE,
   palettes = NULL,
   col = NULL
@@ -39,6 +40,10 @@ If \code{NULL} or missing in \code{annot}, row names from \code{exprs} are shown
 
 \item{sel_annot}{Character vector of column names from \code{covar} to display as
 top annotations. If \code{NULL} (default), no annotation bars are shown.}
+
+\item{sort_by_covar}{Logical; if \code{TRUE} and covariates are selected in
+\code{sel_annot}, samples are ordered by those covariates and column clustering
+is disabled.}
 
 \item{legend}{Logical; whether heatmap and annotation legends should be shown.}
 

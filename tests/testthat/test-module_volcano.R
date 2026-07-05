@@ -1,5 +1,7 @@
 library(shiny)
 
+.default_dataset <- function(x) list(default=x)
+
 .volcano_test_contrast <- function(ids, lfc, pval, extra=NULL) {
   x <- data.frame(
     PrimaryID=ids,
@@ -15,7 +17,7 @@ library(shiny)
   x
 }
 
-test_that(".normalize_volcano_inputs keeps explicit default primary_id", {
+test_that(".check_volcano_inputs keeps explicit default primary_id", {
   cntr <- list(
     contrast_a=data.frame(
       PrimaryID=c("g1", "g2"),
@@ -30,9 +32,9 @@ test_that(".normalize_volcano_inputs keeps explicit default primary_id", {
     stringsAsFactors=FALSE
   )
 
-  normalized <- bioshmods:::.normalize_volcano_inputs(
-    cntr=cntr,
-    annot=annot,
+  normalized <- bioshmods:::.check_volcano_inputs(
+    cntr=list(default=cntr),
+    annot=list(default=annot),
     primary_id="PrimaryID",
     lfc_col="log2FoldChange",
     pval_col="padj",
@@ -67,7 +69,7 @@ test_that("volcanoUI contains expected controls and plot outputs", {
   )
 })
 
-test_that(".normalize_volcano_inputs errors when primary_id is NULL", {
+test_that(".check_volcano_inputs errors when primary_id is NULL", {
   cntr <- list(
     contrast_a=data.frame(
       PrimaryID=c("g1", "g2"),
@@ -82,9 +84,9 @@ test_that(".normalize_volcano_inputs errors when primary_id is NULL", {
   )
 
   expect_error(
-    bioshmods:::.normalize_volcano_inputs(
-      cntr=cntr,
-      annot=annot,
+    bioshmods:::.check_volcano_inputs(
+      cntr=list(default=cntr),
+      annot=list(default=annot),
       primary_id=NULL,
       lfc_col="log2FoldChange",
       pval_col="padj",
@@ -94,7 +96,7 @@ test_that(".normalize_volcano_inputs errors when primary_id is NULL", {
   )
 })
 
-test_that(".normalize_volcano_inputs supports multi-dataset input and trims annot_show columns", {
+test_that(".check_volcano_inputs supports multi-dataset input and trims annot_show columns", {
   cntr <- list(
     ds_a=list(
       c1=.volcano_test_contrast(c("g1", "g2"), c(1, -1), c(0.01, 0.02))
@@ -118,7 +120,7 @@ test_that(".normalize_volcano_inputs supports multi-dataset input and trims anno
     )
   )
 
-  normalized <- bioshmods:::.normalize_volcano_inputs(
+  normalized <- bioshmods:::.check_volcano_inputs(
     cntr=cntr,
     annot=annot,
     primary_id="PrimaryID",
@@ -136,7 +138,7 @@ test_that(".normalize_volcano_inputs supports multi-dataset input and trims anno
   expect_named(normalized$annot_full$ds_b, c("PrimaryID", "SYMBOL", "EXTRA"))
 })
 
-test_that(".normalize_volcano_inputs errors when explicit primary_id is missing in contrasts", {
+test_that(".check_volcano_inputs errors when explicit primary_id is missing in contrasts", {
   cntr <- list(
     contrast_a=data.frame(
       log2FoldChange=c(1, -1),
@@ -150,9 +152,9 @@ test_that(".normalize_volcano_inputs errors when explicit primary_id is missing 
   )
 
   expect_error(
-    bioshmods:::.normalize_volcano_inputs(
-      cntr=cntr,
-      annot=annot,
+    bioshmods:::.check_volcano_inputs(
+      cntr=list(default=cntr),
+      annot=list(default=annot),
       primary_id="PrimaryID",
       lfc_col="log2FoldChange",
       pval_col="padj",
@@ -162,7 +164,7 @@ test_that(".normalize_volcano_inputs errors when explicit primary_id is missing 
   )
 })
 
-test_that(".normalize_volcano_inputs errors when explicit primary_id is missing in annotation", {
+test_that(".check_volcano_inputs errors when explicit primary_id is missing in annotation", {
   cntr <- list(
     contrast_a=data.frame(
       PrimaryID=c("g1", "g2"),
@@ -177,9 +179,9 @@ test_that(".normalize_volcano_inputs errors when explicit primary_id is missing 
   )
 
   expect_error(
-    bioshmods:::.normalize_volcano_inputs(
-      cntr=cntr,
-      annot=annot,
+    bioshmods:::.check_volcano_inputs(
+      cntr=list(default=cntr),
+      annot=list(default=annot),
       primary_id="PrimaryID",
       lfc_col="log2FoldChange",
       pval_col="padj",
@@ -248,8 +250,8 @@ test_that("volcanoServer updates external gene_id on gene button click", {
   testServer(
     volcanoServer,
     args=list(
-      cntr=cntr,
-      annot=annot,
+      cntr=.default_dataset(cntr),
+      annot=.default_dataset(annot),
       gene_id=gene_id
     ),
     {
@@ -276,8 +278,8 @@ test_that("volcanoServer updates external selection ids on Show button click", {
   testServer(
     volcanoServer,
     args=list(
-      cntr=cntr,
-      annot=annot,
+      cntr=.default_dataset(cntr),
+      annot=.default_dataset(annot),
       selection=selection
     ),
     {
@@ -314,8 +316,8 @@ test_that("volcanoServer uses configurable show button label", {
   testServer(
     volcanoServer,
     args=list(
-      cntr=cntr,
-      annot=annot,
+      cntr=.default_dataset(cntr),
+      annot=.default_dataset(annot),
       selection=selection,
       ui_config=list(show_button_label="Send to heatmap")
     ),
@@ -346,8 +348,8 @@ test_that("volcanoServer validates selection", {
     testServer(
       volcanoServer,
       args=list(
-        cntr=cntr,
-        annot=annot,
+        cntr=.default_dataset(cntr),
+        annot=.default_dataset(annot),
         selection=character(0)
       ),
       {
@@ -360,8 +362,8 @@ test_that("volcanoServer validates selection", {
     testServer(
       volcanoServer,
       args=list(
-        cntr=cntr,
-        annot=annot,
+        cntr=.default_dataset(cntr),
+        annot=.default_dataset(annot),
         ui_config=list(show_button_label="")
       ),
       {
@@ -385,8 +387,8 @@ test_that("volcanoServer shows annot_show columns on hover", {
   testServer(
     volcanoServer,
     args=list(
-      cntr=cntr,
-      annot=annot
+      cntr=.default_dataset(cntr),
+      annot=.default_dataset(annot)
     ),
     {
       hover_genes(data.frame(Dataset="default", PrimaryID="g2", stringsAsFactors=FALSE))
@@ -421,8 +423,8 @@ test_that("volcanoServer adds text labels when top labels are enabled", {
   testServer(
     volcanoServer,
     args=list(
-      cntr=cntr,
-      annot=annot
+      cntr=.default_dataset(cntr),
+      annot=.default_dataset(annot)
     ),
     {
       session$setInputs(
@@ -472,8 +474,8 @@ test_that("volcanoServer chooses top labels per contrast", {
   testServer(
     volcanoServer,
     args=list(
-      cntr=cntr,
-      annot=annot
+      cntr=.default_dataset(cntr),
+      annot=.default_dataset(annot)
     ),
     {
       session$setInputs(
@@ -517,8 +519,8 @@ test_that("volcanoServer shows label column selector when annotation columns are
   testServer(
     volcanoServer,
     args=list(
-      cntr=cntr,
-      annot=annot
+      cntr=.default_dataset(cntr),
+      annot=.default_dataset(annot)
     ),
     {
       session$flushReact()

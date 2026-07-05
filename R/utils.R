@@ -70,6 +70,101 @@
   invisible(NULL)
 }
 
+# Check that an object is a non-empty named list.
+# Dataset-capable modules use this instead of accepting shortcut inputs.
+.check_named_dataset_list <- function(x, arg_name) {
+  if(!is.list(x) || is.data.frame(x) || length(x) == 0L) {
+    stop(sprintf("`%s` must be a non-empty named list of datasets.", arg_name))
+  }
+
+  nms <- names(x)
+  if(is.null(nms) || any(is.na(nms) | !nzchar(trimws(nms)))) {
+    stop(sprintf("`%s` must have non-empty dataset names.", arg_name))
+  }
+
+  invisible(NULL)
+}
+
+# Check a dataset list and require every element to satisfy a predicate.
+# Returns the original list, optionally restricted to expected datasets.
+.check_dataset_list <- function(x, arg_name, predicate, element_description, datasets=NULL, allow_null=FALSE) {
+  if(is.null(x)) {
+    if(isTRUE(allow_null)) {
+      return(NULL)
+    }
+    stop(sprintf("`%s` must be a non-empty named list of %s.", arg_name, element_description))
+  }
+
+  .check_named_dataset_list(x, arg_name)
+
+  bad <- names(x)[!vapply(x, predicate, logical(1))]
+  if(length(bad) > 0L) {
+    stop(sprintf(
+      "Every element of `%s` must be %s. Invalid dataset(s): %s.",
+      arg_name,
+      element_description,
+      paste(bad, collapse=", ")
+    ))
+  }
+
+  if(!is.null(datasets)) {
+    missing <- setdiff(datasets, names(x))
+    if(length(missing) > 0L) {
+      stop(sprintf("`%s` is missing dataset(s): %s.", arg_name, paste(missing, collapse=", ")))
+    }
+    x <- x[datasets]
+  }
+
+  x
+}
+
+# Check a dataset-keyed list of data frames.
+# Use list(default=<data frame>) for a single dataset.
+.check_dataset_data_frames <- function(x, arg_name, datasets=NULL, allow_null=FALSE) {
+  .check_dataset_list(
+    x=x,
+    arg_name=arg_name,
+    predicate=is.data.frame,
+    element_description="a data frame",
+    datasets=datasets,
+    allow_null=allow_null
+  )
+}
+
+# Check a dataset-keyed list of expression matrices/data frames.
+# Use list(default=<matrix>) for a single dataset.
+.check_dataset_matrices <- function(x, arg_name, datasets=NULL, allow_null=FALSE) {
+  .check_dataset_list(
+    x=x,
+    arg_name=arg_name,
+    predicate=function(y) is.matrix(y) || is.data.frame(y),
+    element_description="a matrix or data frame",
+    datasets=datasets,
+    allow_null=allow_null
+  )
+}
+
+# Check one dataset-level contrast list.
+# Each contrast must be a data frame.
+.is_contrast_list <- function(x) {
+  is.list(x) && !is.data.frame(x) && length(x) > 0L &&
+    !is.null(names(x)) && !any(is.na(names(x)) | !nzchar(trimws(names(x)))) &&
+    all(vapply(x, is.data.frame, logical(1)))
+}
+
+# Check a dataset-keyed list of contrast lists.
+# Use list(default=<contrast list>) for a single dataset.
+.check_dataset_contrasts <- function(x, arg_name="cntr", datasets=NULL, allow_null=FALSE) {
+  .check_dataset_list(
+    x=x,
+    arg_name=arg_name,
+    predicate=.is_contrast_list,
+    element_description="a named list of contrast data frames",
+    datasets=datasets,
+    allow_null=allow_null
+  )
+}
+
 # Classify each column in a data frame using simple, stable type labels.
 # Used by table modules to decide which columns should receive numeric formatting.
 .data_frame_coltypes <- function(df) {

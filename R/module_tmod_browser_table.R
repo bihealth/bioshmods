@@ -206,7 +206,8 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
 #' @param tmod_dbs (optional) list of tmod database objects (or lists
 #' of list of tmod database object in multi data set mode). If NULL, upset
 #' plots cannot be generated. See Details.
-#' @param multilevel if TRUE, the results are grouped in data sets
+#' @param tmod_res named list of dataset tmod result objects. For a single
+#'   dataset, use `list(default=tmod_res)`.
 #' @param upset_pane if TRUE, UI for the upset plot will be created
 #' @examples
 
@@ -236,7 +237,7 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
 #'
 #'   ui <- fluidPage(tmodBrowserTableUI("tt", names(tmod_res)))
 #'   server <- function(input, output) {
-#'     tmodBrowserTableServer("tt", tmod_res)
+#'     tmodBrowserTableServer("tt", list(default=tmod_res))
 #'   }
 #'   shinyApp(ui, server)
 #'
@@ -247,22 +248,19 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
 #'
 #' if(interactive()) {
 #'
-#'   ui <- fluidPage(tmodBrowserTableUI("tt", names(C19_gs$tmod_res), upset=TRUE))
+#'   ui <- fluidPage(tmodBrowserTableUI("tt", list(default=names(C19_gs$tmod_res)), upset=TRUE))
 #'   server <- function(input, output) {
-#'     tmodBrowserTableServer("tt", C19_gs$tmod_res, gs_id = NULL,
-#'                                  tmod_dbs = C19_gs$tmod_dbs)
+#'     tmodBrowserTableServer("tt", list(default=C19_gs$tmod_res), gs_id = NULL,
+#'                                  tmod_dbs = list(default=C19_gs$tmod_dbs))
 #'   }
 #'   shinyApp(ui, server)
 #'
 #' }
 #'
 #' @export
-tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, multilevel=FALSE, tmod_dbs=NULL) {
-
-  if(!multilevel) {
-    tmod_res <- list(default=tmod_res)
-    tmod_dbs <- list(default=tmod_dbs)
-  }
+tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, tmod_dbs=NULL) {
+  tmod_res <- .check_dataset_list(tmod_res, "tmod_res", is.list, "a tmod result object")
+  tmod_dbs <- .check_dataset_list(tmod_dbs, "tmod_dbs", is.list, "a list of tmod databases", datasets=names(tmod_res), allow_null=TRUE)
 
   if(is.null(gs_id)) {
     but <- NULL

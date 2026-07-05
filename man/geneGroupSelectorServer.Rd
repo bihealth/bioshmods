@@ -25,14 +25,14 @@ geneGroupSelectorServer(
 \arguments{
 \item{id}{module identifier (same as passed to \code{\link[=geneGroupSelectorUI]{geneGroupSelectorUI()}})}
 
-\item{annot}{annotation data frame (minimum input), or named list of data frames
-for multiple datasets}
+\item{annot}{named list of dataset annotation data frames. For a single dataset,
+use \code{list(default=annot)}.}
 
-\item{exprs}{optional expression matrix/data frame, or named list of matrices/data
-frames for multiple datasets}
+\item{exprs}{optional named list of dataset expression matrices/data frames. For
+a single dataset, use \code{list(default=exprs)}.}
 
-\item{cntr}{optional contrasts list (named list of data frames), or named list of
-such lists for multiple datasets}
+\item{cntr}{optional named list of dataset contrast lists. For a single dataset,
+use \code{list(default=cntr)}.}
 
 \item{mode_order}{order of available selection modes. Values must come from
 \code{c("by_expression", "by_dge", "by_name")}. Unavailable modes are skipped.
@@ -53,11 +53,11 @@ for DGE mode.}
 \code{dge_top_value}, \code{dge_rank_mode}, \code{dge_pval_thr}, \code{dge_lfc_thr},
 and \code{dge_require_fdr}. Invalid or unsupported values raise an error.}
 
-\item{selection}{optional \code{reactiveValues()} object with an \code{ids}
-element that will be updated with the currently selected PrimaryIDs
-(column \code{primary_id}) as a character vector. When \code{selection$ids}
-changes externally, the selector switches to \code{by_name} mode and mirrors
-those IDs in the text field.}
+\item{selection}{optional \code{reactiveValues()} object with an \code{ids} element
+that will be updated with the currently selected PrimaryIDs (column
+\code{primary_id}) as a character vector. When \code{selection$ids} changes
+externally, the selector switches to \code{by_name} mode and mirrors those
+IDs in the text field.}
 
 \item{dataset}{optional \code{reactiveVal()} that stores the currently selected
 dataset name. If \code{NULL}, it is initialized internally with \code{reactiveVal()}.}
@@ -109,9 +109,9 @@ if(interactive()) {
 
     geneGroupSelectorServer(
       "gsel",
-      annot=annot,
-      exprs=exprs,
-      cntr=cntr,
+      annot=list(default=annot),
+      exprs=list(default=exprs),
+      cntr=list(default=cntr),
       selection=selection
     )
 
@@ -136,9 +136,9 @@ if(interactive()) {
 
     geneGroupSelectorServer(
       "gsel",
-      annot=C19$annotation,
-      exprs=C19$expression,
-      cntr=C19$contrasts,
+      annot=list(default=C19$annotation),
+      exprs=list(default=C19$expression),
+      cntr=list(default=C19$contrasts),
       selection=selection
     )
 

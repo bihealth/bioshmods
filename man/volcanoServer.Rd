@@ -29,9 +29,8 @@ volcanoServer(
 
 \item{pval_thr}{default p-value threshold}
 
-\item{cntr}{either a named list of data frames, each being the results
-of differential expression analysis for one contrast, or a list of data
-sets, each data set being a named list of data frames.}
+\item{cntr}{named list of dataset contrast lists. For a single dataset, use
+\code{list(default=cntr)}.}
 
 \item{lfc_col, pval_col}{names of the columns in the contrast data
 frames which hold the log2 fold changes and p-values, respectively}
@@ -39,19 +38,17 @@ frames which hold the log2 fold changes and p-values, respectively}
 \item{primary_id}{name of the primary ID column in contrasts and
 annotation data frame.}
 
-\item{annot}{data frame with gene annotations (containing at least the
-column specified with the \code{primary_id} parameter) or (if there are
-multiple data sets) a named list of such data frames. Names of this list
-must match the names of the \code{cntr} list.}
+\item{annot}{named list of dataset annotation data frames. Names must match
+\code{cntr}; for a single dataset, use \code{list(default=annot)}.}
 
 \item{gene_id}{must be a \code{reactiveValues} object. If not NULL, then
 clicking on a gene identifier will modify this object (possibly
 triggering an event in another module).}
 
-\item{selection}{Optional \code{reactiveValues()} object with an \code{ids}
-element populated with the primary IDs from the current plot selection when
-the user clicks the \code{Show} button. If \code{NULL}, the button is not
-shown and no external state is updated.}
+\item{selection}{Optional \code{reactiveValues()} object with an \code{ids} element
+populated with the primary IDs from the current plot selection when the
+user clicks the \code{Show} button. If \code{NULL}, the button is not shown and no
+external state is updated.}
 
 \item{ui_config}{Optional list configuring UI text. Supported keys:
 \code{show_button_label} for the label shown on the \code{Show} button.}
@@ -68,11 +65,7 @@ annot <- data.frame(
   SYMBOL=LETTERS[1:6],
   stringsAsFactors=FALSE
 )
-exprs <- matrix(
-  rnorm(24),
-  nrow=6,
-  dimnames=list(annot$PrimaryID, paste0("s", 1:4))
-)
+
 cntr <- list(
   contrast_a=data.frame(
     PrimaryID=annot$PrimaryID,
@@ -81,32 +74,49 @@ cntr <- list(
     stringsAsFactors=FALSE
   )
 )
-covar <- data.frame(
-  SampleID=colnames(exprs),
-  group=c("A", "A", "B", "B"),
-  stringsAsFactors=FALSE
-)
+
+if(interactive()) {
+  ui <- fluidPage(volcanoUI("volcano"))
+
+  server <- function(input, output, session) {
+    volcanoServer(
+      "volcano",
+      cntr = list(default=cntr),
+      annot = list(default=annot)
+    )
+  }
+
+  shinyApp(ui, server)
+}
+
+# Example showing how to use shared selection to 
+link volcano and heatmap modules
+
+data(C19)
 
 if(interactive()) {
   ui <- fluidPage(
-    fluidRow(
-      column(width=6, volcanoUI("vol")),
-      column(width=6, heatmapUI("hm"))
-    )
+    tabsetPanel(
+      tabPanel("Volcano plot", volcanoUI("vol")),
+      tabPanel("Heatmap", heatmapUI("hm"))
+      )
   )
   server <- function(input, output, session) {
     selection <- reactiveValues(ids=character(0))
-    volcanoServer("vol", cntr=cntr, annot=annot, selection=selection)
+    volcanoServer("vol", 
+                  cntr=list(default=C19$contrasts),
+                  annot=list(default=C19$annotation),
+                  selection=selection)
     heatmapServer(
       "hm",
-      annot=annot,
-      exprs=exprs,
-      cntr=cntr,
-      covar=covar,
+      annot=list(default=C19$annotation),
+      exprs=list(default=C19$expression),
+      cntr=list(default=C19$contrasts),
+      covar=list(default=C19$covariates),
+      sample_id_col="label",
       selection=selection
     )
   }
   shinyApp(ui, server)
 }
-
 }
