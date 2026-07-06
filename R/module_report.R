@@ -48,12 +48,27 @@ reportModuleUI <- function(id) {
     ),
     column(
       width=9,
-      textAreaInput(
-        ns("messages"),
-        label=NULL,
-        value="",
-        width="100%",
-        height="420px"
+      tabsetPanel(
+        tabPanel(
+          "Report",
+          textAreaInput(
+            ns("report_text"),
+            label=NULL,
+            value="",
+            width="100%",
+            height="420px"
+          )
+        ),
+        tabPanel(
+          "Log",
+          textAreaInput(
+            ns("messages"),
+            label=NULL,
+            value="",
+            width="100%",
+            height="420px"
+          )
+        )
       )
     )
   )
@@ -95,20 +110,9 @@ reportModuleUI <- function(id) {
 #' }
 #'
 #' if(interactive()) {
-#'   mtx <- matrix(rnorm(40, mean=rep(c(0, 1), each=20)), nrow=1)
-#'   rownames(mtx) <- "MUZG"
-#'   covar <- data.frame(
-#'     group=rep(c("A", "B"), each=20),
-#'     sample=paste0("S", 1:40),
-#'     stringsAsFactors=FALSE
-#'   )
-#'   annot <- data.frame(
-#'     PrimaryID="MUZG",
-#'     SYMBOL="MUZG",
-#'     stringsAsFactors=FALSE
-#'   )
+#'   data(C19)
 #'
-#'   gene_id <- reactiveValues(id="MUZG", ds="default")
+#'   gene_id <- reactiveValues(id=C19$annotation$PrimaryID[1], ds="default")
 #'   report <- reactiveValues(chunks=list())
 #'
 #'   ui <- fluidPage(
@@ -122,16 +126,16 @@ reportModuleUI <- function(id) {
 #'     geneBrowserPlotServer(
 #'       "gplot",
 #'       gene_id=gene_id,
-#'       covar=list(default=covar),
-#'       exprs=list(default=mtx),
-#'       annot=list(default=annot),
+#'       covar=list(default=C19$covariates),
+#'       exprs=list(default=C19$expression),
+#'       annot=list(default=C19$annotation),
 #'       report=report
 #'     )
 #'
 #'     reportModuleServer(
 #'       "report",
 #'       chunks=reactive(report$chunks),
-#'       preamble="library(ggplot2)",
+#'       preamble="data(C19)",
 #'       template=template
 #'     )
 #'   }
@@ -147,6 +151,7 @@ reportModuleServer <- function(id, chunks, preamble=NULL, template) {
 
     observeEvent(input$generate_report, {
       messages <- character(0)
+      report_text <- ""
 
       tryCatch({
         current_chunks <- .report_module_read_chunks(chunks)
@@ -163,6 +168,7 @@ reportModuleServer <- function(id, chunks, preamble=NULL, template) {
 
         report_file(out_file)
         shinyjs::enable("download_rmd")
+        report_text <- paste(readLines(out_file, warn=FALSE), collapse="\n")
         messages <- c(
           messages,
           sprintf("Appended preamble: %s", if(is.null(preamble) || !nzchar(preamble)) "no" else "yes"),
@@ -172,9 +178,11 @@ reportModuleServer <- function(id, chunks, preamble=NULL, template) {
       }, error=function(e) {
         report_file(NULL)
         shinyjs::disable("download_rmd")
+        report_text <<- ""
         messages <<- c(messages, sprintf("Error: %s", conditionMessage(e)))
       })
 
+      updateTextAreaInput(session, "report_text", value=report_text)
       updateTextAreaInput(session, "messages", value=paste(messages, collapse="\n"))
     })
 

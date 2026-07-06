@@ -49,20 +49,9 @@ if(interactive()) {
 }
 
 if(interactive()) {
-  mtx <- matrix(rnorm(40, mean=rep(c(0, 1), each=20)), nrow=1)
-  rownames(mtx) <- "MUZG"
-  covar <- data.frame(
-    group=rep(c("A", "B"), each=20),
-    sample=paste0("S", 1:40),
-    stringsAsFactors=FALSE
-  )
-  annot <- data.frame(
-    PrimaryID="MUZG",
-    SYMBOL="MUZG",
-    stringsAsFactors=FALSE
-  )
+  data(C19)
 
-  gene_id <- reactiveValues(id="MUZG", ds="default")
+  gene_id <- reactiveValues(id=C19$annotation$PrimaryID[1], ds="default")
   report <- reactiveValues(chunks=list())
 
   ui <- fluidPage(
@@ -76,16 +65,16 @@ if(interactive()) {
     geneBrowserPlotServer(
       "gplot",
       gene_id=gene_id,
-      covar=list(default=covar),
-      exprs=list(default=mtx),
-      annot=list(default=annot),
+      covar=list(default=C19$covariates),
+      exprs=list(default=C19$expression),
+      annot=list(default=C19$annotation),
       report=report
     )
 
     reportModuleServer(
       "report",
       chunks=reactive(report$chunks),
-      preamble="library(ggplot2)",
+      preamble="data(C19)",
       template=template
     )
   }
