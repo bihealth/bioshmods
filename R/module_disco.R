@@ -28,7 +28,10 @@ discoUI <- function(id, cntr_titles) {
         fluidRow(sliderInput(NS(id, "max"), "Max", min=0, max=150, value=100, width="80%")),
         fluidRow(checkboxInput(NS(id, "show_top_labels"), "Show top labels", value=FALSE)),
         fluidRow(numericInput(NS(id, "top_label_n"), "Top labels (N)", value=10, min=1, step=1, width="80%")),
-        fluidRow(downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success")),
+        fluidRow(
+          column(width=6, downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success")),
+          column(width=6, .report_add_button(id))
+        ),
         fluidRow(
                  textInput(NS(id, "glabs"), 
                            "Type a comma separated list of gene IDs to label on the plot",
@@ -272,6 +275,10 @@ discoServer <- function(id, cntr, annot=NULL,
     }, ignoreInit = FALSE)
 
     observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
+
+    observeEvent(input$add_to_report_main, {
       .append_report_chunk(report, input$report_code)
     })
 

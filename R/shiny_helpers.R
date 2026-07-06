@@ -27,6 +27,10 @@ figsizeInput <- function(id, label="Figure size (w x h)",
 
 # Build a blank report-code tab shared by plot modules.
 # The button is intentionally not wired until report storage is defined.
+.report_add_button <- function(id, button_id="add_to_report_main") {
+  shiny::actionButton(shiny::NS(id, button_id), "Add to report", class="btn-default")
+}
+
 .report_code_tab <- function(id, input_id="report_code", button_id="add_to_report", title="Code") {
   shiny::tabPanel(
     title,
@@ -43,6 +47,5 @@ figsizeInput <- function(id, label="Figure size (w x h)",
     )
   )
 }
-
 
 

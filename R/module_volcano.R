@@ -176,8 +176,10 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
                       numericInput(NS(id, "top_label_n"), "Top labels (N)", value=10,
                                    min=1, step=1, width="80%"))),
       fluidRow(column(width=12, uiOutput(NS(id, "label_col_ui")))),
-      fluidRow(column(width=12,
-                      downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success"))),
+      fluidRow(
+        column(width=6, downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success")),
+        column(width=6, .report_add_button(id))
+      ),
       fluidRow(tableOutput(NS(id, "point_id"))),
     width=2),
     mainPanel(
@@ -452,6 +454,10 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
     }, ignoreInit=FALSE)
 
     observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
+
+    observeEvent(input$add_to_report_main, {
       .append_report_chunk(report, input$report_code)
     })
 

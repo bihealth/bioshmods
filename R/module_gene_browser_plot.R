@@ -207,7 +207,8 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
       fluidRow(column(width=1, 
                       tipify(downloadButton(NS(id, "save"), "PDF", class="bg-success"),
                              "Save as PDF")),
-               column(width=11,
+               column(width=2, .report_add_button(id)),
+               column(width=9,
                       withSpinner(plotOutput(NS(id, "countsplot"), height="100%", width="100%")))
       )
 
@@ -382,6 +383,10 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       }})
 
     observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
+
+    observeEvent(input$add_to_report_main, {
       .append_report_chunk(report, input$report_code)
     })
 

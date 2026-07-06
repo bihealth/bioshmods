@@ -94,7 +94,10 @@ heatmapUI <- function(id) {
           .nrow = 3
         ),
         fluidRow(column(colorPalettesUI(ns("heatmap_color")), width=12)),
-        fluidRow(column(downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success"), width=12))
+        fluidRow(
+          column(downloadButton(ns("save"), "Save heatmap to PDF", class="bg-success"), width=6),
+          column(.report_add_button(id), width=6)
+        )
       ),
       width=3
     ),
@@ -279,6 +282,10 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
     heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
 
     observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
+
+    observeEvent(input$add_to_report_main, {
       .append_report_chunk(report, input$report_code)
     })
 

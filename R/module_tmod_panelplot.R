@@ -327,7 +327,10 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
            fluidRow(numericInput(NS(id, "filter_pval"),  label="Filter by p-value (per row)",  
                                  value=0.05, min=0, max=1, step=0.01, width="100%"),
                     bsTooltip(NS(id, "filter_pval"), ttip$filter_auc)),
-           fluidRow(downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success")),
+           fluidRow(
+             column(width=6, downloadButton(NS(id, "save"), "Save plot to PDF", class="bg-success")),
+             column(width=6, .report_add_button(id))
+           ),
            width=5, offset=1)),
         width=3),
       mainPanel(
@@ -440,6 +443,10 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
     disable("save")
 
     observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
+
+    observeEvent(input$add_to_report_main, {
       .append_report_chunk(report, input$report_code)
     })
 

@@ -221,7 +221,8 @@ tmodBrowserPlotUI <- function(id) {
       sidebarPanel(
         fluidRow(
           column(width=4, uiOutput(NS(id, "show_selected_ui"))),
-          column(width=8, downloadButton(NS(id, "save"), "Save plot", class="bg-success"))
+          column(width=4, downloadButton(NS(id, "save"), "Save plot", class="bg-success")),
+          column(width=4, .report_add_button(id))
         ),
         fluidRow(tableOutput(NS(id, "modinfo"))),
         width=5
@@ -349,6 +350,10 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
                         class = "btn-primary btn-sm")
 
     observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
+
+    observeEvent(input$add_to_report_main, {
       .append_report_chunk(report, input$report_code)
     })
 
