@@ -229,6 +229,8 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
 #' @param tmod_res named list of dataset tmod result objects. For a single
 #'   dataset, use `list(default=tmod_res)`.
 #' @param upset_pane if TRUE, UI for the upset plot will be created
+#' @param report Optional report list. When supplied, clicking `Add to report`
+#'   appends the current generated code chunk to `report$chunks`.
 #' @examples
 
 #' ## Building an example from scratch
@@ -278,7 +280,8 @@ tmodBrowserTableUI <- function(id, cntr_titles, upset_pane=FALSE) {
 #' }
 #'
 #' @export
-tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, tmod_dbs=NULL) {
+tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, tmod_dbs=NULL,
+                                   report=NULL) {
   tmod_res <- .check_dataset_list(tmod_res, "tmod_res", is.list, "a tmod result object")
   tmod_dbs <- .check_dataset_list(tmod_dbs, "tmod_dbs", is.list, "a list of tmod databases", datasets=names(tmod_res), allow_null=TRUE)
 
@@ -294,6 +297,10 @@ tmodBrowserTableServer <- function(id, tmod_res, gs_id=NULL, tmod_dbs=NULL) {
 
   moduleServer(id, function(input, output, session) {
     .tmod_browser_table_log("moduleServer started for id='", id, "'.")
+
+    observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
 
     observeEvent(input$filter, {
                    if(input$filter) {

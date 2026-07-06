@@ -14,6 +14,7 @@ heatmapServer(
   cntr = NULL,
   covar = NULL,
   palettes = NULL,
+  report = NULL,
   selection = NULL,
   sample_id_col = "SampleID",
   primary_id = "PrimaryID",
@@ -41,6 +42,9 @@ dataset, use \code{list(default=covar)}.}
 \item{palettes}{Optional reactive expression or \code{reactiveVal} returning a
 palette list forwarded to \code{\link[=plot_heatmap]{plot_heatmap()}}. Useful when heatmap colors are
 coordinated across modules.}
+
+\item{report}{Optional report list. When supplied, clicking \verb{Add to report}
+appends the current generated code chunk to \code{report$chunks}.}
 
 \item{selection}{Optional incoming \code{reactiveValues()} object with an \code{ids}
 element containing gene IDs to import into the embedded gene-group

@@ -231,6 +231,8 @@ volcanoUI <- function(id, datasets=NULL, lfc_thr=1, pval_thr=.05) {
 #'   external state is updated.
 #' @param ui_config Optional list configuring UI text. Supported keys:
 #'   `show_button_label` for the label shown on the `Show` button.
+#' @param report Optional report list. When supplied, clicking `Add to report`
+#'        appends the current generated code chunk to `report$chunks`.
 #' @param annot_show which columns from the annotation data frame should be
 #' shown when mouse hovers over a gene
 #'
@@ -300,6 +302,7 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
                           annot=NULL, gene_id=NULL,
                           selection=NULL,
                           ui_config=NULL,
+                          report=NULL,
                           annot_show=c("SYMBOL", "ENTREZID")) {
 
   checked <- .check_volcano_inputs(cntr, annot, primary_id, lfc_col, pval_col, annot_show)
@@ -447,6 +450,10 @@ volcanoServer <- function(id, cntr, lfc_col="log2FoldChange", pval_col="padj",
         shinyjs::disable("top_label_n")
       }
     }, ignoreInit=FALSE)
+
+    observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
 
     output$save <- downloadHandler(
       filename = function() {

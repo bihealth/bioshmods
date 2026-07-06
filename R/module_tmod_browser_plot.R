@@ -299,6 +299,8 @@ tmodBrowserPlotUI <- function(id) {
 #'   shown and no external state is updated.
 #' @param ui_config Optional list configuring UI text. Supported keys:
 #'   `show_button_label` for the label shown on the `Show` button.
+#' @param report Optional report list. When supplied, clicking `Add to report`
+#'   appends the current generated code chunk to `report$chunks`.
 #' @param gs_id a "reactive values" object (returned by `reactiveValues()`), including 
 #' dataset (`ds`), gene set ID (`id`), contrast id (`cntr`), database ID
 #' (`db`) and sorting mode (`sort`). If `mod_id` is not `NULL`, these
@@ -313,7 +315,8 @@ tmodBrowserPlotUI <- function(id) {
 tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod_gl=NULL, annot=NULL, 
                                   tmod_res=NULL,
                                   primary_id="PrimaryID", gene_id=NULL,
-                                  selection=NULL, ui_config=NULL) {
+                                  selection=NULL, ui_config=NULL,
+                                  report=NULL) {
 
   stopifnot(!is.null(tmod_gl) || !is.null(tmod_map))
   .check_selection_reactivevalues(selection, arg_name="selection")
@@ -344,6 +347,10 @@ tmodBrowserPlotServer <- function(id, gs_id, tmod_dbs, cntr, tmod_map=NULL, tmod
     gene.but <- actionButton("go~%s~%s", label=" \U25B6 ", 
                         onclick=sprintf('Shiny.onInputChange(\"%s-gene_select_button\",  this.id)', id),  
                         class = "btn-primary btn-sm")
+
+    observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
 
     observeEvent(input$gene_select_button, {
       if(!is.null(gene_id)) {

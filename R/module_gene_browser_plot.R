@@ -270,6 +270,8 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 #' @param cntr (optional) named list of dataset contrast lists
 #' @param exprs_label Label to be used for the expression values
 #' @param palettes (optional) reactive value with current color palettes
+#' @param report Optional report list. When supplied, clicking `Add to report`
+#'        appends the current generated code chunk to `report$chunks`.
 #' @return does not return anything useful
 #' @importFrom shiny is.reactivevalues
 #' @examples
@@ -328,7 +330,8 @@ geneBrowserPlotUI <- function(id, contrasts=FALSE) {
 geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NULL, 
                                   primary_id="PrimaryID",
                                   annot_linkout=NULL,
-                                  exprs_label = "Expression", palettes=NULL) {
+                                  exprs_label = "Expression", palettes=NULL,
+                                  report=NULL) {
   covar <- .check_dataset_data_frames(covar, "covar")
   datasets <- names(covar)
   exprs <- .check_dataset_matrices(exprs, "exprs", datasets=datasets)
@@ -377,6 +380,10 @@ geneBrowserPlotServer <- function(id, gene_id, covar, exprs, annot=NULL, cntr=NU
       if(isTruthy(input$dataset)) {
         ds(input$dataset)
       }})
+
+    observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
 
     ## XXX for some reason this does not work
     observe({

@@ -7,7 +7,13 @@
 \usage{
 tmodBrowserTableUI(id, cntr_titles, upset_pane = FALSE)
 
-tmodBrowserTableServer(id, tmod_res, gs_id = NULL, tmod_dbs = NULL)
+tmodBrowserTableServer(
+  id,
+  tmod_res,
+  gs_id = NULL,
+  tmod_dbs = NULL,
+  report = NULL
+)
 }
 \arguments{
 \item{id}{identifier for the namespace of the module}
@@ -28,6 +34,9 @@ another shiny module.}
 \item{tmod_dbs}{(optional) list of tmod database objects (or lists
 of list of tmod database object in multi data set mode). If NULL, upset
 plots cannot be generated. See Details.}
+
+\item{report}{Optional report list. When supplied, clicking \verb{Add to report}
+appends the current generated code chunk to \code{report$chunks}.}
 }
 \description{
 Shiny Module – tmod results browser table selection

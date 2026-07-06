@@ -124,6 +124,8 @@ heatmapUI <- function(id) {
 #' @param palettes Optional reactive expression or `reactiveVal` returning a
 #'   palette list forwarded to [plot_heatmap()]. Useful when heatmap colors are
 #'   coordinated across modules.
+#' @param report Optional report list. When supplied, clicking `Add to report`
+#'   appends the current generated code chunk to `report$chunks`.
 #' @param selection Optional incoming `reactiveValues()` object with an `ids`
 #'   element containing gene IDs to import into the embedded gene-group
 #'   selector. Heatmap selections are not written back there.
@@ -202,6 +204,7 @@ heatmapUI <- function(id) {
 #' @export
 heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
                           palettes=NULL,
+                          report=NULL,
                           selection=NULL,
                           sample_id_col="SampleID",
                           primary_id="PrimaryID",
@@ -274,6 +277,10 @@ heatmapServer <- function(id, annot, exprs=NULL, cntr=NULL, covar=NULL,
 
     heatmap_col_var <- list(default=list(values=list(type="continuous", breaks=c(-2, -1, 0, 1, 2))))
     heatmap_col <- colorPalettesServer("heatmap_color", heatmap_col_var, compact=TRUE)
+
+    observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
 
     selector <- geneGroupSelectorServer(
       "gene_selector",

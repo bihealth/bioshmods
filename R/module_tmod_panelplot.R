@@ -388,13 +388,16 @@ tmodPanelPlotUI <- function(id, datasets=NULL) {
 #' @param tmod_dbs named list of tmod databases, see Details.
 #' @param datasets if there are multiple data sets, this character vector
 #'        defines what they are to show an approppriate selector in the UI
+#' @param report Optional report list. When supplied, clicking `Add to report`
+#'   appends the current generated code chunk to `report$chunks`.
 #' @return Returns a reactive value which is a list with elements
 #' `contrast` and `id`.
 #' @importFrom shiny observe selectizeInput
 #' @importFrom shinyBS bsTooltip addTooltip
 #' @importFrom purrr map_lgl
 #' @export
-tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NULL, annot=NULL) {
+tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NULL,
+                                annot=NULL, report=NULL) {
 
   cntr <- .check_dataset_contrasts(cntr, "cntr")
   ds_ids <- names(cntr)
@@ -435,6 +438,10 @@ tmodPanelPlotServer <- function(id, cntr, tmod_res, tmod_dbs, tmod_map, gs_id=NU
 	moduleServer(id, function(input, output, session) {
     .tmod_panelplot_log("moduleServer started for id='", id, "'.")
     disable("save")
+
+    observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
 
     observeEvent(input$dataset, {
       if(!is_single_ds) {

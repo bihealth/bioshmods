@@ -162,12 +162,15 @@ discoUI <- function(id, cntr_titles) {
 #' @param gene_id must be a `reactiveValues` object. If not NULL, then
 #' clicking on a gene identifier will modify this object (possibly
 #' triggering an event in another module).
+#' @param report Optional report list. When supplied, clicking `Add to report`
+#'        appends the current generated code chunk to `report$chunks`.
 #' @return Returns a reactive expression returning the ID of the activated gene
 #' @example inst/examples/disco.R
 #' @export
 discoServer <- function(id, cntr, annot=NULL,
     selcols=c("PrimaryID", "ENTREZ", "SYMBOL"),
-    primary_id="PrimaryID", gene_id=NULL) {
+    primary_id="PrimaryID", gene_id=NULL,
+    report=NULL) {
 
   checked <- .check_disco_inputs(cntr, annot, primary_id)
   cntr <- checked$cntr
@@ -267,6 +270,10 @@ discoServer <- function(id, cntr, annot=NULL,
         disable("top_label_n")
       }
     }, ignoreInit = FALSE)
+
+    observeEvent(input$add_to_report, {
+      .append_report_chunk(report, input$report_code)
+    })
 
     ## save the disco plot to a PDF file
     output$save <- downloadHandler(

@@ -17,7 +17,8 @@ geneBrowserPlotServer(
   primary_id = "PrimaryID",
   annot_linkout = NULL,
   exprs_label = "Expression",
-  palettes = NULL
+  palettes = NULL,
+  report = NULL
 )
 }
 \arguments{
@@ -49,6 +50,9 @@ containing column 'PrimaryID'}
 \item{exprs_label}{Label to be used for the expression values}
 
 \item{palettes}{(optional) reactive value with current color palettes}
+
+\item{report}{Optional report list. When supplied, clicking \verb{Add to report}
+appends the current generated code chunk to \code{report$chunks}.}
 }
 \value{
 does not return anything useful

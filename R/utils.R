@@ -50,6 +50,25 @@
   ret
 }
 
+# Append one generated report chunk to the caller-provided report object.
+# The caller is responsible for supplying a compatible `report$chunks` list.
+.append_report_chunk <- function(report, chunk) {
+  if(is.null(report) || is.null(chunk) || !nzchar(chunk)) {
+    return(invisible(NULL))
+  }
+
+  report_name <- as.character(substitute(report))
+  report$chunks <- append(report$chunks, list(chunk))
+
+  target_env <- parent.frame()
+  while(!exists(report_name, envir=target_env, inherits=FALSE) &&
+        !identical(target_env, emptyenv())) {
+    target_env <- parent.env(target_env)
+  }
+  assign(report_name, report, envir=target_env)
+  invisible(NULL)
+}
+
 
 # Normalize and validate shared show-button UI configuration.
 # Supports a custom label while rejecting unknown or empty values.

@@ -14,7 +14,8 @@ tmodPanelPlotServer(
   tmod_dbs,
   tmod_map,
   gs_id = NULL,
-  annot = NULL
+  annot = NULL,
+  report = NULL
 )
 }
 \arguments{
@@ -42,6 +43,9 @@ reactive values will be populated, possibly triggering an action in
 another shiny module.}
 
 \item{annot}{data frame containing at least the column 'PrimaryID'}
+
+\item{report}{Optional report list. When supplied, clicking \verb{Add to report}
+appends the current generated code chunk to \code{report$chunks}.}
 }
 \value{
 Returns a reactive value which is a list with elements

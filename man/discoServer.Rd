@@ -13,7 +13,8 @@ discoServer(
   annot = NULL,
   selcols = c("PrimaryID", "ENTREZ", "SYMBOL"),
   primary_id = "PrimaryID",
-  gene_id = NULL
+  gene_id = NULL,
+  report = NULL
 )
 }
 \arguments{
@@ -38,6 +39,9 @@ from the plot}
 \item{gene_id}{must be a \code{reactiveValues} object. If not NULL, then
 clicking on a gene identifier will modify this object (possibly
 triggering an event in another module).}
+
+\item{report}{Optional report list. When supplied, clicking \verb{Add to report}
+appends the current generated code chunk to \code{report$chunks}.}
 }
 \value{
 Returns a reactive expression returning the ID of the activated gene

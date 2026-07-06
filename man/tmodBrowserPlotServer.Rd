@@ -19,7 +19,8 @@ tmodBrowserPlotServer(
   primary_id = "PrimaryID",
   gene_id = NULL,
   selection = NULL,
-  ui_config = NULL
+  ui_config = NULL,
+  report = NULL
 )
 }
 \arguments{
@@ -56,6 +57,9 @@ shown and no external state is updated.}
 
 \item{ui_config}{Optional list configuring UI text. Supported keys:
 \code{show_button_label} for the label shown on the \code{Show} button.}
+
+\item{report}{Optional report list. When supplied, clicking \verb{Add to report}
+appends the current generated code chunk to \code{report$chunks}.}
 }
 \value{
 returns a reactive value with a selected gene identifier

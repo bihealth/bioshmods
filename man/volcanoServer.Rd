@@ -17,6 +17,7 @@ volcanoServer(
   gene_id = NULL,
   selection = NULL,
   ui_config = NULL,
+  report = NULL,
   annot_show = c("SYMBOL", "ENTREZID")
 )
 }
@@ -52,6 +53,9 @@ external state is updated.}
 
 \item{ui_config}{Optional list configuring UI text. Supported keys:
 \code{show_button_label} for the label shown on the \code{Show} button.}
+
+\item{report}{Optional report list. When supplied, clicking \verb{Add to report}
+appends the current generated code chunk to \code{report$chunks}.}
 
 \item{annot_show}{which columns from the annotation data frame should be
 shown when mouse hovers over a gene}
